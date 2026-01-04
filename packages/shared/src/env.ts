@@ -1,53 +1,38 @@
-import { z } from 'zod';
+import { createEnv } from "@t3-oss/env-core";
+import { z } from "zod";
 
-/**
- * Environment schema using zod. This schema validates both server and
- * client environment variables. When adding new variables, extend
- * `ServerEnv` or `ClientEnv` as appropriate. For Next.js, values
- * prefixed with `NEXT_PUBLIC_` are exposed to the client.
- */
-
-const ServerEnvSchema = z.object({
-  /** The base domain for the application, e.g. `https://example.com`. */
+const serverSchema = {
   DOMAIN: z.string().url(),
-  /** The connection string for Postgres. */
   DATABASE_URL: z.string().url(),
-  /** HTTP port for the API server (defaults to 3001 when unset). */
-  PORT: z.coerce.number().int().positive().optional(),
-  /** Clerk public key for verifying JWTs (roles to be added later). */
+  PORT: z.coerce.number().int().positive().default(3001),
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   CLERK_JWT_PUBLIC_KEY: z.string().optional(),
-  /** Clerk secret key for server-side operations. */
   CLERK_SECRET_KEY: z.string().optional(),
-  /** Payments: keepz.me access token (interface will support more providers). */
   PAYMENT_KEEPZ_API_KEY: z.string().optional(),
-  /** Generic webhook secret for payment/fulfillment callbacks. */
   PAYMENT_WEBHOOK_SECRET: z.string().optional(),
-});
+  SEED_SHOP_SLUG: z.string().default("demo-shop"),
+  SEED_SHOP_NAME: z.string().default("Demo Shop"),
+} as const;
 
-const ClientEnvSchema = z.object({
-  /** Client‑side domain, should mirror `DOMAIN` without secrets. */
+const clientSchema = {
   NEXT_PUBLIC_DOMAIN: z.string().url(),
-  /** Clerk publishable key for frontend auth. */
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
-});
+} as const;
 
-export type ServerEnv = z.infer<typeof ServerEnvSchema>;
-export type ClientEnv = z.infer<typeof ClientEnvSchema>;
+type RuntimeEnv = Record<string, string | undefined>;
 
-/**
- * Parse and validate server environment variables at startup. Throws
- * if any required variable is missing or invalid. For Bun, this is
- * executed in the API server; for Next.js, the server runtime can
- * also import this function to validate on start.
- */
-export function loadServerEnv(env: NodeJS.ProcessEnv): ServerEnv {
-  return ServerEnvSchema.parse(env);
+export function buildEnv(runtimeEnv: RuntimeEnv) {
+  return createEnv({
+    server: serverSchema,
+    client: clientSchema,
+    runtimeEnv,
+    clientPrefix: "NEXT_PUBLIC_",
+    skipValidation: Boolean(runtimeEnv.SKIP_ENV_VALIDATION) || runtimeEnv.NODE_ENV === "test",
+    emptyStringAsUndefined: true,
+  });
 }
 
-/**
- * Parse and validate client environment variables. Use this in the
- * Next.js frontend to ensure client variables are present.
- */
-export function loadClientEnv(env: NodeJS.ProcessEnv): ClientEnv {
-  return ClientEnvSchema.parse(env);
-}
+export const env = buildEnv(process.env);
+
+export type ServerEnv = Pick<typeof env, keyof typeof serverSchema>;
+export type ClientEnv = Pick<typeof env, keyof typeof clientSchema>;
