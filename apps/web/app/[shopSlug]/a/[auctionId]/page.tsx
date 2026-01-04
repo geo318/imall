@@ -1,5 +1,6 @@
 "use client";
 
+import { env } from "@repo/shared";
 import { useEffect, useRef, useState } from "react";
 
 interface AuctionDetail {
@@ -28,8 +29,9 @@ export default function AuctionPage({
   useEffect(() => {
     async function loadAuction() {
       try {
-        const domain = process.env.NEXT_PUBLIC_DOMAIN;
-        const res = await fetch(`${domain}/api/shops/${shopSlug}/auctions/${auctionId}`);
+        const res = await fetch(
+          `${env.NEXT_PUBLIC_DOMAIN}/api/shops/${shopSlug}/auctions/${auctionId}`,
+        );
         if (res.ok) {
           const data = (await res.json()) as AuctionDetail;
           setAuction(data);
@@ -43,8 +45,7 @@ export default function AuctionPage({
 
   // Set up WebSocket subscription.
   useEffect(() => {
-    const domain = process.env.NEXT_PUBLIC_DOMAIN;
-    const wsUrl = `${domain?.replace("http", "ws")}/`;
+    const wsUrl = `${env.NEXT_PUBLIC_DOMAIN.replace("http", "ws")}/`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
     ws.addEventListener("open", () => {
@@ -68,8 +69,7 @@ export default function AuctionPage({
   }, [auctionId]);
 
   const placeBid = async () => {
-    const domain = process.env.NEXT_PUBLIC_DOMAIN;
-    await fetch(`${domain}/api/shops/${shopSlug}/auctions/${auctionId}/bids`, {
+    await fetch(`${env.NEXT_PUBLIC_DOMAIN}/api/shops/${shopSlug}/auctions/${auctionId}/bids`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // TODO: replace demo bidder with Clerk user id mapping.

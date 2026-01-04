@@ -1,5 +1,6 @@
 "use client";
 
+import { env } from "@repo/shared";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -31,8 +32,9 @@ export default function ProductPage({
   useEffect(() => {
     async function loadProduct() {
       try {
-        const domain = process.env.NEXT_PUBLIC_DOMAIN;
-        const res = await fetch(`${domain}/api/shops/${shopSlug}/products/${productSlug}`);
+        const res = await fetch(
+          `${env.NEXT_PUBLIC_DOMAIN}/api/shops/${shopSlug}/products/${productSlug}`,
+        );
         if (res.ok) {
           const data = (await res.json()) as ProductDetail;
           setProduct(data);
@@ -53,8 +55,7 @@ export default function ProductPage({
     const key = `cart:${shopSlug}`;
     const cached = typeof window !== "undefined" ? localStorage.getItem(key) : null;
     if (cached) return cached;
-    const domain = process.env.NEXT_PUBLIC_DOMAIN;
-    const res = await fetch(`${domain}/api/shops/${shopSlug}/carts`, {
+    const res = await fetch(`${env.NEXT_PUBLIC_DOMAIN}/api/shops/${shopSlug}/carts`, {
       method: "POST",
     });
     if (!res.ok) throw new Error("Failed to create cart");
@@ -68,12 +69,14 @@ export default function ProductPage({
     try {
       setAdding(true);
       const cartId = await ensureCart();
-      const domain = process.env.NEXT_PUBLIC_DOMAIN;
-      const res = await fetch(`${domain}/api/shops/${shopSlug}/carts/${cartId}/items`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ variantId: selectedVariantId, qty: 1 }),
-      });
+      const res = await fetch(
+        `${env.NEXT_PUBLIC_DOMAIN}/api/shops/${shopSlug}/carts/${cartId}/items`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ variantId: selectedVariantId, qty: 1 }),
+        },
+      );
       if (!res.ok) {
         throw new Error("Failed to add to cart");
       }

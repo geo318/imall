@@ -1,5 +1,6 @@
 "use client";
 
+import { env } from "@repo/shared";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -30,8 +31,7 @@ export default function CartPage({ params }: { params: { shopSlug: string } }) {
         return;
       }
       try {
-        const domain = process.env.NEXT_PUBLIC_DOMAIN;
-        const res = await fetch(`${domain}/api/shops/${shopSlug}/carts/${cartId}`);
+        const res = await fetch(`${env.NEXT_PUBLIC_DOMAIN}/api/shops/${shopSlug}/carts/${cartId}`);
         if (!res.ok) {
           throw new Error("Failed to load cart");
         }
@@ -55,10 +55,12 @@ export default function CartPage({ params }: { params: { shopSlug: string } }) {
     }
     try {
       setCheckingOut(true);
-      const domain = process.env.NEXT_PUBLIC_DOMAIN;
-      const res = await fetch(`${domain}/api/shops/${shopSlug}/carts/${cartId}/checkout`, {
-        method: "POST",
-      });
+      const res = await fetch(
+        `${env.NEXT_PUBLIC_DOMAIN}/api/shops/${shopSlug}/carts/${cartId}/checkout`,
+        {
+          method: "POST",
+        },
+      );
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || "Checkout failed");

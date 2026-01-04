@@ -2,13 +2,7 @@
 
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@repo/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo/ui/card";
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
 import { Textarea } from "@repo/ui/textarea";
@@ -38,8 +32,8 @@ export default function AdminShopPage({
               <Badge variant="secondary">Admin workspace</Badge>
               <CardTitle>{shopSlug} management</CardTitle>
               <CardDescription>
-                Clerk roles pending; assume admin-only for now. Hook API mutations to these
-                sections next.
+                Clerk roles pending; assume admin-only for now. Hook API mutations to these sections
+                next.
               </CardDescription>
             </div>
             <Link
@@ -80,8 +74,8 @@ export default function AdminShopPage({
           <CardHeader>
             <CardTitle>Implementation notes</CardTitle>
             <CardDescription>
-              Server actions or API client should enforce tenant scoping by shopSlug and guard
-              with Clerk.
+              Server actions or API client should enforce tenant scoping by shopSlug and guard with
+              Clerk.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-slate-700">
