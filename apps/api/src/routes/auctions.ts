@@ -3,11 +3,11 @@ import { and, eq, lte } from "drizzle-orm";
 import { Elysia } from "elysia";
 import {
   INVENTORY_REASONS,
+  type WsContext,
   bidPayloadSchema,
   getAvailableStock,
   getTenantIdBySlug,
   listQuerySchema,
-  type WsContext,
 } from "../context";
 
 type AuctionSocket = WsContext<{

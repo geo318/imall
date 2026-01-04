@@ -189,7 +189,9 @@ export const cartRoutes = new Elysia({ prefix: "/shops/:shopSlug/carts" })
         }
 
         const items = cartWithItems.filter(
-          (row): row is typeof cartWithItems[number] & {
+          (
+            row,
+          ): row is (typeof cartWithItems)[number] & {
             variantId: string;
             qty: number;
             price: string;

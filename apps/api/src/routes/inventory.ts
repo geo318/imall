@@ -1,11 +1,11 @@
-import { inventoryLedger, db } from "@repo/db";
+import { db, inventoryLedger } from "@repo/db";
 import { Elysia, t } from "elysia";
 import {
   INVENTORY_REASONS,
   adminGuard,
-  inventoryReserveSchema,
   getAvailableStock,
   getTenantIdBySlug,
+  inventoryReserveSchema,
 } from "../context";
 
 type InventoryParams = { shopSlug: string };
