@@ -13,6 +13,10 @@
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:push": "drizzle-kit push --config drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config drizzle.config.ts",
+    "db:docker": "docker compose up --build -d db",
+    "db:studio:docker": "docker compose up --build -d db && bun run db:push && bun run db:studio",
+    "dev:with-db": "docker compose up --build -d db && bun run db:push && bun run dev:all",
+    "seed:with-db": "docker compose up --build -d db && bun run db:push && bun run seed",
     "lint:biome": "biome check .",
     "format:biome": "biome check --apply .",
     "test": "bun test",
@@ -32,8 +36,5 @@
     "node": ">=18"
   },
   "packageManager": "bun@1.3.0",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ]
+  "workspaces": ["apps/*", "packages/*"]
 }
