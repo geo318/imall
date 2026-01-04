@@ -1,0 +1,24 @@
+{
+  "name": "@repo/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./env": "./dist/env.js",
+    "./constants": "./dist/constants.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "prepare": "bun run build"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "@types/node": "^22.15.3",
+    "typescript": "5.9.2"
+  }
+}

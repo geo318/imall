@@ -1,20 +1,49 @@
 "use client";
 
-import { ReactNode } from "react";
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "./utils";
 
-interface ButtonProps {
-  children: ReactNode;
-  className?: string;
-  appName: string;
-}
+const buttonVariants = cva(
+  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-60",
+  {
+    variants: {
+      variant: {
+        primary: "bg-brand-600 text-white hover:bg-brand-700 shadow-sm",
+        secondary:
+          "bg-slate-900 text-white hover:bg-slate-800 shadow-sm focus-visible:ring-slate-500",
+        outline:
+          "border border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
+        ghost: "text-slate-700 hover:bg-slate-100",
+      },
+      size: {
+        sm: "h-9 px-3",
+        md: "h-10 px-4",
+        lg: "h-11 px-5 text-base",
+      },
+    },
+    defaultVariants: {
+      variant: "primary",
+      size: "md",
+    },
+  },
+);
 
-export const Button = ({ children, className, appName }: ButtonProps) => {
-  return (
-    <button
-      className={className}
-      onClick={() => alert(`Hello from your ${appName} app!`)}
-    >
-      {children}
-    </button>
-  );
-};
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {}
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, type = "button", ...props }, ref) => {
+    return (
+      <button
+        ref={ref}
+        type={type}
+        className={cn(buttonVariants({ variant, size }), className)}
+        {...props}
+      />
+    );
+  },
+);
+
+Button.displayName = "Button";
