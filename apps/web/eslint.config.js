@@ -1,4 +1,2 @@
-import { nextJsConfig } from "@repo/eslint-config/next-js";
-
-/** @type {import("eslint").Linter.Config[]} */
-export default nextJsConfig;
+// ESLint is disabled; Biome is the formatter/linter. This file remains to avoid Next warnings.
+export default [];
