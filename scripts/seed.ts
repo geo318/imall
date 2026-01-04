@@ -1,24 +1,35 @@
-import { auctions, products, tenants, variants, db } from "@repo/db";
+import { db } from "@repo/db";
+import { auctions, products, tenants, variants } from "@repo/db/schema";
+import { env } from "@repo/shared";
 import { eq } from "drizzle-orm";
-import { loadServerEnv } from "@repo/shared";
 
-const env = loadServerEnv(process.env);
-const shopSlug = process.env.SEED_SHOP_SLUG ?? "demo-shop";
-const shopName = process.env.SEED_SHOP_NAME ?? "Demo Shop";
+const shopSlug = env.SEED_SHOP_SLUG;
+const shopName = env.SEED_SHOP_NAME;
 
 async function upsertTenant() {
-  const existing = await db
+  const [existing] = await db
     .select({ id: tenants.id })
     .from(tenants)
     .where(eq(tenants.shopSlug, shopSlug));
 
-  if (existing[0]?.id) return existing[0].id;
+  if (existing?.id) return existing.id;
 
   const [inserted] = await db
     .insert(tenants)
     .values({ id: crypto.randomUUID(), shopSlug, name: shopName })
+    .onConflictDoNothing()
     .returning({ id: tenants.id });
-  return inserted.id;
+
+  if (inserted?.id) return inserted.id;
+
+  const [fetched] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.shopSlug, shopSlug))
+    .limit(1);
+
+  if (!fetched?.id) throw new Error("Failed to upsert tenant");
+  return fetched.id;
 }
 
 async function seed() {
@@ -36,15 +47,16 @@ async function seed() {
     .onConflictDoNothing()
     .returning({ id: products.id });
 
-  const productId =
-    product?.id ??
-    (
-      await db
+  const [productFallback] = product?.id
+    ? []
+    : await db
         .select({ id: products.id })
         .from(products)
         .where(eq(products.slug, "demo-product"))
-        .limit(1)
-    )[0].id;
+        .limit(1);
+
+  const productId = product?.id ?? productFallback?.id;
+  if (!productId) throw new Error("Failed to upsert demo product");
 
   const [variant] = await db
     .insert(variants)
@@ -59,15 +71,16 @@ async function seed() {
     .onConflictDoNothing()
     .returning({ id: variants.id });
 
-  const variantId =
-    variant?.id ??
-    (
-      await db
+  const [variantFallback] = variant?.id
+    ? []
+    : await db
         .select({ id: variants.id })
         .from(variants)
         .where(eq(variants.productId, productId))
-        .limit(1)
-    )[0].id;
+        .limit(1);
+
+  const variantId = variant?.id ?? variantFallback?.id;
+  if (!variantId) throw new Error("Failed to upsert demo variant");
 
   await db
     .insert(auctions)
