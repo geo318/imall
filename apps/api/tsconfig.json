@@ -1,6 +1,7 @@
 {
   "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "outDir": "dist",
     "noEmitOnError": true,
     "target": "es2022",
@@ -10,11 +11,6 @@
     "skipLibCheck": true,
     "types": ["bun-types", "node"],
     "paths": {
-      "@repo/db": ["../../packages/db/src/index.ts"],
-      "@repo/db/*": ["../../packages/db/src/*"],
-      "@repo/shared": ["../../packages/shared/src/index.ts"],
-      "@repo/shared/*": ["../../packages/shared/src/*"],
-      "@repo/ui": ["../../packages/ui/src"],
       "drizzle-orm": ["../../node_modules/drizzle-orm"],
       "drizzle-orm/*": ["../../node_modules/drizzle-orm/*"]
     }
