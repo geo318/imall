@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { ClerkProvider } from "@clerk/nextjs";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -14,8 +15,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "MyShop | Multi-tenant commerce with carts and auctions",
-  description:
-    "Tenant-based shops with carts, auctions, inventory, and admin workspace.",
+  description: "Tenant-based shops with carts, auctions, inventory, and admin workspace.",
 };
 
 export default function RootLayout({
@@ -24,12 +24,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={cn("font-sans antialiased", geistSans.variable, geistMono.variable)}
-      >
-        {children}
-      </body>
-    </html>
+    <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+      <html lang="en">
+        <body className={cn("font-sans antialiased", geistSans.variable, geistMono.variable)}>
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
