@@ -1,7 +1,7 @@
 "use client";
 
+import { type VariantProps, cva } from "class-variance-authority";
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "./utils";
 
 const buttonVariants = cva(
@@ -12,8 +12,7 @@ const buttonVariants = cva(
         primary: "bg-brand-600 text-white hover:bg-brand-700 shadow-sm",
         secondary:
           "bg-slate-900 text-white hover:bg-slate-800 shadow-sm focus-visible:ring-slate-500",
-        outline:
-          "border border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
+        outline: "border border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
         ghost: "text-slate-700 hover:bg-slate-100",
       },
       size: {

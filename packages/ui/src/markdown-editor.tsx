@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "./utils";
 import { Label } from "./label";
 import { Textarea } from "./textarea";
+import { cn } from "./utils";
 
 type MarkdownEditorProps = {
   id?: string;
