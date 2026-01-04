@@ -1,0 +1,15 @@
+{
+  "extends": "./packages/typescript-config/base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@repo/db": ["./packages/db/src/index.ts"],
+      "@repo/db/*": ["./packages/db/src/*"],
+      "@repo/shared": ["./packages/shared/src/index.ts"],
+      "@repo/shared/*": ["./packages/shared/src/*"],
+      "@repo/ui": ["./packages/ui/src"],
+      "@repo/ui/*": ["./packages/ui/src/*"]
+    }
+  },
+  "include": ["apps", "packages", "scripts", "drizzle.config.ts"]
+}

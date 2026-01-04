@@ -1,12 +1,12 @@
 import { db, inventoryLedger, products, tenants, variants } from "@repo/db";
-import { INVENTORY_REASONS, loadServerEnv } from "@repo/shared";
+import { INVENTORY_REASONS, env as sharedEnv } from "@repo/shared";
 import { and, eq, sum } from "drizzle-orm";
 import { Elysia } from "elysia";
 import type { ElysiaWS } from "elysia/dist/ws";
 
 import { z } from "zod";
 
-export const env = loadServerEnv(process.env);
+export const env = sharedEnv;
 
 /* ---------- Auth ---------- */
 export type AuthContext = {

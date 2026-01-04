@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
+import { env } from "./packages/shared/src/env";
 
 /**
  * Drizzle migration settings.
@@ -8,14 +9,12 @@ import { defineConfig } from "drizzle-kit";
  * - dbCredentials: uses DATABASE_URL from .env (fallback for local dev)
  */
 export default defineConfig({
-	schema: "./packages/db/src/schema.ts",
-	out: "./packages/db/drizzle",
-	dialect: "postgresql",
-	dbCredentials: {
-		url:
-			process.env.DATABASE_URL ??
-			"postgres://postgres:postgres@localhost:5432/myshop",
-	},
-	verbose: true,
-	strict: true,
+  schema: "./packages/db/src/schema.ts",
+  out: "./packages/db/drizzle",
+  dialect: "postgresql",
+  dbCredentials: {
+    url: env.DATABASE_URL,
+  },
+  verbose: true,
+  strict: true,
 });
