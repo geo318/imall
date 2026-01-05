@@ -1,0 +1,38 @@
+export const homeVendorsMock = [
+  {
+    name: "Artisan Studio",
+    specialty: "Ceramics & Pottery",
+    rating: "4.9",
+    sales: "1,234",
+    avatar: "https://picsum.photos/id/64/200/200",
+    verified: true,
+    href: "/demo-shop",
+  },
+  {
+    name: "Heritage Crafts",
+    specialty: "Leather Goods",
+    rating: "4.8",
+    sales: "892",
+    avatar: "https://picsum.photos/id/65/200/200",
+    verified: true,
+    href: "/demo-shop",
+  },
+  {
+    name: "Modern Gallery",
+    specialty: "Art & Prints",
+    rating: "5.0",
+    sales: "2,341",
+    avatar: "https://picsum.photos/id/66/200/200",
+    verified: true,
+    href: "/demo-shop",
+  },
+  {
+    name: "Eco Living",
+    specialty: "Sustainable Home",
+    rating: "4.7",
+    sales: "567",
+    avatar: "https://picsum.photos/id/67/200/200",
+    verified: false,
+    href: "/demo-shop",
+  },
+];
