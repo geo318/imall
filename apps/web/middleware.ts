@@ -6,8 +6,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/:shopSlug",
-  "/:shopSlug/p/:productSlug",
-  "/:shopSlug/a/:auctionId",
+  "/:shopSlug/:productSlug",
   "/favicon.ico",
 ]);
 
