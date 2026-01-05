@@ -17,6 +17,7 @@
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "@tanstack/react-query": "^5.66.2",
     "next": "16.1.0",
     "postcss": "^8.4.47",
     "react": "^19.2.0",
