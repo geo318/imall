@@ -43,11 +43,14 @@ This document tracks the current implementation state and the next steps to fini
 - Use `NEXT_PUBLIC_DOMAIN` to talk to API; add API client helpers; move to server components where possible.
 
 ## Dev workflow
-- Env: see `.env.example`.
+- Env: root `.env` is the source of truth; `apps/web/next.config.js` force-loads it (prefers `@next/env`, falls back to `dotenv`) so Next picks up Clerk keys in dev/build. Env validation lives in `@repo/shared/src/env.ts` (required: `DOMAIN`, `DATABASE_URL`, `NEXT_PUBLIC_DOMAIN`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`; optional: `CLERK_JWT_PUBLIC_KEY`). Rebuild shared after env schema changes (`cd packages/shared && bun run build`).
 - Scripts: turbo for dev/build; drizzle-kit for migrations (`bun run db:generate` / `bun run db:push`).
 - Migrations: generated from `packages/db/src/schema.ts`; keep migration SQL checked in (drizzle-kit 0.31.8 + drizzle-orm 0.45.x working).
 - Tests: unit coverage started (env parsing, validation, UI utils); add integration tests against a test DB; e2e (Playwright/Cypress) planned after core flows stabilize.
 - Formatting/linting: Biome configured (`bun run lint:biome` / `bun run format:biome`); prefer Biome over Prettier/ESLint where feasible.
+
+## Meta
+- AI agent log lives in `AGENTS.md`; update with rationale and non-obvious decisions when you change env/config/architecture.
 
 ## Immediate TODO
 - Extend shadcn-based UI kit (add markdown editor, data table, modal).
