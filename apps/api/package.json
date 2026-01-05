@@ -5,9 +5,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "dev": "bun --env-file ../../.env run src/index.ts",
+    "dev": "bun --env-file ../../.env src/index.ts",
     "build": "tsc -b",
-    "start": "bun --env-file ../../.env run dist/index.js"
+    "start": "bun --env-file ../../.env dist/index.js"
   },
   "dependencies": {
     "@repo/db": "*",
