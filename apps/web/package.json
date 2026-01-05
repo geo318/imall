@@ -4,11 +4,11 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
-    "build": "next build",
-    "start": "next start",
-    "lint": "bun run lint:biome",
-    "check-types": "next typegen && tsc --noEmit"
+    "dev": "bun run --bun next dev --port 3000",
+    "build": "bun run --bun next build",
+    "start": "bun run --bun next start",
+    "lint": "bun run --bun lint:biome",
+    "check-types": "bun run --bun next typegen && tsc --noEmit"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.36.5",
