@@ -106,7 +106,7 @@ export default function CartPage({ params }: { params: { shopSlug: string } }) {
                 </p>
                 <Link
                   className="text-xs text-blue-600 underline"
-                  href={`/${shopSlug}/p/${item.productSlug}`}
+                  href={`/${shopSlug}/${item.productSlug}`}
                 >
                   View product
                 </Link>

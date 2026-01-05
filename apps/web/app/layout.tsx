@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ClerkProvider } from "@clerk/nextjs";
+import { QueryProvider } from "./query-provider";
 import { env } from "@repo/shared";
 
 const geistSans = localFont({
@@ -28,7 +29,7 @@ export default function RootLayout({
     <ClerkProvider publishableKey={env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
       <html lang="en">
         <body className={cn("font-sans antialiased", geistSans.variable, geistMono.variable)}>
-          {children}
+          <QueryProvider>{children}</QueryProvider>
         </body>
       </html>
     </ClerkProvider>

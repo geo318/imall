@@ -1,111 +1,76 @@
+import { valuePropsMock } from "@/MOCKS/valueProps.mock";
+import { MarketingFooter } from "@/components/marketing-footer";
+import { MarketingNav } from "@/components/marketing-nav";
+import { CategoryBanner } from "@/components/marketing/category-banner";
+import { FeaturedProductsClient } from "@/components/marketing/featured-products-client";
+import { HeroSection } from "@/components/marketing/hero";
+import { VendorSpotlight } from "@/components/marketing/vendor-spotlight";
 import { Button } from "@repo/ui/button";
 import Link from "next/link";
 
-const features = [
-  {
-    title: "Multi-tenant storefronts",
-    body: "Path-based shops with per-tenant settings, branding, bank details and addresses.",
-  },
-  {
-    title: "Catalog & variants",
-    body: "Products with markdown descriptions, rich media, and variants with price/SKU/inventory.",
-  },
-  {
-    title: "Auctions optional",
-    body: "Enable auctions per variant with min increment, buy-now, and anti-snipe windows.",
-  },
-  {
-    title: "Inventory ledger",
-    body: "Ledger + snapshots to track stock, with reserve/release flows for cart and auctions.",
-  },
-  {
-    title: "Payments & shipping",
-    body: "Start with keepz.me, design for credo/bog/tbc; manual shipping now, providers later.",
-  },
-  {
-    title: "Admin workspace",
-    body: "Manage catalog, inventory, auctions, orders, and shop settings; Clerk roles planned.",
-  },
-];
-
-export default function Home() {
+export default async function Home() {
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto flex max-w-6xl flex-col gap-12 px-6 py-12 lg:py-16">
-        <header className="grid gap-6 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-          <div className="space-y-4">
-            <span className="inline-flex items-center rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-800">
-              Tenant shop platform
-            </span>
-            <h1 className="text-4xl font-semibold leading-tight text-slate-900 lg:text-5xl">
-              Launch shops with carts and auctions in days, not weeks.
-            </h1>
-            <p className="max-w-2xl text-lg text-slate-600">
-              A multi-tenant commerce base: standard cart checkout, optional auctions per variant,
-              inventory ledger, and admin controls for settings and payouts.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/demo-shop" prefetch>
-                <Button variant="primary" size="lg" className="shadow-sm">
-                  View demo shop
-                </Button>
-              </Link>
-              <Link href="/admin/demo-shop" prefetch>
-                <Button variant="outline" size="lg">
-                  Open admin workspace
-                </Button>
-              </Link>
+    <div className="min-h-screen bg-white">
+      <MarketingNav />
+      <main>
+        <HeroSection />
+        <FeaturedProductsClient />
+        <CategoryBanner />
+        <VendorSpotlight />
+        <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
+          <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/40 to-sky-50/40 p-8 shadow-sm sm:p-10">
+            <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
+              <div className="space-y-4">
+                <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+                  Why MarketHub
+                </p>
+                <h3 className="text-3xl font-semibold text-slate-900">
+                  Built for marketplaces that need trust, speed, and flexibility.
+                </h3>
+                <p className="text-slate-600">
+                  Multi-tenant shops, auctions when you need them, and a shared admin space that
+                  keeps everything running smoothly.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {valuePropsMock.map((item) => (
+                    <div
+                      key={item.title}
+                      className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100"
+                    >
+                      <h4 className="text-base font-semibold text-slate-900">{item.title}</h4>
+                      <p className="mt-1 text-sm text-slate-600">{item.body}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+                <h4 className="text-lg font-semibold text-slate-900">For vendors</h4>
+                <ul className="space-y-3 text-sm text-slate-600">
+                  <li>• List products or run auctions with minimal setup.</li>
+                  <li>• Manage inventory, payouts, and orders from one workspace.</li>
+                  <li>• Built-in buyer messaging and trust signals coming soon.</li>
+                </ul>
+                <div className="flex gap-3">
+                  <Button className="bg-emerald-600 text-white hover:bg-emerald-700">
+                    <Link href="/vendors" prefetch>
+                      Start selling
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  >
+                    <Link href="/admin/demo-shop" prefetch>
+                      Open admin
+                    </Link>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Currently planned</p>
-                <p className="text-2xl font-semibold text-slate-900">Auctions + Cart</p>
-              </div>
-              <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800">
-                WIP
-              </span>
-            </div>
-            <ul className="mt-4 space-y-2 text-sm text-slate-600">
-              <li>• Payment providers: keepz.me first; credo/bog/tbc next.</li>
-              <li>• Manual shipping; providers (trackings.ge/onway.ge) queued.</li>
-              <li>• Clerk roles: start with admin-only, expand later.</li>
-              <li>• Inventory ledger + snapshots for concurrency safety.</li>
-            </ul>
-          </div>
-        </header>
-
-        <section>
-          <h2 className="text-xl font-semibold text-slate-900">What’s in this build</h2>
-          <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <h3 className="text-base font-semibold text-slate-900">{feature.title}</h3>
-                <p className="mt-2 text-sm text-slate-600">{feature.body}</p>
-              </div>
-            ))}
-          </div>
         </section>
-
-        <section className="rounded-2xl border border-dashed border-brand-200 bg-brand-50/60 p-6 text-slate-900 shadow-inner">
-          <h3 className="text-lg font-semibold">Next steps</h3>
-          <p className="mt-2 text-sm text-slate-700">
-            Tailwind and shadcn UI are now enabled. Wire the API to the UI, implement admin pages,
-            and hook payments/shipping providers. See IMPLEMENTATION.md for the roadmap.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2 text-sm text-brand-900">
-            <span className="rounded-full bg-white px-3 py-1">Cart & Orders</span>
-            <span className="rounded-full bg-white px-3 py-1">Auctions</span>
-            <span className="rounded-full bg-white px-3 py-1">Inventory</span>
-            <span className="rounded-full bg-white px-3 py-1">Admin</span>
-            <span className="rounded-full bg-white px-3 py-1">Auth</span>
-          </div>
-        </section>
-      </div>
+      </main>
+      <MarketingFooter />
     </div>
   );
 }
