@@ -11,6 +11,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Tightened Clerk env validation (server + client) and wired `ClerkProvider` to the validated env.
 - Added monorepo-root env loading for the web app with a fallback to avoid `@next/env` missing-module errors when hoisted.
 - Fixed browser-side env validation failures by feeding a curated `runtimeEnv` into `createEnv` and explicitly setting `isServer`.
+- Typed product seed variants so optional auctions are lint-clean in `scripts/seed.ts`.
 
 ## Known gaps / follow-ups
 - Ensure all environments set the required Clerk keys; browser fails fast otherwise.
