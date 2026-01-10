@@ -1,4 +1,4 @@
-import { auctions, bids, db, inventoryLedger, orderItems, orders, variants } from "@repo/db";
+import { auctions, bids, db, inventoryLedger, orderItems, orders, users, variants } from "@repo/db";
 import { and, eq, lte } from "drizzle-orm";
 import { Elysia } from "elysia";
 import {
@@ -113,13 +113,20 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
       .where(eq(bids.auctionId, params.auctionId));
     return results;
   })
-  .post("/:auctionId/bids", async ({ params, body }) => {
+  .post("/:auctionId/bids", async ({ params, body, auth }) => {
     let payload: ReturnType<typeof bidPayloadSchema.parse>;
     try {
       payload = bidPayloadSchema.parse(body);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Invalid bid payload";
       return new Response(message, { status: 400 });
+    }
+
+    // Get or create user from Clerk userId (externalAuthId)
+    // bidderId from payload is deprecated - use auth token instead
+    const externalAuthId = auth?.userId;
+    if (!externalAuthId) {
+      return new Response("Authentication required", { status: 401 });
     }
 
     const tenantId = await getTenantIdBySlug(params.shopSlug);
@@ -131,6 +138,29 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
         amount,
         endsAt: newEndsAt,
       } = await db.transaction(async (tx) => {
+        // Get or create user
+        let [existingUser] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.externalAuthId, externalAuthId))
+          .limit(1);
+
+        if (!existingUser) {
+          // Create user if doesn't exist
+          const [newUser] = await tx
+            .insert(users)
+            .values({
+              id: crypto.randomUUID(),
+              externalAuthId,
+            })
+            .returning({ id: users.id });
+          existingUser = newUser;
+        }
+
+        if (!existingUser?.id) {
+          throw new Response("Failed to get or create user", { status: 500 });
+        }
+
         const [auction] = await tx
           .select({
             id: auctions.id,
@@ -175,7 +205,7 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
             id: crypto.randomUUID(),
             tenantId,
             auctionId,
-            bidderId: payload.bidderId,
+            bidderId: existingUser.id, // Use the user's database ID, not Clerk ID
             amount: String(payload.amount),
           })
           .returning({ id: bids.id });

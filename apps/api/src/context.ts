@@ -25,16 +25,50 @@ export type WsContext<Extras extends Record<string, unknown> = Record<string, ne
   { auth?: AuthContext } & Extras
 >;
 
-export const authPlugin = new Elysia<"", AuthSingleton>({ name: "auth" }).derive(({ request }) => {
-  const demoUser = request.headers.get("x-demo-user");
-  const demoRole = (request.headers.get("x-demo-role") as AuthContext["role"]) ?? "admin";
-  return {
-    auth: {
-      userId: demoUser ?? undefined,
-      role: demoRole,
-    } satisfies AuthContext,
-  };
-});
+export const authPlugin = new Elysia<"", AuthSingleton>({ name: "auth" }).derive(
+  async ({ request }) => {
+    // Check for Clerk JWT token in Authorization header
+    const authHeader = request.headers.get("authorization");
+    let userId: string | undefined;
+    let role: AuthContext["role"] = "admin";
+
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.substring(7);
+      // TODO: Verify Clerk JWT token and extract userId
+      // For now, we'll extract from token if it's a valid format
+      // In production, verify with Clerk's public key
+      try {
+        // Basic JWT parsing (without verification for now)
+        const parts = token.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          userId = payload.sub || payload.user_id;
+          // Extract role from token if available
+          if (payload.role) {
+            role = payload.role;
+          }
+        }
+      } catch {
+        // Invalid token format, fall back to demo headers
+      }
+    }
+
+    // Fall back to demo headers if no token
+    if (!userId) {
+      const demoUser = request.headers.get("x-demo-user");
+      const demoRole = (request.headers.get("x-demo-role") as AuthContext["role"]) ?? "admin";
+      userId = demoUser ?? undefined;
+      role = demoRole;
+    }
+
+    return {
+      auth: {
+        userId,
+        role,
+      } satisfies AuthContext,
+    };
+  },
+);
 
 export function requireAdmin(ctx: AuthContext) {
   if (ctx.role !== "admin" && ctx.role !== "staff") {
@@ -55,7 +89,8 @@ export const bidPayloadSchema = z.object({
     .or(z.number())
     .transform((val) => Number(val))
     .refine((v) => !Number.isNaN(v) && v > 0, "Bid amount must be positive"),
-  bidderId: z.string().uuid(),
+  // bidderId is optional - backend gets it from auth token
+  bidderId: z.string().uuid().optional(),
 });
 
 export const listQuerySchema = z.object({
@@ -90,7 +125,9 @@ export async function getTenantIdBySlug(slug: string): Promise<string> {
     .where(eq(tenants.shopSlug, slug))
     .limit(1);
   if (!tenant) {
-    throw new Response("Tenant not found", { status: 404 });
+    const error = new Error("Tenant not found");
+    error.name = "TenantNotFound";
+    throw error;
   }
   return tenant.id;
 }
@@ -100,7 +137,9 @@ export async function getAvailableStock(tenantId: string, variantId: string) {
     .select({ onHand: sum(inventoryLedger.delta) })
     .from(inventoryLedger)
     .where(and(eq(inventoryLedger.tenantId, tenantId), eq(inventoryLedger.variantId, variantId)));
-  return Number(row?.onHand ?? 0);
+  // PostgreSQL sum() returns null when no rows exist, convert to 0
+  const stock = row?.onHand ? Number(row.onHand) : 0;
+  return stock;
 }
 
 export async function decrementStock(
