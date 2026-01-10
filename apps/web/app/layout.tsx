@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ClerkProvider } from "@clerk/nextjs";
 import { QueryProvider } from "./query-provider";
 import { env } from "@repo/shared";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -30,6 +31,7 @@ export default function RootLayout({
       <html lang="en">
         <body className={cn("font-sans antialiased", geistSans.variable, geistMono.variable)}>
           <QueryProvider>{children}</QueryProvider>
+          <Toaster />
         </body>
       </html>
     </ClerkProvider>
