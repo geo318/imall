@@ -12,6 +12,7 @@ const serverSchema = {
   PAYMENT_WEBHOOK_SECRET: z.string().optional(),
   SEED_SHOP_SLUG: z.string().default("demo-shop"),
   SEED_SHOP_NAME: z.string().default("Demo Shop"),
+  BACKEND_URL: z.string().url().default("http://localhost:3001"),
 } as const;
 
 const clientSchema = {
@@ -32,6 +33,7 @@ const runtimeEnv: RuntimeEnv = {
   PAYMENT_WEBHOOK_SECRET: process.env.PAYMENT_WEBHOOK_SECRET,
   SEED_SHOP_SLUG: process.env.SEED_SHOP_SLUG,
   SEED_SHOP_NAME: process.env.SEED_SHOP_NAME,
+  BACKEND_URL: process.env.BACKEND_URL,
   NEXT_PUBLIC_DOMAIN: process.env.NEXT_PUBLIC_DOMAIN,
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
   SKIP_ENV_VALIDATION: process.env.SKIP_ENV_VALIDATION,

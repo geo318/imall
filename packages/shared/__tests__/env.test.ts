@@ -9,6 +9,7 @@ describe("env schemas", () => {
       PORT: "4000",
       PAYMENT_KEEPZ_API_KEY: "test-key",
       NEXT_PUBLIC_DOMAIN: "http://localhost:3001",
+      BACKEND_URL: "http://localhost:3001",
     });
 
     expect(env.DOMAIN).toBe("http://localhost:3001");
@@ -16,6 +17,17 @@ describe("env schemas", () => {
     expect(env.PORT).toBe(4000);
     expect(env.PAYMENT_KEEPZ_API_KEY).toBe("test-key");
     expect(env.NEXT_PUBLIC_DOMAIN).toBe("http://localhost:3001");
+    expect(env.BACKEND_URL).toBe("http://localhost:3001");
+  });
+
+  test("uses default BACKEND_URL when not provided", () => {
+    const env = buildEnv({
+      DOMAIN: "http://localhost:3001",
+      DATABASE_URL: "postgres://user:pass@localhost:5432/db",
+      NEXT_PUBLIC_DOMAIN: "http://localhost:3001",
+    });
+
+    expect(env.BACKEND_URL).toBe("http://localhost:3001");
   });
 
   test("throws when required env is missing", () => {
