@@ -40,7 +40,8 @@ This document tracks the current implementation state and the next steps to fini
 - Web app pages:
   - Public: home `/[shopSlug]`, product detail `/[shopSlug]/p/[productSlug]`, auction `/[shopSlug]/a/[auctionId]`, cart, checkout.
   - Admin: `/admin/[shopSlug]/...` sections above.
-- Use `NEXT_PUBLIC_DOMAIN` to talk to API; add API client helpers; move to server components where possible.
+- Use `NEXT_PUBLIC_DOMAIN` to talk to API; React Query is wired in via `app/layout.tsx` and `QueryProvider` so client components fetch data without blocking server renders. API helpers live in `apps/web/lib/api/` with a marketing mapping helper at `apps/web/lib/marketing.ts`.
+- Marketing pages (home/products/about/vendors/faq) now use the MarketHub-inspired UI with picsum assets, linking product cards to `/[shopSlug]/p/[productSlug]` and vendor promos to `/[shopSlug]`.
 
 ## Dev workflow
 - Env: root `.env` is the source of truth; `apps/web/next.config.js` force-loads it (prefers `@next/env`, falls back to `dotenv`) so Next picks up Clerk keys in dev/build. Env validation lives in `@repo/shared/src/env.ts` (required: `DOMAIN`, `DATABASE_URL`, `NEXT_PUBLIC_DOMAIN`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`; optional: `CLERK_JWT_PUBLIC_KEY`). Rebuild shared after env schema changes (`cd packages/shared && bun run build`).
@@ -57,3 +58,5 @@ This document tracks the current implementation state and the next steps to fini
 - Finish API: auth guard (Clerk), inventory reservation flows (reserve/release), auction buy-now + status transitions, WS bid broadcasting + timers.
 - Seed data script per tenant.
 - Admin UI scaffolding + auth guard; wire UI to product/variant/cart/auction/order endpoints.
+- Expose shop metadata from the API so the marketing/shop cards can use the real vendor name instead of slug/env fallbacks.
+- Keep `apps/api` running alongside the web app (`bun run dev:all`) so client React Query calls to `NEXT_PUBLIC_DOMAIN` don’t fail.
