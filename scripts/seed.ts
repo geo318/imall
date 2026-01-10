@@ -1,7 +1,15 @@
 import { db } from "@repo/db";
-import { auctions, cartItems, carts, products, tenants, variants } from "@repo/db/schema";
-import { env } from "@repo/shared";
-import { and, eq } from "drizzle-orm";
+import {
+  auctions,
+  cartItems,
+  carts,
+  inventoryLedger,
+  products,
+  tenants,
+  variants,
+} from "@repo/db/schema";
+import { env, INVENTORY_REASONS } from "@repo/shared";
+import { and, eq, sum } from "drizzle-orm";
 
 type AuctionSeed = {
   startingBid: string;
@@ -148,6 +156,180 @@ const shopSeeds: ShopSeed[] = [
         title: "Sculpted Planter Duo",
         description: "Pair of sculpted planters with drainage, perfect for shelves.",
         variants: [{ sku: "PLN-001", price: "58.00", currency: "USD" }],
+      },
+      {
+        slug: "minimalist-coffee-mug",
+        title: "Minimalist Coffee Mug",
+        description: "Hand-thrown ceramic mug with a comfortable handle.",
+        variants: [{ sku: "MUG-001", price: "24.00", currency: "USD" }],
+      },
+      {
+        slug: "wool-blanket",
+        title: "Wool Blanket",
+        description: "Warm wool blanket in neutral tones, perfect for cozy evenings.",
+        variants: [{ sku: "BLK-001", price: "95.00", currency: "USD" }],
+      },
+      {
+        slug: "brass-candle-holder",
+        title: "Brass Candle Holder",
+        description: "Elegant brass candle holder with geometric design.",
+        variants: [
+          {
+            sku: "CH-001",
+            price: "42.00",
+            currency: "USD",
+            auction: {
+              startingBid: "25.00",
+              minIncrement: "3.00",
+              buyNowPrice: "55.00",
+              durationMinutes: 150,
+            },
+          },
+        ],
+      },
+      {
+        slug: "linen-napkin-set",
+        title: "Linen Napkin Set",
+        description: "Set of 6 linen napkins in natural color.",
+        variants: [{ sku: "NAP-001", price: "38.00", currency: "USD" }],
+      },
+      {
+        slug: "wooden-cutting-board",
+        title: "Wooden Cutting Board",
+        description: "Bamboo cutting board with juice groove.",
+        variants: [{ sku: "CUT-001", price: "52.00", currency: "USD" }],
+      },
+      {
+        slug: "ceramic-bowl-set",
+        title: "Ceramic Bowl Set",
+        description: "Set of 4 hand-glazed ceramic bowls in various sizes.",
+        variants: [
+          {
+            sku: "BOW-001",
+            price: "68.00",
+            currency: "USD",
+            auction: {
+              startingBid: "40.00",
+              minIncrement: "4.00",
+              buyNowPrice: "85.00",
+              durationMinutes: 200,
+            },
+          },
+        ],
+      },
+      {
+        slug: "macrame-wall-hanging",
+        title: "Macrame Wall Hanging",
+        description: "Hand-knotted macrame wall art in natural fibers.",
+        variants: [{ sku: "MAC-001", price: "75.00", currency: "USD" }],
+      },
+      {
+        slug: "marble-coaster-set",
+        title: "Marble Coaster Set",
+        description: "Set of 4 marble coasters with cork backing.",
+        variants: [{ sku: "COA-001", price: "32.00", currency: "USD" }],
+      },
+      {
+        slug: "leather-keychain",
+        title: "Leather Keychain",
+        description: "Handcrafted leather keychain with brass hardware.",
+        variants: [{ sku: "KEY-001", price: "18.00", currency: "USD" }],
+      },
+      {
+        slug: "cotton-pillow-cover",
+        title: "Cotton Pillow Cover",
+        description: "Organic cotton pillow cover with geometric pattern.",
+        variants: [
+          {
+            sku: "PIL-001",
+            price: "45.00",
+            currency: "USD",
+            auction: {
+              startingBid: "25.00",
+              minIncrement: "2.50",
+              buyNowPrice: "60.00",
+              durationMinutes: 180,
+            },
+          },
+        ],
+      },
+      {
+        slug: "terracotta-pot",
+        title: "Terracotta Pot",
+        description: "Classic terracotta pot with drainage hole.",
+        variants: [{ sku: "TER-001", price: "22.00", currency: "USD" }],
+      },
+      {
+        slug: "bamboo-utensil-set",
+        title: "Bamboo Utensil Set",
+        description: "Set of 5 bamboo kitchen utensils.",
+        variants: [{ sku: "UTL-001", price: "28.00", currency: "USD" }],
+      },
+      {
+        slug: "woven-basket",
+        title: "Woven Basket",
+        description: "Handwoven storage basket in natural materials.",
+        variants: [{ sku: "WOV-001", price: "48.00", currency: "USD" }],
+      },
+      {
+        slug: "stone-salt-pepper-set",
+        title: "Stone Salt & Pepper Set",
+        description: "Natural stone salt and pepper shakers.",
+        variants: [
+          {
+            sku: "STO-001",
+            price: "35.00",
+            currency: "USD",
+            auction: {
+              startingBid: "20.00",
+              minIncrement: "2.00",
+              buyNowPrice: "45.00",
+              durationMinutes: 120,
+            },
+          },
+        ],
+      },
+      {
+        slug: "linen-tablecloth",
+        title: "Linen Tablecloth",
+        description: "Elegant linen tablecloth in natural color.",
+        variants: [{ sku: "TAB-001", price: "78.00", currency: "USD" }],
+      },
+      {
+        slug: "ceramic-vase-small",
+        title: "Small Ceramic Vase",
+        description: "Mini ceramic vase perfect for single stems.",
+        variants: [{ sku: "VAS-001", price: "32.00", currency: "USD" }],
+      },
+      {
+        slug: "wooden-spoon-set",
+        title: "Wooden Spoon Set",
+        description: "Set of 3 hand-carved wooden spoons.",
+        variants: [{ sku: "SPO-001", price: "26.00", currency: "USD" }],
+      },
+      {
+        slug: "cotton-dish-towels",
+        title: "Cotton Dish Towels",
+        description: "Set of 4 absorbent cotton dish towels.",
+        variants: [{ sku: "TOW-001", price: "34.00", currency: "USD" }],
+      },
+      {
+        slug: "brass-bookend-pair",
+        title: "Brass Bookend Pair",
+        description: "Heavy brass bookends with geometric design.",
+        variants: [
+          {
+            sku: "BOO-001",
+            price: "65.00",
+            currency: "USD",
+            auction: {
+              startingBid: "35.00",
+              minIncrement: "5.00",
+              buyNowPrice: "80.00",
+              durationMinutes: 240,
+            },
+          },
+        ],
       },
     ],
   },
@@ -305,27 +487,79 @@ async function upsertProductWithVariants(tenantId: string, productSeed: ProductS
     if (!variantId) throw new Error(`Failed to upsert variant for ${productSeed.slug}`);
     variantIds.push(variantId);
 
-    if (!("auction" in variantSeed) || !variantSeed.auction) continue;
+    // Add initial inventory stock with randomized availability states
+    // 0 = sold out, 1-5 = low stock, 6-20 = in stock, 21-50 = plenty in stock
+    const [existingStock] = await db
+      .select({ total: sum(inventoryLedger.delta) })
+      .from(inventoryLedger)
+      .where(
+        and(
+          eq(inventoryLedger.tenantId, tenantId),
+          eq(inventoryLedger.variantId, variantId),
+        ),
+      );
 
-    const auction = variantSeed.auction;
-    const startsAt = new Date(Date.now() - 5 * 60_000);
-    const endsAt = new Date(startsAt.getTime() + auction.durationMinutes * 60_000);
-    await db
-      .insert(auctions)
-      .values({
+    // PostgreSQL sum() returns null when no rows, convert to 0
+    const currentStock = existingStock?.total ? Number(existingStock.total) : 0;
+    if (currentStock <= 0) {
+      // Randomize stock to show different availability states:
+      // 20% chance: sold out (0)
+      // 20% chance: low stock (1-5)
+      // 30% chance: in stock (6-20)
+      // 30% chance: plenty in stock (21-50)
+      const rand = Math.random();
+      let initialStock: number;
+      if (rand < 0.2) {
+        initialStock = 0; // Sold out
+      } else if (rand < 0.4) {
+        initialStock = Math.floor(Math.random() * 5) + 1; // Low stock (1-5)
+      } else if (rand < 0.7) {
+        initialStock = Math.floor(Math.random() * 15) + 6; // In stock (6-20)
+      } else {
+        initialStock = Math.floor(Math.random() * 30) + 21; // Plenty (21-50)
+      }
+      
+      console.log(
+        `  Adding ${initialStock} units of stock for variant ${variantSeed.sku} (${variantId})`,
+      );
+      await db.insert(inventoryLedger).values({
         id: crypto.randomUUID(),
         tenantId,
         variantId,
-        status: "active",
-        startsAt,
-        endsAt,
-        startingBid: auction.startingBid,
-        minIncrement: auction.minIncrement,
-        antiSnipeSeconds: 300,
-        buyNowPrice: auction.buyNowPrice,
-        currentPrice: auction.startingBid,
-      })
-      .onConflictDoNothing();
+        delta: initialStock,
+        reason: INVENTORY_REASONS.INIT,
+        refType: "SEED",
+      });
+    } else {
+      console.log(
+        `  Variant ${variantSeed.sku} already has ${currentStock} units in stock, skipping`,
+      );
+    }
+
+    if (!("auction" in variantSeed) || !variantSeed.auction) continue;
+
+    const auction = variantSeed.auction;
+    // Start auction now (or very recently) so it's active
+    const startsAt = new Date();
+    // End auction in the future based on duration
+    const endsAt = new Date(startsAt.getTime() + auction.durationMinutes * 60_000);
+    
+    // Delete existing auction for this variant if it exists, then insert new one
+    await db.delete(auctions).where(eq(auctions.variantId, variantId));
+    
+    await db.insert(auctions).values({
+      id: crypto.randomUUID(),
+      tenantId,
+      variantId,
+      status: "active",
+      startsAt,
+      endsAt,
+      startingBid: auction.startingBid,
+      minIncrement: auction.minIncrement,
+      antiSnipeSeconds: 300,
+      buyNowPrice: auction.buyNowPrice,
+      currentPrice: auction.startingBid,
+    });
   }
 
   return variantIds;
