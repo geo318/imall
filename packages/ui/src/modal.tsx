@@ -7,10 +7,9 @@ type ModalProps = {
   open: boolean;
   onClose: () => void;
   children: React.ReactNode;
-  className?: string;
 };
 
-export function Modal({ open, onClose, children }: ModalProps) {
+export function Modal({ open, onClose, children }: Readonly<ModalProps>) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -29,26 +28,35 @@ export function Modal({ open, onClose, children }: ModalProps) {
   );
 }
 
-export function ModalHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function ModalHeader({
+  className,
+  ...props
+}: Readonly<React.HTMLAttributes<HTMLDivElement>>) {
   return <div className={cn("border-b border-slate-200 px-6 py-4", className)} {...props} />;
 }
 
-export function ModalTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+export function ModalTitle({
+  className,
+  ...props
+}: Readonly<React.HTMLAttributes<HTMLHeadingElement>>) {
   return <h2 className={cn("text-lg font-semibold text-slate-900", className)} {...props} />;
 }
 
 export function ModalDescription({
   className,
   ...props
-}: React.HTMLAttributes<HTMLParagraphElement>) {
+}: Readonly<React.HTMLAttributes<HTMLParagraphElement>>) {
   return <p className={cn("text-sm text-slate-600", className)} {...props} />;
 }
 
-export function ModalBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function ModalBody({ className, ...props }: Readonly<React.HTMLAttributes<HTMLDivElement>>) {
   return <div className={cn("px-6 py-4", className)} {...props} />;
 }
 
-export function ModalFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+export function ModalFooter({
+  className,
+  ...props
+}: Readonly<React.HTMLAttributes<HTMLDivElement>>) {
   return (
     <div
       className={cn(

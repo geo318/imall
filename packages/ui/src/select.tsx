@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "./utils";
 
 export type SelectOption = { value: string; label: string };
@@ -13,7 +12,13 @@ export type SelectProps = {
   className?: string;
 };
 
-export function Select({ value, onValueChange, options, placeholder, className }: SelectProps) {
+export function Select({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  className,
+}: Readonly<SelectProps>) {
   return (
     <select
       value={value}
@@ -28,7 +33,7 @@ export function Select({ value, onValueChange, options, placeholder, className }
           {placeholder}
         </option>
       ) : null}
-      {options.map((opt) => (
+      {options?.map((opt) => (
         <option key={opt.value} value={opt.value}>
           {opt.label}
         </option>
@@ -36,4 +41,3 @@ export function Select({ value, onValueChange, options, placeholder, className }
     </select>
   );
 }
-

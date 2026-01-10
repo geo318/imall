@@ -7,7 +7,7 @@
     "./utils": "./src/utils.ts"
   },
   "scripts": {
-    "lint": "bun run lint:biome",
+    "lint": "biome check .",
     "generate:component": "turbo gen react-component",
     "check-types": "tsc --noEmit"
   },

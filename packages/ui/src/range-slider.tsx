@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { cn } from "./utils";
 
 export type RangeSliderProps = {
@@ -19,7 +18,7 @@ export function RangeSlider({
   max = 100,
   step = 1,
   className,
-}: RangeSliderProps) {
+}: Readonly<RangeSliderProps>) {
   const [lo, hi] = value;
   const left = Math.min(lo, hi);
   const right = Math.max(lo, hi);
@@ -53,4 +52,3 @@ export function RangeSlider({
     </div>
   );
 }
-

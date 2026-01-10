@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { Label } from "./label";
 import { Textarea } from "./textarea";
 import { cn } from "./utils";
@@ -29,7 +28,7 @@ export function MarkdownEditor({
   return (
     <div className={cn("space-y-2", className)}>
       {label && (
-        <Label htmlFor={id} className="block">
+        <Label htmlFor={id ?? ""} className="block">
           {label}
         </Label>
       )}
