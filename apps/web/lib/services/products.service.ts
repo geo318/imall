@@ -8,11 +8,14 @@ export type ApiProduct = {
   description: string | null;
   tenantSlug?: string;
   tenantName?: string;
+  createdAt?: string;
+  hasAuction?: boolean;
   variants: {
     id: string;
     sku: string | null;
     price: string;
     currency: string;
+    availableQty?: number;
     auction?: {
       id: string;
       status: string | null;
@@ -25,6 +28,21 @@ export type ApiProduct = {
       highestBidId?: string | null;
     } | null;
   }[];
+};
+
+export type ProductSearchParams = {
+  limit?: number;
+  offset?: number;
+  q?: string;
+  type?: "all" | "buyNow" | "auction";
+  sort?: "newest" | "oldest" | "priceAsc" | "priceDesc" | "random";
+  minPrice?: number;
+  maxPrice?: number;
+};
+
+export type ProductSearchResponse = {
+  items: ApiProduct[];
+  nextOffset: number | null;
 };
 
 export async function getShopProducts(shopSlug: string, limit = 20): Promise<ApiProduct[]> {
@@ -96,3 +114,14 @@ export async function getAnyProducts(limit = 20): Promise<ApiProduct[]> {
   return data.data;
 }
 
+export async function searchProducts(params: ProductSearchParams): Promise<ProductSearchResponse> {
+  const [data, error] = await tryCatch(
+    axios.get<ProductSearchResponse>("/api/products/search", { params }),
+  );
+
+  if (error) {
+    throw new Error("Failed to search products");
+  }
+
+  return data.data;
+}
