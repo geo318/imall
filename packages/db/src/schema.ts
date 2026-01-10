@@ -165,11 +165,11 @@ export const inventorySnapshot = pgTable(
 // Carts hold items prior to checkout. A cart may be anonymous (no user)
 // or associated with a user. Status transitions through open,
 // checking_out and completed or expired.
+// tenantId is nullable to support a single cart that can hold items from multiple shops.
 export const carts = pgTable("carts", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id")
-    .references(() => tenants.id)
-    .notNull(),
+    .references(() => tenants.id),
   userId: uuid("user_id").references(() => users.id),
   status: varchar("status", { length: 32 }).default("open"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -4,6 +4,8 @@ import { tryCatch } from "../utils";
 export type CartItem = {
   id: string;
   qty: number;
+  availableQty?: number;
+  variantId?: string;
   productId: string;
   productTitle: string;
   productSlug: string;
@@ -50,6 +52,26 @@ export async function getCart(cartId: string): Promise<Cart> {
   );
 
   if (error) {
+    if (axios.isAxiosError(error)) {
+      console.error("[Cart Service] Get cart error:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url,
+        message: error.message,
+      });
+      const message =
+        typeof error.response?.data === "string"
+          ? error.response.data
+          : error.response?.data?.error || error.response?.data?.message || error.message;
+      
+      // If cart not found (404), return a more specific error
+      if (error.response?.status === 404) {
+        throw new Error(message || "Cart not found");
+      }
+      
+      throw new Error(message || "Failed to load cart");
+    }
     throw new Error("Failed to load cart");
   }
 
@@ -68,7 +90,9 @@ export async function addToCart(
   if (error) {
     if (axios.isAxiosError(error)) {
       const message =
-        typeof error.response?.data === "string" ? error.response.data : error.message;
+        typeof error.response?.data === "string"
+          ? error.response.data
+          : error.response?.data?.error || error.response?.data?.message || error.message;
       throw new Error(message || "Failed to add to cart");
     }
     throw new Error("Failed to add to cart");
@@ -83,10 +107,45 @@ export async function checkoutCart(cartId: string): Promise<void> {
   if (error) {
     if (axios.isAxiosError(error)) {
       const message =
-        typeof error.response?.data === "string" ? error.response.data : error.message;
+        typeof error.response?.data === "string"
+          ? error.response.data
+          : error.response?.data?.error || error.response?.data?.message || error.message;
       throw new Error(message || "Checkout failed");
     }
     throw new Error("Checkout failed");
   }
 }
 
+export async function updateCartItemQty(cartId: string, itemId: string, qty: number): Promise<void> {
+  const [, error] = await tryCatch(
+    axios.patch(`/api/carts/${cartId}/items/${itemId}`, { qty }),
+  );
+
+  if (error) {
+    if (axios.isAxiosError(error)) {
+      const message =
+        typeof error.response?.data === "string"
+          ? error.response.data
+          : error.response?.data?.error || error.response?.data?.message || error.message;
+      throw new Error(message || "Failed to update cart item");
+    }
+    throw new Error("Failed to update cart item");
+  }
+}
+
+export async function removeCartItem(cartId: string, itemId: string): Promise<void> {
+  const [, error] = await tryCatch(
+    axios.delete(`/api/carts/${cartId}/items/${itemId}`),
+  );
+
+  if (error) {
+    if (axios.isAxiosError(error)) {
+      const message =
+        typeof error.response?.data === "string"
+          ? error.response.data
+          : error.response?.data?.error || error.response?.data?.message || error.message;
+      throw new Error(message || "Failed to remove cart item");
+    }
+    throw new Error("Failed to remove cart item");
+  }
+}
