@@ -6,6 +6,7 @@ import { AuctionTimer } from "./auction-timer";
 
 export type MarketingProduct = {
   id: string;
+  slug: string;
   title: string;
   price?: number | null;
   currency?: string | null;

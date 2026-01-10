@@ -21,6 +21,7 @@ export function mapApiProductToMarketing(product: ApiProduct): MarketingProduct 
   const endsAt = auction?.endsAt ?? undefined;
   return {
     id: product.id,
+    slug: product.slug,
     title: product.title,
     price: firstVariant ? Number(firstVariant.price) : null,
     currency: firstVariant?.currency ?? null,

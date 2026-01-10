@@ -26,6 +26,7 @@ export const productCategoriesMock = [
 export const productPicksMock: MarketingProduct[] = [
   {
     id: "p1",
+    slug: "midnight-desk-set",
     title: "Midnight Desk Set",
     price: 210,
     vendor: "Desk Lab",
@@ -34,18 +35,20 @@ export const productPicksMock: MarketingProduct[] = [
   },
   {
     id: "p2",
+    slug: "vintage-illustration",
     title: "Vintage Illustration",
     price: 0,
     vendor: "Modern Gallery",
     image: "https://picsum.photos/id/1047/800/800",
     isAuction: true,
     currentBid: 128,
-    endsIn: "1h 20m",
+    endsAt: new Date(Date.now() + 1 * 60 * 60 * 1000 + 20 * 60 * 1000).toISOString(),
     tag: "Live now",
     href: "/demo-shop/vintage-illustration",
   },
   {
     id: "p3",
+    slug: "sculpted-planter-duo",
     title: "Sculpted Planter Duo",
     price: 58,
     vendor: "Eco Living",

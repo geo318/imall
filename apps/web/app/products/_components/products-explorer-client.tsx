@@ -298,18 +298,19 @@ export function ProductsExplorerClient() {
         </button>
         {expandedSections.sorting && (
           <div className="pt-2">
-            <Select value={sortBy} onValueChange={(value: SortKey) => setSortBy(value)}>
-              <Select.Trigger className="w-full">
-                <Select.Value placeholder="Sort by..." />
-              </Select.Trigger>
-              <Select.Content>
-                <Select.Item value="newest">Newest First</Select.Item>
-                <Select.Item value="name-asc">Name: A to Z</Select.Item>
-                <Select.Item value="name-desc">Name: Z to A</Select.Item>
-                <Select.Item value="price-asc">Price: Low to High</Select.Item>
-                <Select.Item value="price-desc">Price: High to Low</Select.Item>
-              </Select.Content>
-            </Select>
+            <Select
+              value={sortBy}
+              onValueChange={(value) => setSortBy(value as SortKey)}
+              options={[
+                { value: "newest", label: "Newest First" },
+                { value: "name-asc", label: "Name: A to Z" },
+                { value: "name-desc", label: "Name: Z to A" },
+                { value: "price-asc", label: "Price: Low to High" },
+                { value: "price-desc", label: "Price: High to Low" },
+              ]}
+              placeholder="Sort by..."
+              className="w-full"
+            />
           </div>
         )}
       </div>

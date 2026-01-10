@@ -46,8 +46,10 @@ export function FeaturedProductsClient({ limit = 24 }: Props) {
   const auctions = products.filter((p) => p.isAuction);
   const curated = [...buyNow.slice(0, 4), ...auctions.slice(0, 4)];
   // If auctions are missing, fill remaining slots from buy-now.
-  while (curated.length < 8 && buyNow[curated.length]) {
-    curated.push(buyNow[curated.length]);
+  while (curated.length < 8) {
+    const nextProduct = buyNow[curated.length];
+    if (!nextProduct) break;
+    curated.push(nextProduct);
   }
 
   if (products.length === 0) {

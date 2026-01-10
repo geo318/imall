@@ -3,6 +3,7 @@ import type { MarketingProduct } from "@/components/marketing/product-card";
 export const homeProductsMock: MarketingProduct[] = [
   {
     id: "1",
+    slug: "handcrafted-ceramic-vase",
     title: "Handcrafted Ceramic Vase - Minimalist Design",
     price: 89.0,
     image: "https://picsum.photos/id/1025/800/800",
@@ -11,6 +12,7 @@ export const homeProductsMock: MarketingProduct[] = [
   },
   {
     id: "2",
+    slug: "vintage-leather-messenger-bag",
     title: "Vintage Leather Messenger Bag",
     price: 159.0,
     image: "https://picsum.photos/id/1080/800/800",
@@ -19,17 +21,19 @@ export const homeProductsMock: MarketingProduct[] = [
   },
   {
     id: "3",
+    slug: "limited-edition-art-print",
     title: "Limited Edition Art Print - Abstract",
     price: 45.0,
     image: "https://picsum.photos/id/1063/800/800",
     vendor: "Modern Gallery",
     isAuction: true,
     currentBid: 78.5,
-    endsIn: "2h 15m",
+    endsAt: new Date(Date.now() + 2 * 60 * 60 * 1000 + 15 * 60 * 1000).toISOString(),
     href: "/demo-shop/limited-edition-art-print",
   },
   {
     id: "4",
+    slug: "organic-cotton-throw",
     title: "Organic Cotton Throw Blanket",
     price: 120.0,
     image: "https://picsum.photos/id/1040/800/800",
@@ -38,17 +42,19 @@ export const homeProductsMock: MarketingProduct[] = [
   },
   {
     id: "5",
+    slug: "handmade-silver-jewelry-set",
     title: "Handmade Silver Jewelry Set",
     price: 275.0,
     image: "https://picsum.photos/id/1027/800/800",
     vendor: "Silver Moon",
     isAuction: true,
     currentBid: 320.0,
-    endsIn: "45m",
+    endsAt: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
     href: "/demo-shop/handmade-silver-jewelry-set",
   },
   {
     id: "6",
+    slug: "wooden-watch-sustainable-oak",
     title: "Wooden Watch - Sustainable Oak",
     price: 195.0,
     image: "https://picsum.photos/id/1050/800/800",
@@ -57,6 +63,7 @@ export const homeProductsMock: MarketingProduct[] = [
   },
   {
     id: "7",
+    slug: "artisanal-candle-collection",
     title: "Artisanal Candle Collection",
     price: 65.0,
     image: "https://picsum.photos/id/1072/800/800",
@@ -65,6 +72,7 @@ export const homeProductsMock: MarketingProduct[] = [
   },
   {
     id: "8",
+    slug: "handwoven-basket-set",
     title: "Handwoven Basket Set",
     price: 85.0,
     image: "https://picsum.photos/id/1062/800/800",
