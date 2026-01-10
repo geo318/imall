@@ -32,7 +32,9 @@ describe("listQuerySchema", () => {
 describe("bidPayloadSchema", () => {
   test("accepts string/number amounts > 0", () => {
     const bidderId = "00000000-0000-0000-0000-000000000001";
-    expect(bidPayloadSchema.parse({ amount: "10.50", bidderId }).amount).toBe(10.5);
+    expect(bidPayloadSchema.parse({ amount: "10.50", bidderId }).amount).toBe(
+      10.5,
+    );
     expect(bidPayloadSchema.parse({ amount: 5, bidderId }).amount).toBe(5);
   });
 

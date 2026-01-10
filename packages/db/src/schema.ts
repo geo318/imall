@@ -67,7 +67,10 @@ export const products = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    tenantSlugIdx: uniqueIndex("products_tenant_slug_unique").on(table.tenantId, table.slug),
+    tenantSlugIdx: uniqueIndex("products_tenant_slug_unique").on(
+      table.tenantId,
+      table.slug,
+    ),
   }),
 );
 
@@ -89,7 +92,10 @@ export const variants = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    productSkuIdx: uniqueIndex("variants_product_sku_unique").on(table.productId, table.sku),
+    productSkuIdx: uniqueIndex("variants_product_sku_unique").on(
+      table.productId,
+      table.sku,
+    ),
   }),
 );
 
@@ -168,8 +174,7 @@ export const inventorySnapshot = pgTable(
 // tenantId is nullable to support a single cart that can hold items from multiple shops.
 export const carts = pgTable("carts", {
   id: uuid("id").defaultRandom().primaryKey(),
-  tenantId: uuid("tenant_id")
-    .references(() => tenants.id),
+  tenantId: uuid("tenant_id").references(() => tenants.id),
   userId: uuid("user_id").references(() => users.id),
   status: varchar("status", { length: 32 }).default("open"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -1,13 +1,21 @@
-import { MarketingFooter } from "@/components/marketing-footer";
+import { Suspense } from "react";
+import { Footer } from "@/components/footer/footer";
 import { MarketingNav } from "@/components/marketing-nav";
-import { ProductsExplorerClient } from "./ProductsExplorerClient";
+import { ProductGridSkeleton } from "@/components/skeletons/product-card-skeleton";
+import { ProductsExplorerClient } from "./_components/products-explorer-client";
 
+export const metadata = {
+  title: "Products | MarketHub",
+  description: "Browse our curated collection of products from verified vendors",
+};
+
+// PPR: Static shell with dynamic products explorer slot
 export default async function ProductsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <MarketingNav />
       <main className="flex-1">
-        {/* Page Header */}
+        {/* Static: Page Header */}
         <div className="bg-gradient-hero py-12">
           <div className="container">
             <h1 className="text-3xl md:text-4xl font-bold mb-4">
@@ -19,9 +27,18 @@ export default async function ProductsPage() {
           </div>
         </div>
 
-        <ProductsExplorerClient />
+        {/* Dynamic slot: Products explorer with Suspense boundary */}
+        <Suspense
+          fallback={
+            <div className="container py-8">
+              <ProductGridSkeleton count={12} />
+            </div>
+          }
+        >
+          <ProductsExplorerClient />
+        </Suspense>
       </main>
-      <MarketingFooter />
+      <Footer />
     </div>
   );
 }

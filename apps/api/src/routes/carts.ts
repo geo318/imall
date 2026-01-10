@@ -11,7 +11,12 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { INVENTORY_REASONS, cartItemSchema, createCartSchema, getAvailableStock } from "../context";
+import {
+  cartItemSchema,
+  createCartSchema,
+  getAvailableStock,
+  INVENTORY_REASONS,
+} from "../context";
 
 // Cart routes - single cart that can hold items from multiple shops
 export const cartRoutes = new Elysia({ prefix: "/carts" })
@@ -98,7 +103,10 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       // Attach availability for each item (small N, ok for cart sizes)
       const itemsWithAvailability = await Promise.all(
         items.map(async (item) => {
-          const availableQty = await getAvailableStock(item.tenantId, item.variantId);
+          const availableQty = await getAvailableStock(
+            item.tenantId,
+            item.variantId,
+          );
           return { ...item, availableQty };
         }),
       );
@@ -123,7 +131,8 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
     try {
       payload = cartItemSchema.parse(body);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Invalid item payload";
+      const message =
+        err instanceof Error ? err.message : "Invalid item payload";
       return new Response(message, { status: 400 });
     }
     const { variantId, qty } = payload as z.infer<typeof cartItemSchema>;
@@ -155,23 +164,37 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         const [existing] = await tx
           .select({ id: cartItems.id, qty: cartItems.qty })
           .from(cartItems)
-          .where(and(eq(cartItems.cartId, cartId), eq(cartItems.variantId, variantId)))
+          .where(
+            and(
+              eq(cartItems.cartId, cartId),
+              eq(cartItems.variantId, variantId),
+            ),
+          )
           .limit(1);
 
         let itemId: string;
         let newQty: number;
         if (existing) {
           newQty = existing.qty + qty;
-          const available = await getAvailableStock(variant.tenantId, variantId);
+          const available = await getAvailableStock(
+            variant.tenantId,
+            variantId,
+          );
           if (available < newQty) {
             throw new Error(`INSUFFICIENT_STOCK:${available}`);
           }
-          await tx.update(cartItems).set({ qty: newQty }).where(eq(cartItems.id, existing.id));
+          await tx
+            .update(cartItems)
+            .set({ qty: newQty })
+            .where(eq(cartItems.id, existing.id));
           itemId = existing.id;
         } else {
           itemId = crypto.randomUUID();
           newQty = qty;
-          const available = await getAvailableStock(variant.tenantId, variantId);
+          const available = await getAvailableStock(
+            variant.tenantId,
+            variantId,
+          );
           if (available < newQty) {
             throw new Error(`INSUFFICIENT_STOCK:${available}`);
           }
@@ -184,7 +207,10 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           });
         }
 
-        await tx.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, cartId));
+        await tx
+          .update(carts)
+          .set({ updatedAt: new Date() })
+          .where(eq(carts.id, cartId));
 
         return { itemId, qty: newQty };
       });
@@ -196,7 +222,10 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       if (errMsg.startsWith("INSUFFICIENT_STOCK:")) {
         const available = Number(errMsg.split(":")[1]);
         set.status = 409;
-        return { error: "Insufficient stock", message: `Only ${available} available` };
+        return {
+          error: "Insufficient stock",
+          message: `Only ${available} available`,
+        };
       }
       console.error("[Cart Route] Failed to add item to cart:", params.cartId);
       console.error("[Cart Route] Error:", err);
@@ -244,17 +273,26 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
 
         if (qty <= 0) {
           await tx.delete(cartItems).where(eq(cartItems.id, itemId));
-          await tx.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, cartId));
+          await tx
+            .update(carts)
+            .set({ updatedAt: new Date() })
+            .where(eq(carts.id, cartId));
           return { removed: true, itemId };
         }
 
-        const available = await getAvailableStock(item.tenantId, item.variantId);
+        const available = await getAvailableStock(
+          item.tenantId,
+          item.variantId,
+        );
         if (available < qty) {
           throw new Error(`INSUFFICIENT_STOCK:${available}`);
         }
 
         await tx.update(cartItems).set({ qty }).where(eq(cartItems.id, itemId));
-        await tx.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, cartId));
+        await tx
+          .update(carts)
+          .set({ updatedAt: new Date() })
+          .where(eq(carts.id, cartId));
         return { removed: false, itemId, qty };
       });
 
@@ -265,9 +303,16 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       if (errMsg.startsWith("INSUFFICIENT_STOCK:")) {
         const available = Number(errMsg.split(":")[1]);
         set.status = 409;
-        return { error: "Insufficient stock", message: `Only ${available} available` };
+        return {
+          error: "Insufficient stock",
+          message: `Only ${available} available`,
+        };
       }
-      console.error("[Cart Route] Failed to update cart item:", params.cartId, params.itemId);
+      console.error(
+        "[Cart Route] Failed to update cart item:",
+        params.cartId,
+        params.itemId,
+      );
       console.error("[Cart Route] Error:", err);
       set.status = 500;
       return {
@@ -292,14 +337,21 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         }
 
         await tx.delete(cartItems).where(eq(cartItems.id, itemId));
-        await tx.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, cartId));
+        await tx
+          .update(carts)
+          .set({ updatedAt: new Date() })
+          .where(eq(carts.id, cartId));
       });
 
       set.status = 204;
       return;
     } catch (err) {
       if (err instanceof Response) return err;
-      console.error("[Cart Route] Failed to remove cart item:", params.cartId, params.itemId);
+      console.error(
+        "[Cart Route] Failed to remove cart item:",
+        params.cartId,
+        params.itemId,
+      );
       console.error("[Cart Route] Error:", err);
       set.status = 500;
       return {
@@ -345,7 +397,13 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
             tenantId: string;
             qty: number;
             price: string;
-          } => Boolean(row.variantId && row.tenantId && row.qty !== null && row.price !== null),
+          } =>
+            Boolean(
+              row.variantId &&
+              row.tenantId &&
+              row.qty !== null &&
+              row.price !== null,
+            ),
         );
         if (items.length === 0) {
           throw new Response("Cart is empty", { status: 400 });
@@ -357,7 +415,10 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
             continue;
           }
 
-          const available = await getAvailableStock(item.tenantId, item.variantId);
+          const available = await getAvailableStock(
+            item.tenantId,
+            item.variantId,
+          );
           if (available < (item.qty ?? 0)) {
             throw new Response("Insufficient stock", { status: 409 });
           }

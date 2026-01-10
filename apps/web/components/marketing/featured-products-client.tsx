@@ -1,9 +1,9 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import type { MarketingProduct } from "@/components/marketing/product-card";
 import { fetchAnyProducts } from "@/lib/api/products";
 import { mapApiProductToMarketing } from "@/lib/marketing";
-import { useQuery } from "@tanstack/react-query";
 import { FeaturedProducts } from "./featured-products";
 
 type Props = {

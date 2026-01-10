@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import type * as React from "react";
 import { cn } from "./utils";
 
 export type CheckboxProps = Omit<
@@ -25,4 +25,3 @@ export function Checkbox({ className, checked, onCheckedChange, ...props }: Chec
     />
   );
 }
-

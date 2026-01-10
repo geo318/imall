@@ -1,13 +1,22 @@
-import { auctions, bids, db, inventoryLedger, orderItems, orders, users, variants } from "@repo/db";
+import {
+  auctions,
+  bids,
+  db,
+  inventoryLedger,
+  orderItems,
+  orders,
+  users,
+  variants,
+} from "@repo/db";
 import { and, eq, lte } from "drizzle-orm";
 import { Elysia } from "elysia";
 import {
-  INVENTORY_REASONS,
-  type WsContext,
   bidPayloadSchema,
   getAvailableStock,
   getTenantIdBySlug,
+  INVENTORY_REASONS,
   listQuerySchema,
+  type WsContext,
 } from "../context";
 
 type AuctionSocket = WsContext<{
@@ -40,7 +49,10 @@ async function closeExpiredAuctions() {
     .limit(50);
 
   for (const auction of expired) {
-    await db.update(auctions).set({ status: "finished" }).where(eq(auctions.id, auction.id));
+    await db
+      .update(auctions)
+      .set({ status: "finished" })
+      .where(eq(auctions.id, auction.id));
     broadcastBidEvent(auction.id, {
       type: "auction.finished",
       auctionId: auction.id,
@@ -49,7 +61,9 @@ async function closeExpiredAuctions() {
   }
 }
 
-export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" })
+export const auctionsRoutes = new Elysia({
+  prefix: "/shops/:shopSlug/auctions",
+})
   .get("/", async ({ params, query, set }) => {
     try {
       const tenantId = await getTenantIdBySlug(params.shopSlug);
@@ -118,7 +132,8 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
     try {
       payload = bidPayloadSchema.parse(body);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Invalid bid payload";
+      const message =
+        err instanceof Error ? err.message : "Invalid bid payload";
       return new Response(message, { status: 400 });
     }
 
@@ -174,7 +189,9 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
             antiSnipeSeconds: auctions.antiSnipeSeconds,
           })
           .from(auctions)
-          .where(and(eq(auctions.id, auctionId), eq(auctions.tenantId, tenantId)))
+          .where(
+            and(eq(auctions.id, auctionId), eq(auctions.tenantId, tenantId)),
+          )
           .limit(1);
 
         if (!auction) {
@@ -182,11 +199,17 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
         }
 
         const now = new Date();
-        if (auction.status !== "active" || auction.startsAt > now || auction.endsAt < now) {
+        if (
+          auction.status !== "active" ||
+          auction.startsAt > now ||
+          auction.endsAt < now
+        ) {
           throw new Response("Auction is not active", { status: 409 });
         }
 
-        const currentPrice = Number(auction.currentPrice ?? auction.startingBid ?? 0);
+        const currentPrice = Number(
+          auction.currentPrice ?? auction.startingBid ?? 0,
+        );
         const minIncrement = Math.max(0, Number(auction.minIncrement ?? 0));
         const minAllowed = auction.currentPrice
           ? currentPrice + minIncrement
@@ -214,7 +237,9 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
         if (auction.antiSnipeSeconds && auction.antiSnipeSeconds > 0) {
           const secondsLeft = (auction.endsAt.getTime() - now.getTime()) / 1000;
           if (secondsLeft <= auction.antiSnipeSeconds) {
-            endsAt = new Date(auction.endsAt.getTime() + auction.antiSnipeSeconds * 1000);
+            endsAt = new Date(
+              auction.endsAt.getTime() + auction.antiSnipeSeconds * 1000,
+            );
           }
         }
 
@@ -238,12 +263,16 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
         endsAt: newEndsAt,
       });
 
-      return new Response(JSON.stringify({ id: bidId, amount, endsAt: newEndsAt }), {
-        status: 201,
-      });
+      return new Response(
+        JSON.stringify({ id: bidId, amount, endsAt: newEndsAt }),
+        {
+          status: 201,
+        },
+      );
     } catch (err) {
       if (err instanceof Response) return err;
-      const message = err instanceof Error ? err.message : "Failed to place bid";
+      const message =
+        err instanceof Error ? err.message : "Failed to place bid";
       return new Response(message, { status: 500 });
     }
   })
@@ -263,14 +292,20 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
             buyNowPrice: auctions.buyNowPrice,
           })
           .from(auctions)
-          .where(and(eq(auctions.id, auctionId), eq(auctions.tenantId, tenantId)))
+          .where(
+            and(eq(auctions.id, auctionId), eq(auctions.tenantId, tenantId)),
+          )
           .limit(1);
 
         if (!auction) {
           throw new Response("Auction not found", { status: 404 });
         }
         const now = new Date();
-        if (auction.status !== "active" || auction.startsAt > now || auction.endsAt < now) {
+        if (
+          auction.status !== "active" ||
+          auction.startsAt > now ||
+          auction.endsAt < now
+        ) {
           throw new Response("Auction is not active", { status: 409 });
         }
         if (!auction.buyNowPrice) {
@@ -389,6 +424,8 @@ export const auctionsRoutes = new Elysia({ prefix: "/shops/:shopSlug/auctions" }
 
 export function startAuctionCloser() {
   setInterval(() => {
-    closeExpiredAuctions().catch((err) => console.error("close auctions failed", err));
+    closeExpiredAuctions().catch((err) =>
+      console.error("close auctions failed", err),
+    );
   }, 30_000);
 }

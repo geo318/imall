@@ -1,4 +1,4 @@
-import { ProductCard, type MarketingProduct } from "./product-card";
+import { type MarketingProduct, ProductCard } from "./product-card";
 
 type Props = {
   products: MarketingProduct[];

@@ -1,6 +1,6 @@
-import { isReservedRoute } from "@/lib/utils";
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { isReservedRoute } from "@/lib/utils";
 
 const isPublicRoute = createRouteMatcher([
   "/",

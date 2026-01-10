@@ -27,4 +27,3 @@ export async function placeBid(
     throw new Error("Failed to place bid");
   }
 }
-

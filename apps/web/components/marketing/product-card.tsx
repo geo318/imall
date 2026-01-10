@@ -1,7 +1,8 @@
 import { Badge } from "@repo/ui/badge";
-import { Clock, Gavel } from "lucide-react";
+import { Gavel } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { AuctionTimer } from "./auction-timer";
 
 export type MarketingProduct = {
   id: string;
@@ -12,7 +13,7 @@ export type MarketingProduct = {
   image: string;
   isAuction?: boolean;
   currentBid?: number;
-  endsIn?: string;
+  endsAt?: string; // ISO string for auction end time
   tag?: string;
   href?: string;
 };
@@ -26,7 +27,7 @@ export function ProductCard({
   image,
   isAuction,
   currentBid,
-  endsIn,
+  endsAt,
   href,
   tag,
 }: MarketingProduct) {
@@ -66,12 +67,7 @@ export function ProductCard({
                     : "View"}
                 </span>
               </div>
-              {endsIn && (
-                <div className="flex items-center gap-1 text-xs text-amber-700">
-                  <Clock className="h-3 w-3" />
-                  <span>Ends in {endsIn}</span>
-                </div>
-              )}
+              {endsAt && <AuctionTimer endsAt={endsAt} />}
             </div>
           ) : (
             <p className="font-bold text-lg">

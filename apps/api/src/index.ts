@@ -15,7 +15,8 @@ if (cartRoutes) {
 
 const corsHeaders = (origin: string | null) => {
   const headers: Record<string, string> = {
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Demo-User, X-Demo-Role",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Demo-User, X-Demo-Role",
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",

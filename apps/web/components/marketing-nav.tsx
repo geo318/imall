@@ -1,15 +1,15 @@
 "use client";
 
-import { MarketHubLogo } from "@/assets";
-import { cn } from "@/lib/utils";
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
+import { useQuery } from "@tanstack/react-query";
 import { Menu, Search, ShoppingBag, User, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { getCart } from "@/lib/api/cart";
 import { useEffect, useMemo, useState } from "react";
+import { MarketHubLogo } from "@/assets";
+import { getCart } from "@/lib/api/cart";
+import { cn } from "@/lib/utils";
 
 const navLinks = [
   { href: "/products", label: "Products" },
@@ -133,7 +133,10 @@ export function MarketingNav() {
           <Button variant="ghost" size="sm" className="rounded-full">
             <User className="h-5 w-5" />
           </Button>
-          <Button size="sm" className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 rounded-lg">
+          <Button
+            size="sm"
+            className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 rounded-lg"
+          >
             <Link href="/admin/demo-shop" prefetch>
               Start Selling
             </Link>
@@ -181,6 +184,7 @@ export function MarketingNav() {
           </Button>
           <button
             onClick={() => setIsMenuOpen((v) => !v)}
+            type="button"
             className="p-2 rounded-full hover:bg-slate-100 transition-colors"
           >
             {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -207,7 +211,9 @@ export function MarketingNav() {
                 <User className="h-4 w-4 mr-2" />
                 Account
               </Button>
-              <Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700">Sign In</Button>
+              <Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700">
+                Sign In
+              </Button>
             </div>
           </nav>
         </div>

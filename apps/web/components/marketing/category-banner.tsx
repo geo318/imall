@@ -1,7 +1,7 @@
-import { homeCategoriesMock } from "@/MOCKS/homeCategories.mock";
 import { Button } from "@repo/ui/button";
 import Image from "next/image";
 import Link from "next/link";
+import { homeCategoriesMock } from "@/MOCKS/homeCategories.mock";
 
 export function CategoryBanner() {
   return (

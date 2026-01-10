@@ -21,9 +21,7 @@ export type Cart = {
 };
 
 export async function createCart(): Promise<{ id: string }> {
-  const [data, error] = await tryCatch(
-    axios.post<{ id: string }>(`/api/carts`),
-  );
+  const [data, error] = await tryCatch(axios.post<{ id: string }>(`/api/carts`));
 
   if (error) {
     if (axios.isAxiosError(error)) {
@@ -35,8 +33,8 @@ export async function createCart(): Promise<{ id: string }> {
         message: error.message,
       });
       const message =
-        typeof error.response?.data === "string" 
-          ? error.response.data 
+        typeof error.response?.data === "string"
+          ? error.response.data
           : error.response?.data?.error || error.response?.data?.message || error.message;
       throw new Error(message || "Failed to create cart");
     }
@@ -47,9 +45,7 @@ export async function createCart(): Promise<{ id: string }> {
 }
 
 export async function getCart(cartId: string): Promise<Cart> {
-  const [data, error] = await tryCatch(
-    axios.get<Cart>(`/api/carts/${cartId}`),
-  );
+  const [data, error] = await tryCatch(axios.get<Cart>(`/api/carts/${cartId}`));
 
   if (error) {
     if (axios.isAxiosError(error)) {
@@ -64,12 +60,12 @@ export async function getCart(cartId: string): Promise<Cart> {
         typeof error.response?.data === "string"
           ? error.response.data
           : error.response?.data?.error || error.response?.data?.message || error.message;
-      
+
       // If cart not found (404), return a more specific error
       if (error.response?.status === 404) {
         throw new Error(message || "Cart not found");
       }
-      
+
       throw new Error(message || "Failed to load cart");
     }
     throw new Error("Failed to load cart");
@@ -78,14 +74,8 @@ export async function getCart(cartId: string): Promise<Cart> {
   return data.data;
 }
 
-export async function addToCart(
-  cartId: string,
-  variantId: string,
-  qty: number,
-): Promise<void> {
-  const [, error] = await tryCatch(
-    axios.post(`/api/carts/${cartId}/items`, { variantId, qty }),
-  );
+export async function addToCart(cartId: string, variantId: string, qty: number): Promise<void> {
+  const [, error] = await tryCatch(axios.post(`/api/carts/${cartId}/items`, { variantId, qty }));
 
   if (error) {
     if (axios.isAxiosError(error)) {
@@ -100,9 +90,7 @@ export async function addToCart(
 }
 
 export async function checkoutCart(cartId: string): Promise<void> {
-  const [, error] = await tryCatch(
-    axios.post(`/api/carts/${cartId}/checkout`),
-  );
+  const [, error] = await tryCatch(axios.post(`/api/carts/${cartId}/checkout`));
 
   if (error) {
     if (axios.isAxiosError(error)) {
@@ -116,10 +104,12 @@ export async function checkoutCart(cartId: string): Promise<void> {
   }
 }
 
-export async function updateCartItemQty(cartId: string, itemId: string, qty: number): Promise<void> {
-  const [, error] = await tryCatch(
-    axios.patch(`/api/carts/${cartId}/items/${itemId}`, { qty }),
-  );
+export async function updateCartItemQty(
+  cartId: string,
+  itemId: string,
+  qty: number,
+): Promise<void> {
+  const [, error] = await tryCatch(axios.patch(`/api/carts/${cartId}/items/${itemId}`, { qty }));
 
   if (error) {
     if (axios.isAxiosError(error)) {
@@ -134,9 +124,7 @@ export async function updateCartItemQty(cartId: string, itemId: string, qty: num
 }
 
 export async function removeCartItem(cartId: string, itemId: string): Promise<void> {
-  const [, error] = await tryCatch(
-    axios.delete(`/api/carts/${cartId}/items/${itemId}`),
-  );
+  const [, error] = await tryCatch(axios.delete(`/api/carts/${cartId}/items/${itemId}`));
 
   if (error) {
     if (axios.isAxiosError(error)) {

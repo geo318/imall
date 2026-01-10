@@ -1,9 +1,15 @@
-import { aboutPillarsMock } from "@/MOCKS/aboutPage.mock";
-import { MarketingFooter } from "@/components/marketing-footer";
-import { MarketingNav } from "@/components/marketing-nav";
 import { Button } from "@repo/ui/button";
 import Link from "next/link";
+import { Footer } from "@/components/footer/footer";
+import { MarketingNav } from "@/components/marketing-nav";
+import { aboutPillarsMock } from "@/MOCKS/aboutPage.mock";
 
+export const metadata = {
+  title: "About | MarketHub",
+  description: "Learn about MarketHub - a modern multi-vendor marketplace platform",
+};
+
+// PPR: Fully static page (no dynamic slots needed)
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-white">
@@ -59,7 +65,7 @@ export default function AboutPage() {
           ))}
         </section>
       </main>
-      <MarketingFooter />
+      <Footer />
     </div>
   );
 }

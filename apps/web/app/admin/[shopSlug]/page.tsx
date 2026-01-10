@@ -9,18 +9,34 @@ import { Textarea } from "@repo/ui/textarea";
 import Link from "next/link";
 
 const sections = [
-  { href: "settings", title: "Shop settings", desc: "Name, branding, bank details, addresses" },
-  { href: "catalog", title: "Catalog", desc: "Products, markdown descriptions, variants, media" },
-  { href: "inventory", title: "Inventory", desc: "Adjust stock, ledger entries, snapshots" },
-  { href: "auctions", title: "Auctions", desc: "Min increment, buy-now, anti-snipe windows" },
-  { href: "orders", title: "Orders", desc: "Payments, shipping status, fulfillment notes" },
+  {
+    href: "settings",
+    title: "Shop settings",
+    desc: "Name, branding, bank details, addresses",
+  },
+  {
+    href: "catalog",
+    title: "Catalog",
+    desc: "Products, markdown descriptions, variants, media",
+  },
+  {
+    href: "inventory",
+    title: "Inventory",
+    desc: "Adjust stock, ledger entries, snapshots",
+  },
+  {
+    href: "auctions",
+    title: "Auctions",
+    desc: "Min increment, buy-now, anti-snipe windows",
+  },
+  {
+    href: "orders",
+    title: "Orders",
+    desc: "Payments, shipping status, fulfillment notes",
+  },
 ];
 
-export default function AdminShopPage({
-  params,
-}: {
-  params: { shopSlug: string };
-}) {
+export default function AdminShopPage({ params }: { params: { shopSlug: string } }) {
   const { shopSlug } = params;
 
   return (

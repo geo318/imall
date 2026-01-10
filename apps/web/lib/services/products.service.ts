@@ -33,7 +33,7 @@ export type ApiProduct = {
 export type ProductSearchParams = {
   limit?: number;
   offset?: number;
-  q?: string;
+  q?: string; // Backend expects 'q', not 'query'
   type?: "all" | "buyNow" | "auction";
   sort?: "newest" | "oldest" | "priceAsc" | "priceDesc" | "random";
   minPrice?: number;
@@ -63,9 +63,7 @@ export async function getShopProducts(shopSlug: string, limit = 20): Promise<Api
 }
 
 export async function getProductByIdentifier(productIdentifier: string): Promise<ApiProduct> {
-  const [data, error] = await tryCatch(
-    axios.get<ApiProduct>(`/api/products/${productIdentifier}`),
-  );
+  const [data, error] = await tryCatch(axios.get<ApiProduct>(`/api/products/${productIdentifier}`));
 
   if (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
@@ -77,10 +75,7 @@ export async function getProductByIdentifier(productIdentifier: string): Promise
   return data.data;
 }
 
-export async function getProductBySlug(
-  shopSlug: string,
-  productSlug: string,
-): Promise<ApiProduct> {
+export async function getProductBySlug(shopSlug: string, productSlug: string): Promise<ApiProduct> {
   const [data, error] = await tryCatch(
     axios.get<ApiProduct>(`/api/shops/${shopSlug}/products/${productSlug}`),
   );

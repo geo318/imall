@@ -46,7 +46,8 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "handcrafted-ceramic-vase",
         title: "Handcrafted Ceramic Vase",
-        description: "Minimalist ceramic vase thrown by hand with a satin glaze.",
+        description:
+          "Minimalist ceramic vase thrown by hand with a satin glaze.",
         variants: [
           {
             sku: "CER-001",
@@ -64,7 +65,8 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "vintage-leather-messenger-bag",
         title: "Vintage Leather Messenger Bag",
-        description: "Full-grain leather bag with brass hardware and padded laptop sleeve.",
+        description:
+          "Full-grain leather bag with brass hardware and padded laptop sleeve.",
         variants: [{ sku: "BAG-001", price: "159.00", currency: "USD" }],
       },
       {
@@ -94,7 +96,8 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "handmade-silver-jewelry-set",
         title: "Handmade Silver Jewelry Set",
-        description: "925 sterling silver necklace and earrings crafted in small batches.",
+        description:
+          "925 sterling silver necklace and earrings crafted in small batches.",
         variants: [
           {
             sku: "JEW-001",
@@ -112,7 +115,8 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "wooden-watch-sustainable-oak",
         title: "Wooden Watch - Sustainable Oak",
-        description: "Sustainable oak case with a minimalist dial and leather strap.",
+        description:
+          "Sustainable oak case with a minimalist dial and leather strap.",
         variants: [{ sku: "WAT-001", price: "195.00", currency: "USD" }],
       },
       {
@@ -124,13 +128,15 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "handwoven-basket-set",
         title: "Handwoven Basket Set",
-        description: "Set of three handwoven baskets made from sustainable fibers.",
+        description:
+          "Set of three handwoven baskets made from sustainable fibers.",
         variants: [{ sku: "BAS-001", price: "85.00", currency: "USD" }],
       },
       {
         slug: "midnight-desk-set",
         title: "Midnight Desk Set",
-        description: "Matte black desk set including tray, pen holder, and catch-all.",
+        description:
+          "Matte black desk set including tray, pen holder, and catch-all.",
         variants: [{ sku: "DSK-001", price: "210.00", currency: "USD" }],
       },
       {
@@ -154,7 +160,8 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "sculpted-planter-duo",
         title: "Sculpted Planter Duo",
-        description: "Pair of sculpted planters with drainage, perfect for shelves.",
+        description:
+          "Pair of sculpted planters with drainage, perfect for shelves.",
         variants: [{ sku: "PLN-001", price: "58.00", currency: "USD" }],
       },
       {
@@ -166,7 +173,8 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "wool-blanket",
         title: "Wool Blanket",
-        description: "Warm wool blanket in neutral tones, perfect for cozy evenings.",
+        description:
+          "Warm wool blanket in neutral tones, perfect for cozy evenings.",
         variants: [{ sku: "BLK-001", price: "95.00", currency: "USD" }],
       },
       {
@@ -340,13 +348,15 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "hand-blown-glass-vase",
         title: "Hand-Blown Glass Vase",
-        description: "Unique hand-blown glass vase with organic shapes and colors.",
+        description:
+          "Unique hand-blown glass vase with organic shapes and colors.",
         variants: [{ sku: "GLAS-001", price: "145.00", currency: "USD" }],
       },
       {
         slug: "leather-bound-journal",
         title: "Leather Bound Journal",
-        description: "Premium leather journal with hand-stitched binding and blank pages.",
+        description:
+          "Premium leather journal with hand-stitched binding and blank pages.",
         variants: [
           {
             sku: "JRN-001",
@@ -364,7 +374,8 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "copper-mug-set",
         title: "Copper Mug Set",
-        description: "Set of four hand-hammered copper mugs, perfect for cocktails.",
+        description:
+          "Set of four hand-hammered copper mugs, perfect for cocktails.",
         variants: [{ sku: "COP-001", price: "125.00", currency: "USD" }],
       },
     ],
@@ -376,13 +387,15 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "minimalist-wall-clock",
         title: "Minimalist Wall Clock",
-        description: "Sleek wall clock with silent movement and minimalist design.",
+        description:
+          "Sleek wall clock with silent movement and minimalist design.",
         variants: [{ sku: "CLK-001", price: "95.00", currency: "USD" }],
       },
       {
         slug: "geometric-planter",
         title: "Geometric Planter",
-        description: "Modern geometric planter in matte finish, perfect for succulents.",
+        description:
+          "Modern geometric planter in matte finish, perfect for succulents.",
         variants: [
           {
             sku: "GEO-001",
@@ -400,7 +413,8 @@ const shopSeeds: ShopSeed[] = [
       {
         slug: "linen-table-runner",
         title: "Linen Table Runner",
-        description: "Elegant linen table runner in natural color, hand-finished edges.",
+        description:
+          "Elegant linen table runner in natural color, hand-finished edges.",
         variants: [{ sku: "LIN-001", price: "68.00", currency: "USD" }],
       },
     ],
@@ -417,7 +431,11 @@ async function upsertTenant(shopSeed: ShopSeed) {
 
   const [inserted] = await db
     .insert(tenants)
-    .values({ id: crypto.randomUUID(), shopSlug: shopSeed.slug, name: shopSeed.name })
+    .values({
+      id: crypto.randomUUID(),
+      shopSlug: shopSeed.slug,
+      name: shopSeed.name,
+    })
     .onConflictDoNothing()
     .returning({ id: tenants.id });
 
@@ -433,7 +451,10 @@ async function upsertTenant(shopSeed: ShopSeed) {
   return fetched.id;
 }
 
-async function upsertProductWithVariants(tenantId: string, productSeed: ProductSeed) {
+async function upsertProductWithVariants(
+  tenantId: string,
+  productSeed: ProductSeed,
+) {
   const [product] = await db
     .insert(products)
     .values({
@@ -452,11 +473,17 @@ async function upsertProductWithVariants(tenantId: string, productSeed: ProductS
       : await db
           .select({ id: products.id })
           .from(products)
-          .where(and(eq(products.tenantId, tenantId), eq(products.slug, productSeed.slug)))
+          .where(
+            and(
+              eq(products.tenantId, tenantId),
+              eq(products.slug, productSeed.slug),
+            ),
+          )
           .limit(1);
 
   const productId = product?.id ?? productFallback?.id;
-  if (!productId) throw new Error(`Failed to upsert product ${productSeed.slug}`);
+  if (!productId)
+    throw new Error(`Failed to upsert product ${productSeed.slug}`);
 
   const variantIds: string[] = [];
 
@@ -484,7 +511,8 @@ async function upsertProductWithVariants(tenantId: string, productSeed: ProductS
             .limit(1);
 
     const variantId = variant?.id ?? variantFallback?.id;
-    if (!variantId) throw new Error(`Failed to upsert variant for ${productSeed.slug}`);
+    if (!variantId)
+      throw new Error(`Failed to upsert variant for ${productSeed.slug}`);
     variantIds.push(variantId);
 
     // Add initial inventory stock with randomized availability states
@@ -518,7 +546,7 @@ async function upsertProductWithVariants(tenantId: string, productSeed: ProductS
       } else {
         initialStock = Math.floor(Math.random() * 30) + 21; // Plenty (21-50)
       }
-      
+
       console.log(
         `  Adding ${initialStock} units of stock for variant ${variantSeed.sku} (${variantId})`,
       );
@@ -542,11 +570,13 @@ async function upsertProductWithVariants(tenantId: string, productSeed: ProductS
     // Start auction now (or very recently) so it's active
     const startsAt = new Date();
     // End auction in the future based on duration
-    const endsAt = new Date(startsAt.getTime() + auction.durationMinutes * 60_000);
-    
+    const endsAt = new Date(
+      startsAt.getTime() + auction.durationMinutes * 60_000,
+    );
+
     // Delete existing auction for this variant if it exists, then insert new one
     await db.delete(auctions).where(eq(auctions.variantId, variantId));
-    
+
     await db.insert(auctions).values({
       id: crypto.randomUUID(),
       tenantId,
@@ -642,8 +672,13 @@ async function seed() {
   }
 
   const totalShops = shopSeeds.length;
-  const totalProducts = shopSeeds.reduce((sum, shop) => sum + shop.products.length, 0);
-  console.log(`\n✅ Seed complete! ${totalShops} shops, ${totalProducts} products`);
+  const totalProducts = shopSeeds.reduce(
+    (sum, shop) => sum + shop.products.length,
+    0,
+  );
+  console.log(
+    `\n✅ Seed complete! ${totalShops} shops, ${totalProducts} products`,
+  );
 }
 
 seed()

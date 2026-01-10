@@ -39,8 +39,8 @@ TypeScript: also upgrade `@types/react` and `@types/react-dom`.
 - If you have a custom `webpack` config, `next build` may fail (to prevent misconfiguration). Fix by migrating config, using `next build --webpack`, or using Turbopack and removing/ignoring the webpack config.
 - Turbopack config moved: `experimental.turbopack` → top-level `turbopack` in `next.config.*`.
 - Turbopack migration gotchas:
-	- Sass imports: remove the Webpack-only `~` prefix (e.g. `@import 'bootstrap/...';`).
-	- Browser bundles must not import Node built-ins (e.g. `fs`). If unavoidable, use `turbopack.resolveAlias` as a stopgap.
+  - Sass imports: remove the Webpack-only `~` prefix (e.g. `@import 'bootstrap/...';`).
+  - Browser bundles must not import Node built-ins (e.g. `fs`). If unavoidable, use `turbopack.resolveAlias` as a stopgap.
 - Turbopack filesystem cache (dev, beta): `experimental.turbopackFileSystemCacheForDev: true`.
 - React Compiler support: stable opt-in via `reactCompiler: true` (expect higher build/compile cost).
 - Build Adapters API: alpha (custom build adapters).

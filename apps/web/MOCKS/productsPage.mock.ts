@@ -1,10 +1,26 @@
 import type { MarketingProduct } from "@/components/marketing/product-card";
 
 export const productCategoriesMock = [
-  { name: "Home & Living", blurb: "Handmade decor, kitchenware, and storage.", color: "from-emerald-100 to-white" },
-  { name: "Fashion", blurb: "Limited apparel drops, bags, and accessories.", color: "from-amber-100 to-white" },
-  { name: "Art & Prints", blurb: "Auctions for originals and signed editions.", color: "from-sky-100 to-white" },
-  { name: "Tech & Gadgets", blurb: "Thoughtful devices and desk upgrades.", color: "from-indigo-100 to-white" },
+  {
+    name: "Home & Living",
+    blurb: "Handmade decor, kitchenware, and storage.",
+    color: "from-emerald-100 to-white",
+  },
+  {
+    name: "Fashion",
+    blurb: "Limited apparel drops, bags, and accessories.",
+    color: "from-amber-100 to-white",
+  },
+  {
+    name: "Art & Prints",
+    blurb: "Auctions for originals and signed editions.",
+    color: "from-sky-100 to-white",
+  },
+  {
+    name: "Tech & Gadgets",
+    blurb: "Thoughtful devices and desk upgrades.",
+    color: "from-indigo-100 to-white",
+  },
 ];
 
 export const productPicksMock: MarketingProduct[] = [

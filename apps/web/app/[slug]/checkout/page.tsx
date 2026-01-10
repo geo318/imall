@@ -1,14 +1,14 @@
 "use client";
 
-import { MarketingFooter } from "@/components/marketing-footer";
-import { MarketingNav } from "@/components/marketing-nav";
-import { type CartItem, checkoutCart, getCart } from "@/lib/api/cart";
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
 import { ArrowLeft, Check, CreditCard, Shield, Truck } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Footer } from "@/components/footer/footer";
+import { MarketingNav } from "@/components/marketing-nav";
+import { type CartItem, checkoutCart, getCart } from "@/lib/api/cart";
 
 export default function CheckoutPage({ params }: { params: Promise<{ slug: string }> }) {
   const [slug, setSlug] = useState<string>("");
@@ -26,14 +26,14 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
   useEffect(() => {
     if (!slug) return;
     async function loadCart() {
-      const cartId = typeof window !== "undefined" ? localStorage.getItem(cartKey) : null;
+      const cartId = globalThis.window ? localStorage.getItem(cartKey) : null;
       if (!cartId) {
         setItems([]);
         setLoading(false);
         return;
       }
       try {
-        const cart = await getCart(slug, cartId);
+        const cart = await getCart(cartId);
         setItems(cart.items ?? []);
       } catch (err) {
         console.error("Failed to load cart:", err);
@@ -54,10 +54,10 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
       setStep("payment");
     } else if (step === "payment") {
       // Place order
-      const cartId = typeof window !== "undefined" ? localStorage.getItem(cartKey) : null;
+      const cartId = globalThis.window ? localStorage.getItem(cartKey) : null;
       if (cartId) {
         try {
-          await checkoutCart(slug, cartId);
+          await checkoutCart(cartId);
           localStorage.removeItem(cartKey);
           setStep("confirmation");
         } catch (err) {
@@ -74,7 +74,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         <main className="flex-1 container py-8">
           <p className="p-4">Loading…</p>
         </main>
-        <MarketingFooter />
+        <Footer />
       </div>
     );
   }
@@ -91,7 +91,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             <h1 className="text-3xl font-bold mb-2">Order Confirmed!</h1>
             <p className="text-slate-600 mb-2">Thank you for your purchase</p>
             <p className="text-sm text-slate-500 mb-8">
-              Order #MKT-{Math.random().toString(36).substring(2, 8).toUpperCase()}
+              Order #MKT-
+              {Math.random().toString(36).substring(2, 8).toUpperCase()}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button>
@@ -103,7 +104,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
             </div>
           </div>
         </main>
-        <MarketingFooter />
+        <Footer />
       </div>
     );
   }
@@ -335,7 +336,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ slug: strin
         </div>
       </main>
 
-      <MarketingFooter />
+      <Footer />
     </div>
   );
 }

@@ -67,6 +67,10 @@ const config: Config = {
           800: "#223c8c",
           900: "#1f356f",
         },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -21,54 +21,55 @@ type AuthSingleton = {
   resolve: Record<string, never>;
 };
 
-export type WsContext<Extras extends Record<string, unknown> = Record<string, never>> = ElysiaWS<
-  { auth?: AuthContext } & Extras
->;
+export type WsContext<
+  Extras extends Record<string, unknown> = Record<string, never>,
+> = ElysiaWS<{ auth?: AuthContext } & Extras>;
 
-export const authPlugin = new Elysia<"", AuthSingleton>({ name: "auth" }).derive(
-  async ({ request }) => {
-    // Check for Clerk JWT token in Authorization header
-    const authHeader = request.headers.get("authorization");
-    let userId: string | undefined;
-    let role: AuthContext["role"] = "admin";
+export const authPlugin = new Elysia<"", AuthSingleton>({
+  name: "auth",
+}).derive(async ({ request }) => {
+  // Check for Clerk JWT token in Authorization header
+  const authHeader = request.headers.get("authorization");
+  let userId: string | undefined;
+  let role: AuthContext["role"] = "admin";
 
-    if (authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.substring(7);
-      // TODO: Verify Clerk JWT token and extract userId
-      // For now, we'll extract from token if it's a valid format
-      // In production, verify with Clerk's public key
-      try {
-        // Basic JWT parsing (without verification for now)
-        const parts = token.split(".");
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          userId = payload.sub || payload.user_id;
-          // Extract role from token if available
-          if (payload.role) {
-            role = payload.role;
-          }
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.substring(7);
+    // TODO: Verify Clerk JWT token and extract userId
+    // For now, we'll extract from token if it's a valid format
+    // In production, verify with Clerk's public key
+    try {
+      // Basic JWT parsing (without verification for now)
+      const parts = token.split(".");
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1]));
+        userId = payload.sub || payload.user_id;
+        // Extract role from token if available
+        if (payload.role) {
+          role = payload.role;
         }
-      } catch {
-        // Invalid token format, fall back to demo headers
       }
+    } catch {
+      // Invalid token format, fall back to demo headers
     }
+  }
 
-    // Fall back to demo headers if no token
-    if (!userId) {
-      const demoUser = request.headers.get("x-demo-user");
-      const demoRole = (request.headers.get("x-demo-role") as AuthContext["role"]) ?? "admin";
-      userId = demoUser ?? undefined;
-      role = demoRole;
-    }
+  // Fall back to demo headers if no token
+  if (!userId) {
+    const demoUser = request.headers.get("x-demo-user");
+    const demoRole =
+      (request.headers.get("x-demo-role") as AuthContext["role"]) ?? "admin";
+    userId = demoUser ?? undefined;
+    role = demoRole;
+  }
 
-    return {
-      auth: {
-        userId,
-        role,
-      } satisfies AuthContext,
-    };
-  },
-);
+  return {
+    auth: {
+      userId,
+      role,
+    } satisfies AuthContext,
+  };
+});
 
 export function requireAdmin(ctx: AuthContext) {
   if (ctx.role !== "admin" && ctx.role !== "staff") {
@@ -136,7 +137,12 @@ export async function getAvailableStock(tenantId: string, variantId: string) {
   const [row] = await db
     .select({ onHand: sum(inventoryLedger.delta) })
     .from(inventoryLedger)
-    .where(and(eq(inventoryLedger.tenantId, tenantId), eq(inventoryLedger.variantId, variantId)));
+    .where(
+      and(
+        eq(inventoryLedger.tenantId, tenantId),
+        eq(inventoryLedger.variantId, variantId),
+      ),
+    );
   // PostgreSQL sum() returns null when no rows exist, convert to 0
   const stock = row?.onHand ? Number(row.onHand) : 0;
   return stock;

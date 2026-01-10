@@ -1,21 +1,31 @@
-import { valuePropsMock } from "@/MOCKS/valueProps.mock";
-import { MarketingFooter } from "@/components/marketing-footer";
-import { MarketingNav } from "@/components/marketing-nav";
-import { CategoryBanner } from "@/components/marketing/category-banner";
-import { FeaturedProductsClient } from "@/components/marketing/featured-products-client";
-import { HeroSection } from "@/components/marketing/hero";
-import { VendorSpotlight } from "@/components/marketing/vendor-spotlight";
 import { Button } from "@repo/ui/button";
 import Link from "next/link";
+import { Footer } from "@/components/footer/footer";
+import { CategoryBanner } from "@/components/marketing/category-banner";
+import { FeaturedProductsServer } from "@/components/marketing/featured-products-server";
+import { HeroSection } from "@/components/marketing/hero";
+import { VendorSpotlight } from "@/components/marketing/vendor-spotlight";
+import { MarketingNav } from "@/components/marketing-nav";
+import { valuePropsMock } from "@/MOCKS/valueProps.mock";
 
+export const metadata = {
+  title: "MarketHub - Modern Multi-Vendor Marketplace",
+  description: "Discover products from verified vendors. Shop now or bid in auctions.",
+};
+
+// PPR: Static shell with dynamic content slots
 export default async function Home() {
   return (
     <div className="min-h-screen bg-white">
       <MarketingNav />
       <main>
+        {/* Static: Hero section */}
         <HeroSection />
-        <FeaturedProductsClient />
+        {/* Dynamic slot: Featured products */}
+        <FeaturedProductsServer />
+        {/* Static: Category banner */}
         <CategoryBanner />
+        {/* Dynamic slot: Vendor spotlight */}
         <VendorSpotlight />
         <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
           <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/40 to-sky-50/40 p-8 shadow-sm sm:p-10">
@@ -70,7 +80,7 @@ export default async function Home() {
           </div>
         </section>
       </main>
-      <MarketingFooter />
+      <Footer />
     </div>
   );
 }

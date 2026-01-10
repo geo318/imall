@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
-import { NextRequest, NextResponse } from "next/server";
 import { env } from "@repo/shared";
 import axios from "axios";
+import { type NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   request: NextRequest,
@@ -70,7 +70,7 @@ async function proxyRequest(
 
     // Add Clerk token if available
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers.Authorization = `Bearer ${token}`;
     }
 
     // Forward relevant headers from the original request
@@ -122,11 +122,11 @@ async function proxyRequest(
       "vary",
     ];
 
-    Object.entries(backendResponse.headers).forEach(([key, value]) => {
+    for (const [key, value] of Object.entries(backendResponse.headers)) {
       if (corsHeaders.includes(key.toLowerCase()) && typeof value === "string") {
         response.headers.set(key, value);
       }
-    });
+    }
 
     return response;
   } catch (error) {
@@ -157,4 +157,3 @@ async function proxyRequest(
     );
   }
 }
-

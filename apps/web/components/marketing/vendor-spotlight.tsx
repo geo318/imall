@@ -10,7 +10,9 @@ export function VendorSpotlight() {
           <h2 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
             Top <span className="text-gradient">Vendors</span>
           </h2>
-          <p className="mt-2 text-slate-600">Meet the passionate creators behind our best products</p>
+          <p className="mt-2 text-slate-600">
+            Meet the passionate creators behind our best products
+          </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

@@ -20,4 +20,3 @@ export async function getShops(limit = 50): Promise<Shop[]> {
 
   return data.data;
 }
-

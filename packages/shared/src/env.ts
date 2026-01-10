@@ -5,7 +5,9 @@ const serverSchema = {
   DOMAIN: z.string().url(),
   DATABASE_URL: z.string().url(),
   PORT: z.coerce.number().int().positive().default(3001),
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   CLERK_JWT_PUBLIC_KEY: z.string().optional(),
   CLERK_SECRET_KEY: z.string(),
   PAYMENT_KEEPZ_API_KEY: z.string().optional(),
@@ -35,7 +37,8 @@ const runtimeEnv: RuntimeEnv = {
   SEED_SHOP_NAME: process.env.SEED_SHOP_NAME,
   BACKEND_URL: process.env.BACKEND_URL,
   NEXT_PUBLIC_DOMAIN: process.env.NEXT_PUBLIC_DOMAIN,
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
   SKIP_ENV_VALIDATION: process.env.SKIP_ENV_VALIDATION,
 };
 
@@ -44,9 +47,10 @@ export function buildEnv(runtimeEnv: RuntimeEnv) {
     server: serverSchema,
     client: clientSchema,
     runtimeEnv,
-    isServer: typeof window === "undefined",
+    isServer: !globalThis.window,
     clientPrefix: "NEXT_PUBLIC_",
-    skipValidation: Boolean(runtimeEnv.SKIP_ENV_VALIDATION) || runtimeEnv.NODE_ENV === "test",
+    skipValidation:
+      Boolean(runtimeEnv.SKIP_ENV_VALIDATION) || runtimeEnv.NODE_ENV === "test",
     emptyStringAsUndefined: true,
   });
 }

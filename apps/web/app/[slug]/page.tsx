@@ -1,13 +1,10 @@
-import { isProductIdentifier, isReservedRoute } from "@/lib/utils";
 import { env } from "@repo/shared";
-import { ProductClient } from "./ProductClient";
-import { ShopProfileClient } from "./ShopProfileClient";
+import { isProductIdentifier, isReservedRoute } from "@/lib/utils";
+import { ProductServer } from "./_components/product/product-server";
+import { ShopProfileClient } from "./_components/shop/shop-profile-client";
 
-export default async function SlugPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+// PPR: Dynamic route with conditional rendering based on slug type
+export default async function SlugPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
   // Check if it's a reserved route name
@@ -24,7 +21,7 @@ export default async function SlugPage({
 
   // Check if it's a product identifier (format: slug-abc12345)
   if (isProductIdentifier(slug)) {
-    return <ProductClient productIdentifier={slug} />;
+    return <ProductServer productIdentifier={slug} />;
   }
 
   // Otherwise treat it as a shop slug
