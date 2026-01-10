@@ -1,3 +1,5 @@
+import { Badge } from "@repo/ui/badge";
+import { Clock, Gavel } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -30,8 +32,9 @@ export function ProductCard({
 }: MarketingProduct) {
   return (
     <Link href={href ?? "/products"} className="group block" prefetch>
-      <div className="card-hover relative overflow-hidden rounded-2xl border border-slate-200/70 bg-white">
-        <div className="relative aspect-square overflow-hidden bg-slate-100">
+      <div className="card-hover relative overflow-hidden rounded-2xl bg-card border border-border/50">
+        {/* Image */}
+        <div className="relative aspect-square overflow-hidden bg-secondary">
           <Image
             src={image}
             alt={title}
@@ -41,35 +44,41 @@ export function ProductCard({
             priority={id === "1"}
           />
           {(isAuction || tag) && (
-            <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-amber-400 px-3 py-1 text-xs font-semibold text-amber-900">
-              <span aria-hidden>⏳</span>
+            <Badge className="absolute top-3 left-3 bg-amber-200 text-amber-950 gap-1">
+              <Gavel className="h-3 w-3" />
               {tag ?? "Auction"}
-            </span>
+            </Badge>
           )}
         </div>
+        {/* Content */}
         <div className="p-4">
-          <p className="mb-1 text-xs text-slate-500">{vendor}</p>
-          <h3 className="line-clamp-2 text-sm font-semibold text-slate-900 transition-colors group-hover:text-emerald-700">
+          <p className="text-xs text-muted-foreground mb-1">{vendor}</p>
+          <h3 className="font-semibold text-sm line-clamp-2 mb-2 group-hover:text-emerald-700 transition-colors">
             {title}
           </h3>
           {isAuction ? (
-            <div className="mt-2 space-y-1 text-sm">
+            <div className="space-y-1">
               <div className="flex items-baseline justify-between">
-                <span className="text-slate-500">Current bid</span>
-                <span className="font-semibold text-emerald-700">${currentBid?.toFixed(2)}</span>
+                <span className="text-xs text-muted-foreground">Current bid</span>
+                <span className="font-bold text-emerald-700">
+                  {currentBid !== undefined && currentBid !== null
+                    ? `$${currentBid.toFixed(2)}`
+                    : "View"}
+                </span>
               </div>
               {endsIn && (
                 <div className="flex items-center gap-1 text-xs text-amber-700">
-                  <span aria-hidden>🕒</span>
+                  <Clock className="h-3 w-3" />
                   <span>Ends in {endsIn}</span>
                 </div>
               )}
             </div>
           ) : (
-            <p className="mt-2 text-lg font-semibold text-slate-900">
-              {price !== undefined && price !== null
-                ? `$${price.toFixed(2)}${currency ? ` ${currency}` : ""}`
-                : "View product"}
+            <p className="font-bold text-lg">
+              {price !== undefined && price !== null ? `$${price.toFixed(2)}` : "View product"}
+              {currency ? (
+                <span className="ml-1 text-sm text-muted-foreground">{currency}</span>
+              ) : null}
             </p>
           )}
         </div>
