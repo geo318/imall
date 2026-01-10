@@ -10,7 +10,7 @@ type Props = {
   limit?: number;
 };
 
-export function FeaturedProductsClient({ limit = 8 }: Props) {
+export function FeaturedProductsClient({ limit = 24 }: Props) {
   const { data, isLoading, isError } = useQuery({
     queryKey: ["featured-products", limit],
     queryFn: () => fetchAnyProducts(limit),
@@ -41,6 +41,15 @@ export function FeaturedProductsClient({ limit = 8 }: Props) {
 
   const products: MarketingProduct[] = data.map((product) => mapApiProductToMarketing(product));
 
+  // Home rule: first 4 buy-now, next 4 auctions (if available).
+  const buyNow = products.filter((p) => !p.isAuction);
+  const auctions = products.filter((p) => p.isAuction);
+  const curated = [...buyNow.slice(0, 4), ...auctions.slice(0, 4)];
+  // If auctions are missing, fill remaining slots from buy-now.
+  while (curated.length < 8 && buyNow[curated.length]) {
+    curated.push(buyNow[curated.length]);
+  }
+
   if (products.length === 0) {
     return (
       <section className="py-14 sm:py-16 lg:py-20">
@@ -51,5 +60,5 @@ export function FeaturedProductsClient({ limit = 8 }: Props) {
     );
   }
 
-  return <FeaturedProducts products={products} />;
+  return <FeaturedProducts products={curated.slice(0, 8)} />;
 }
