@@ -15,6 +15,10 @@ function loadRootEnv() {
     return;
   } catch (error) {
     // Fallback for environments where @next/env is not installed (e.g. monorepo hoisting quirks).
+    // This is expected in some monorepo setups, so we silently fall back to dotenv.
+    if (error instanceof Error && !error.message.includes("@next/env")) {
+      console.warn("[next.config] Failed to load @next/env, using dotenv fallback:", error.message);
+    }
     const dotenv = require("dotenv");
     const files = [".env", `.env.${nodeEnv}`, ".env.local", `.env.${nodeEnv}.local`];
     for (const file of files) {
@@ -28,6 +32,7 @@ loadRootEnv();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  cacheComponents: true,
   images: {
     remotePatterns: [
       {

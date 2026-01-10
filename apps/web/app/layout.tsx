@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { Suspense } from "react";
 import { cn } from "@/lib/utils";
-import { ClerkProvider } from "@clerk/nextjs";
-import { QueryProvider } from "./query-provider";
-import { env } from "@repo/shared";
-import { Toaster } from "@/components/ui/sonner";
+import { LayoutClient } from "./layout-client";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -21,19 +19,19 @@ export const metadata: Metadata = {
   description: "Tenant-based shops with carts, auctions, inventory, and admin workspace.",
 };
 
+// PPR: Static shell with client providers in Suspense
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider publishableKey={env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
-      <html lang="en">
-        <body className={cn("font-sans antialiased", geistSans.variable, geistMono.variable)}>
-          <QueryProvider>{children}</QueryProvider>
-          <Toaster />
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      <body className={cn("font-sans antialiased", geistSans.variable, geistMono.variable)}>
+        <Suspense fallback={null}>
+          <LayoutClient>{children}</LayoutClient>
+        </Suspense>
+      </body>
+    </html>
   );
 }
