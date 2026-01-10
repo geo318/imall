@@ -11,6 +11,7 @@ import {
 import { and, eq, lte } from "drizzle-orm";
 import { Elysia } from "elysia";
 import {
+  authPlugin,
   bidPayloadSchema,
   getAvailableStock,
   getTenantIdBySlug,
@@ -20,7 +21,6 @@ import {
 } from "../context";
 
 type AuctionSocket = WsContext<{
-  params: { auctionId: string; shopSlug: string };
   subscriptions?: Set<string>;
 }>;
 type AuctionSubscriptions = Record<string, Set<AuctionSocket>>;
@@ -127,7 +127,8 @@ export const auctionsRoutes = new Elysia({
       .where(eq(bids.auctionId, params.auctionId));
     return results;
   })
-  .post("/:auctionId/bids", async ({ params, body, auth }) => {
+  .post("/:auctionId/bids", async ({ params, body, ...ctx }) => {
+    const auth = (ctx as { auth?: { userId?: string; role?: "admin" | "staff" | "viewer" } }).auth;
     let payload: ReturnType<typeof bidPayloadSchema.parse>;
     try {
       payload = bidPayloadSchema.parse(body);
@@ -388,35 +389,43 @@ export const auctionsRoutes = new Elysia({
     }
   })
   .ws("/ws/auctions/:auctionId", {
-    open(ws: AuctionSocket) {
-      const auctionId = ws.data.params.auctionId;
+    open(ws) {
+      // Extract auctionId from the WebSocket route params
+      // In Elysia, WebSocket params are available via the route pattern
+      const auctionId = (ws as unknown as { params: { auctionId: string } }).params?.auctionId;
+      if (!auctionId) {
+        ws.close();
+        return;
+      }
       const subs = new Set<string>([auctionId]);
-      ws.data.subscriptions = subs;
+      (ws.data as { subscriptions?: Set<string> }).subscriptions = subs;
       subscriptions[auctionId] ??= new Set();
-      subscriptions[auctionId].add(ws);
+      subscriptions[auctionId].add(ws as AuctionSocket);
       ws.send(JSON.stringify({ type: "subscribed", auctionId }));
     },
-    message(ws: AuctionSocket, message) {
+    message(ws, message) {
       try {
         const data = JSON.parse(message as string);
         if (data.action === "subscribe" && typeof data.auctionId === "string") {
           const auctionId = data.auctionId;
-          const subs = ws.data.subscriptions ?? new Set<string>();
+          const wsData = ws.data as { subscriptions?: Set<string> };
+          const subs = wsData.subscriptions ?? new Set<string>();
           subs.add(auctionId);
-          ws.data.subscriptions = subs;
+          wsData.subscriptions = subs;
           subscriptions[auctionId] ??= new Set();
-          subscriptions[auctionId].add(ws);
+          subscriptions[auctionId].add(ws as AuctionSocket);
           ws.send(JSON.stringify({ type: "subscribed", auctionId }));
         }
       } catch {
         ws.send(JSON.stringify({ error: "Invalid message" }));
       }
     },
-    close(ws: AuctionSocket) {
-      const subs = ws.data.subscriptions;
+    close(ws) {
+      const wsData = ws.data as { subscriptions?: Set<string> };
+      const subs = wsData.subscriptions;
       if (subs) {
         for (const auctionId of subs) {
-          subscriptions[auctionId]?.delete(ws);
+          subscriptions[auctionId]?.delete(ws as AuctionSocket);
         }
       }
     },

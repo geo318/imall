@@ -41,7 +41,7 @@ export const authPlugin = new Elysia<"", AuthSingleton>({
     try {
       // Basic JWT parsing (without verification for now)
       const parts = token.split(".");
-      if (parts.length === 3) {
+      if (parts.length === 3 && parts[1]) {
         const payload = JSON.parse(atob(parts[1]));
         userId = payload.sub || payload.user_id;
         // Extract role from token if available
