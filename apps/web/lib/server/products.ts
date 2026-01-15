@@ -2,7 +2,7 @@
 
 import { env } from "@repo/shared";
 import { cacheLife, cacheTag } from "next/cache";
-import { CACHE_LIFE, CACHE_TAGS } from "../constants";
+import { CACHE_TAGS } from "../constants";
 import type {
   ApiProduct,
   ProductSearchParams,
@@ -13,13 +13,12 @@ const API_BASE = env.BACKEND_URL || "http://localhost:3001";
 
 /**
  * Server-side function to fetch products for a shop
- * Uses Cache Components with 'use cache' directive
+ * Uses Cache Components with 'use cache' directive for PPR
  */
 export async function getShopProductsServer(shopSlug: string, limit = 20): Promise<ApiProduct[]> {
   "use cache";
-  cacheLife(CACHE_LIFE.SHOP);
-  cacheTag(CACHE_TAGS.SHOPS);
-  cacheTag(CACHE_TAGS.SHOP);
+  cacheLife({ stale: 60, expire: 3600 }); // 1m stale, 1h expire
+  cacheTag(CACHE_TAGS.PRODUCTS);
   cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
 
   const response = await fetch(`${API_BASE}/api/shops/${shopSlug}/products?limit=${limit}`);
@@ -36,11 +35,11 @@ export async function getShopProductsServer(shopSlug: string, limit = 20): Promi
 
 /**
  * Server-side function to fetch a product by identifier
- * Uses Cache Components with 'use cache' directive
+ * Uses Cache Components with 'use cache' directive for PPR
  */
 export async function getProductByIdentifierServer(productIdentifier: string): Promise<ApiProduct> {
   "use cache";
-  cacheLife(CACHE_LIFE.PRODUCT);
+  cacheLife({ stale: 30, expire: 1800 }); // 30s stale, 30m expire
   cacheTag(CACHE_TAGS.PRODUCT);
   cacheTag(`${CACHE_TAGS.PRODUCT}-${productIdentifier}`);
 
@@ -58,13 +57,13 @@ export async function getProductByIdentifierServer(productIdentifier: string): P
 
 /**
  * Server-side function to search products
- * Uses Cache Components with 'use cache' directive
+ * Uses Cache Components with 'use cache' directive for PPR
  */
 export async function searchProductsServer(
   params: ProductSearchParams,
 ): Promise<ProductSearchResponse> {
   "use cache";
-  cacheLife(CACHE_LIFE.PRODUCTS);
+  cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
   cacheTag(CACHE_TAGS.PRODUCTS);
 
   const searchParams = new URLSearchParams();
@@ -87,11 +86,11 @@ export async function searchProductsServer(
 
 /**
  * Server-side function to fetch random products
- * Uses Cache Components with 'use cache' directive
+ * Uses Cache Components with 'use cache' directive for PPR
  */
 export async function getAnyProductsServer(limit = 20): Promise<ApiProduct[]> {
   "use cache";
-  cacheLife(CACHE_LIFE.PRODUCTS);
+  cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
   cacheTag(CACHE_TAGS.PRODUCTS);
 
   const response = await fetch(`${API_BASE}/api/products?limit=${limit}`);

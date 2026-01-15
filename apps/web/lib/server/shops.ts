@@ -1,5 +1,5 @@
-import { env } from "@repo/shared";
 import { cacheLife, cacheTag } from "next/cache";
+import { env } from "@repo/shared";
 import { CACHE_LIFE, CACHE_TAGS } from "../constants";
 
 const API_BASE = env.BACKEND_URL || "http://localhost:3001";
@@ -12,11 +12,11 @@ export type Shop = {
 
 /**
  * Server-side function to fetch shops
- * Uses Cache Components with 'use cache' directive
+ * Uses Cache Components with 'use cache' directive for PPR
  */
 export async function getShopsServer(limit = 50): Promise<Shop[]> {
   "use cache";
-  cacheLife(CACHE_LIFE.SHOPS);
+  cacheLife({ stale: 300, expire: 3600 }); // 5m stale, 1h expire
   cacheTag(CACHE_TAGS.SHOPS);
 
   const response = await fetch(`${API_BASE}/api/shops?limit=${limit}`);
