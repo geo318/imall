@@ -180,13 +180,14 @@ export function ProductsExplorerClient() {
           )}
         </button>
         {expandedSections.price && (
-          <div className="space-y-4 pt-2">
+          <div className="space-y-4 pt-2" style={{ pointerEvents: "auto" }}>
             <RangeSlider
               value={priceRange}
               onValueChange={(value) => setPriceRange(value as [number, number])}
               min={0}
               max={500}
               step={10}
+              minRange={20}
               className="w-full"
             />
             <div className="flex items-center justify-between text-sm text-muted-foreground">
