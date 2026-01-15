@@ -1,6 +1,6 @@
 "use client";
 
-import type { ApiProduct } from "@/lib/services/products.service";
+import type { ApiProduct } from "@/lib/api/products";
 
 type Props = {
   product: ApiProduct;

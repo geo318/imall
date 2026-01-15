@@ -4,7 +4,7 @@ import { Button } from "@repo/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { addToCart as addToCartApi, createCart } from "@/lib/api/cart";
+import { addToCart, createCart } from "@/actions/carts";
 import { revalidateCartClient } from "@/lib/revalidate-client";
 
 type Props = {
@@ -35,7 +35,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
       }
 
       try {
-        await addToCartApi(cartId, variantId, 1);
+        await addToCart(cartId, variantId, 1);
         return cartId;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -48,7 +48,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
           if (isClient) {
             globalThis.window.localStorage.setItem(key, cartId);
           }
-          await addToCartApi(cartId, variantId, 1);
+          await addToCart(cartId, variantId, 1);
           return cartId;
         }
         throw err;

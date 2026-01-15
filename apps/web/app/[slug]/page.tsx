@@ -1,4 +1,5 @@
 import { env } from "@repo/shared";
+import { Suspense } from "react";
 import { isProductIdentifier, isReservedRoute } from "@/lib/utils";
 import { ProductServer } from "./_components/product/product-server";
 import { ShopProfileClient } from "./_components/shop/shop-profile-client";
@@ -26,5 +27,9 @@ export default async function SlugPage({ params }: { params: Promise<{ slug: str
 
   // Otherwise treat it as a shop slug
   const shopName = slug === env.SEED_SHOP_SLUG ? env.SEED_SHOP_NAME : slug;
-  return <ShopProfileClient shopName={shopName} shopSlug={slug} />;
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <ShopProfileClient shopName={shopName} shopSlug={slug} />
+    </Suspense>
+  );
 }

@@ -3,7 +3,7 @@
 import { Badge } from "@repo/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { ApiProduct } from "@/lib/services/products.service";
+import type { ApiProduct } from "@/lib/api/products";
 import { cn } from "@/lib/utils";
 import { getAvailabilityIcon, getStockStatus } from "./utils";
 

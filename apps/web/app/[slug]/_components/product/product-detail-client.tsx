@@ -15,7 +15,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import type { ApiProduct } from "@/lib/services/products.service";
+import type { ApiProduct } from "@/lib/api/products";
 import { cn } from "@/lib/utils";
 import { ProductActionsSlot, ProductAvailabilitySlot, ProductPriceSlot } from "./";
 

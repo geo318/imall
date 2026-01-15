@@ -1,8 +1,10 @@
 "use client";
 
-import type { ApiProduct } from "@/lib/services/products.service";
+import { Suspense } from "react";
+import type { ApiProduct } from "@/lib/api/products";
 import { AuctionBidCard } from "../auctions/auction-bid-card";
 import { ProductButtons } from "./product-buttons";
+import { AuctionFormSkeleton } from "./product-detail-skeleton";
 
 type Props = {
   product: ApiProduct;
@@ -26,15 +28,17 @@ export function ProductActionsSlot({ product, selectedVariantId, productIdentifi
 
   if (auction) {
     return (
-      <AuctionBidCard
-        product={product}
-        selectedVariantId={selectedVariantId}
-        productIdentifier={productIdentifier}
-        auction={auction}
-        selectedVariant={selectedVariant}
-        shopSlug={shopSlug}
-        isSoldOut={isSoldOut}
-      />
+      <Suspense fallback={<AuctionFormSkeleton />}>
+        <AuctionBidCard
+          product={product}
+          selectedVariantId={selectedVariantId}
+          productIdentifier={productIdentifier}
+          auction={auction}
+          selectedVariant={selectedVariant}
+          shopSlug={shopSlug}
+          isSoldOut={isSoldOut}
+        />
+      </Suspense>
     );
   }
 
