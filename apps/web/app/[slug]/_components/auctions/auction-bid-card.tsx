@@ -98,9 +98,6 @@ export function AuctionBidCard({
     : false;
   const isDisabled = isSoldOut || isAuctionEnded;
 
-  console.log("freshAuction", freshAuction, user?.id);
-  console.log("highestBidderId", freshAuction?.highestBidderId);
-
   // Check if user is winning on initial load and when auction data changes
   useEffect(() => {
     if (freshAuction && user?.id) {
