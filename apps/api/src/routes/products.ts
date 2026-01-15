@@ -1,4 +1,4 @@
-import { auctions, db, products, tenants, variants } from "@repo/db";
+import { auctions, bids, db, products, tenants, users, variants } from "@repo/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
@@ -126,7 +126,8 @@ export const productsRoutes = new Elysia({
 
       const variantIds = productVariants.map((v) => v.id);
 
-      // Fetch auctions for these variants
+      // Fetch auctions for these variants with highest bidder info
+      // Use left join to get highestBidderId from the highest bid's user
       const variantAuctions =
         variantIds.length === 0
           ? []
@@ -142,8 +143,11 @@ export const productsRoutes = new Elysia({
                 startingBid: auctions.startingBid,
                 minIncrement: auctions.minIncrement,
                 buyNowPrice: auctions.buyNowPrice,
+                highestBidderId: users.externalAuthId, // Get from users table via join
               })
               .from(auctions)
+              .leftJoin(bids, eq(auctions.highestBidId, bids.id))
+              .leftJoin(users, eq(bids.bidderId, users.id))
               .where(inArray(auctions.variantId, variantIds));
 
       // Serialize dates to ISO strings for JSON response and add availability
@@ -161,8 +165,15 @@ export const productsRoutes = new Elysia({
           }
 
           // Convert Date objects to ISO strings
+          // Note: highestBidderId is stored directly in auctions table (Clerk user ID)
+          // It will be null if there's no highest bid yet
           const serializedAuction = {
-            ...auction,
+            id: auction.id,
+            variantId: auction.variantId,
+            status: auction.status,
+            currentPrice: auction.currentPrice,
+            highestBidId: auction.highestBidId,
+            highestBidderId: auction.highestBidderId ?? null, // Explicitly include even if null
             startsAt:
               auction.startsAt instanceof Date
                 ? auction.startsAt.toISOString()
@@ -171,6 +182,9 @@ export const productsRoutes = new Elysia({
               auction.endsAt instanceof Date
                 ? auction.endsAt.toISOString()
                 : String(auction.endsAt),
+            startingBid: auction.startingBid,
+            minIncrement: auction.minIncrement,
+            buyNowPrice: auction.buyNowPrice,
           };
 
           return {
@@ -536,7 +550,8 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
 
       const variantIds = productVariants.map((v) => v.id);
 
-      // Fetch auctions for these variants
+      // Fetch auctions for these variants with highest bidder info
+      // Use left join to get highestBidderId from the highest bid's user
       const variantAuctions =
         variantIds.length === 0
           ? []
@@ -552,8 +567,11 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
                 startingBid: auctions.startingBid,
                 minIncrement: auctions.minIncrement,
                 buyNowPrice: auctions.buyNowPrice,
+                highestBidderId: users.externalAuthId, // Get from users table via join
               })
               .from(auctions)
+              .leftJoin(bids, eq(auctions.highestBidId, bids.id))
+              .leftJoin(users, eq(bids.bidderId, users.id))
               .where(inArray(auctions.variantId, variantIds));
 
       // Serialize dates to ISO strings for JSON response
@@ -568,14 +586,24 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         }
 
         // Convert Date objects to ISO strings
+        // Note: highestBidderId is stored in auctions table, or fetched from bid via COALESCE
+        // It will be null if there's no highest bid yet
         const serializedAuction = {
-          ...auction,
+          id: auction.id,
+          variantId: auction.variantId,
+          status: auction.status,
+          currentPrice: auction.currentPrice,
+          highestBidId: auction.highestBidId,
+          highestBidderId: auction.highestBidderId ?? null, // Explicitly include even if null
           startsAt:
             auction.startsAt instanceof Date
               ? auction.startsAt.toISOString()
               : String(auction.startsAt),
           endsAt:
             auction.endsAt instanceof Date ? auction.endsAt.toISOString() : String(auction.endsAt),
+          startingBid: auction.startingBid,
+          minIncrement: auction.minIncrement,
+          buyNowPrice: auction.buyNowPrice,
         };
 
         return {

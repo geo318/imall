@@ -269,6 +269,7 @@ export const auctionsRoutes = new Elysia({
           .set({
             currentPrice: String(payload.amount),
             highestBidId: inserted?.id,
+            highestBidderId: externalAuthId, // Store Clerk user ID directly
             endsAt,
           })
           .where(eq(auctions.id, auctionId));
