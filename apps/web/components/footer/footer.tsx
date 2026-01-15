@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Instagram, ShoppingBag, Twitter, Youtube } from "lucide-react";
 import Link from "next/link";
 import { Copyright } from "./copyright";
@@ -119,7 +120,9 @@ export function Footer() {
         </div>
 
         <div className="mt-12 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
-          <Copyright />
+          <Suspense fallback={<p className="text-sm text-muted-foreground">© 2024 MarketHub. All rights reserved.</p>}>
+            <Copyright />
+          </Suspense>
           <p className="text-sm text-muted-foreground">Made with care for vendors worldwide.</p>
         </div>
       </div>
