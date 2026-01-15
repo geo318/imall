@@ -5,9 +5,7 @@ const serverSchema = {
   DOMAIN: z.string().url(),
   DATABASE_URL: z.string().url(),
   PORT: z.coerce.number().int().positive().default(3001),
-  NODE_ENV: z
-    .enum(["development", "test", "production"])
-    .default("development"),
+  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   CLERK_JWT_PUBLIC_KEY: z.string().optional(),
   CLERK_SECRET_KEY: z.string(),
   PAYMENT_KEEPZ_API_KEY: z.string().optional(),
@@ -20,6 +18,10 @@ const serverSchema = {
 const clientSchema = {
   NEXT_PUBLIC_DOMAIN: z.string().url(),
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string(),
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL: z.string().url().optional(),
+  NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: z.string().url().optional(),
+  NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: z.string().url().optional(),
+  NEXT_PUBLIC_BACKEND_URL: z.string().url().optional(),
 } as const;
 
 type RuntimeEnv = Record<string, string | undefined>;
@@ -37,8 +39,13 @@ const runtimeEnv: RuntimeEnv = {
   SEED_SHOP_NAME: process.env.SEED_SHOP_NAME,
   BACKEND_URL: process.env.BACKEND_URL,
   NEXT_PUBLIC_DOMAIN: process.env.NEXT_PUBLIC_DOMAIN,
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  NEXT_PUBLIC_CLERK_SIGN_IN_URL: process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL,
+  NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL:
+    process.env.NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL,
+  NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL:
+    process.env.NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL,
+  NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
   SKIP_ENV_VALIDATION: process.env.SKIP_ENV_VALIDATION,
 };
 
@@ -49,8 +56,7 @@ export function buildEnv(runtimeEnv: RuntimeEnv) {
     runtimeEnv,
     isServer: !globalThis.window,
     clientPrefix: "NEXT_PUBLIC_",
-    skipValidation:
-      Boolean(runtimeEnv.SKIP_ENV_VALIDATION) || runtimeEnv.NODE_ENV === "test",
+    skipValidation: Boolean(runtimeEnv.SKIP_ENV_VALIDATION) || runtimeEnv.NODE_ENV === "test",
     emptyStringAsUndefined: true,
   });
 }

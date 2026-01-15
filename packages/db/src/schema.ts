@@ -1,5 +1,4 @@
 import {
-  boolean,
   integer,
   numeric,
   pgTable,
@@ -67,10 +66,7 @@ export const products = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    tenantSlugIdx: uniqueIndex("products_tenant_slug_unique").on(
-      table.tenantId,
-      table.slug,
-    ),
+    tenantSlugIdx: uniqueIndex("products_tenant_slug_unique").on(table.tenantId, table.slug),
   }),
 );
 
@@ -92,10 +88,7 @@ export const variants = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    productSkuIdx: uniqueIndex("variants_product_sku_unique").on(
-      table.productId,
-      table.sku,
-    ),
+    productSkuIdx: uniqueIndex("variants_product_sku_unique").on(table.productId, table.sku),
   }),
 );
 

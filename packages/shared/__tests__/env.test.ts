@@ -10,6 +10,8 @@ describe("env schemas", () => {
       PAYMENT_KEEPZ_API_KEY: "test-key",
       NEXT_PUBLIC_DOMAIN: "http://localhost:3001",
       BACKEND_URL: "http://localhost:3001",
+      CLERK_SECRET_KEY: "sk_test_mock_secret_key",
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_mock_publishable_key",
     });
 
     expect(env.DOMAIN).toBe("http://localhost:3001");
@@ -25,6 +27,8 @@ describe("env schemas", () => {
       DOMAIN: "http://localhost:3001",
       DATABASE_URL: "postgres://user:pass@localhost:5432/db",
       NEXT_PUBLIC_DOMAIN: "http://localhost:3001",
+      CLERK_SECRET_KEY: "sk_test_mock_secret_key",
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_mock_publishable_key",
     });
 
     expect(env.BACKEND_URL).toBe("http://localhost:3001");
