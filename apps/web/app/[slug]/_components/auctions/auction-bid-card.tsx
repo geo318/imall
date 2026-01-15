@@ -98,14 +98,23 @@ export function AuctionBidCard({
     : false;
   const isDisabled = isSoldOut || isAuctionEnded;
 
-  // Reset winning state when auction changes
-  const lastAuctionIdRef = useRef(freshAuction?.id);
+  console.log("freshAuction", freshAuction, user?.id);
+  console.log("highestBidderId", freshAuction?.highestBidderId);
+
+  // Check if user is winning on initial load and when auction data changes
   useEffect(() => {
-    if (lastAuctionIdRef.current !== freshAuction?.id) {
+    if (freshAuction && user?.id) {
+      // Check if current user is the highest bidder
+      // highestBidderId is the Clerk user ID (externalAuthId) from the database
+      // It should match user.id from Clerk
+      const isWinning = Boolean(
+        freshAuction.highestBidderId && freshAuction.highestBidderId === user.id,
+      );
+      setIsUserWinning(isWinning);
+    } else {
       setIsUserWinning(false);
-      lastAuctionIdRef.current = freshAuction?.id;
     }
-  }, [freshAuction?.id]);
+  }, [freshAuction, user?.id]);
 
   // Calculate minimum bid using standard increments
   const currentPrice = freshAuction

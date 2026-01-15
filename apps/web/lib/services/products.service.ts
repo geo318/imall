@@ -26,6 +26,7 @@ export type ApiProduct = {
       buyNowPrice?: string | null;
       currentPrice?: string | null;
       highestBidId?: string | null;
+      highestBidderId?: string | null;
     } | null;
   }[];
 };
