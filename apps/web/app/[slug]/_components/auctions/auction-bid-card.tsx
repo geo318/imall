@@ -1,17 +1,19 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Gavel, ShieldCheck } from "lucide-react";
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { placeBid as placeBidApi } from "@/lib/api/auctions";
+import { placeBid } from "@/actions/auctions";
+import type { ApiProduct } from "@/lib/api/products";
+import { useAuctionWebSocket } from "@/lib/hooks/use-auction-websocket";
 import { revalidateProductClient } from "@/lib/revalidate-client";
-import type { ApiProduct } from "@/lib/services/products.service";
+import { calculateNextMinBid } from "@/lib/utils/bid-increments";
 import { AuctionFormSkeleton, AuctionTimerSkeleton } from "../product/product-detail-skeleton";
 import { AuctionTimerSlot } from "./auction-timer-slot";
 
@@ -37,19 +39,55 @@ export function AuctionBidCard({
   shopSlug,
   isSoldOut,
 }: Props) {
-  const { user } = useUser();
+  const { user, isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const queryClient = useQueryClient();
 
-  // Get fresh data for real-time status
+  // Use WebSocket for real-time auction updates instead of polling
+  const isAuctionActive = auction && new Date(auction.endsAt).getTime() > Date.now();
+
+  // Track if user is currently winning
+  const [isUserWinning, setIsUserWinning] = useState(false);
+
+  // Memoize the onMessage callback to prevent infinite loops
+  const handleWebSocketMessage = useCallback(
+    (message: { type: string; bidderId?: string; amount?: string }) => {
+      // Handle WebSocket messages - cache invalidation is handled in the hook
+      if (message.type === "bid") {
+        // Check if user is winning
+        if (message.bidderId && message.bidderId === user?.id) {
+          setIsUserWinning(true);
+          return; // Don't show toast for own bids
+        } else {
+          setIsUserWinning(false);
+        }
+        toast.info(`New bid: $${message.amount}`, { duration: 3000 });
+      } else if (message.type === "auction.finished") {
+        setIsUserWinning(false);
+        toast.info("Auction has ended", { duration: 5000 });
+      }
+    },
+    [user?.id],
+  );
+
+  useAuctionWebSocket({
+    shopSlug,
+    auctionId: auction.id,
+    enabled: isAuctionActive,
+    onMessage: handleWebSocketMessage,
+  });
+
+  // Initial data fetch - no polling needed, WebSocket handles updates
   const { data: freshData, isLoading: isLoadingFresh } = useQuery({
     queryKey: ["product", productIdentifier],
     queryFn: async () => {
-      const response = await fetch(`/api/products/${productIdentifier}`);
-      if (!response.ok) throw new Error("Failed to fetch");
-      return response.json();
+      const { getProductByIdentifier } = await import("@/app/actions/products");
+      return getProductByIdentifier(productIdentifier);
     },
-    staleTime: 0,
-    refetchInterval: 5000, // Poll every 5s for auctions
+    staleTime: 30000, // Data stays fresh for 30s since WebSocket updates it
+    refetchInterval: false, // No polling - WebSocket handles real-time updates
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
     enabled: true,
   });
 
@@ -60,10 +98,21 @@ export function AuctionBidCard({
     : false;
   const isDisabled = isSoldOut || isAuctionEnded;
 
-  const minBid = freshAuction
-    ? Number(freshAuction.currentPrice ?? freshAuction.startingBid ?? selectedVariant?.price ?? 0) +
-      Number(freshAuction.minIncrement ?? 0)
+  // Reset winning state when auction changes
+  const lastAuctionIdRef = useRef(freshAuction?.id);
+  useEffect(() => {
+    if (lastAuctionIdRef.current !== freshAuction?.id) {
+      setIsUserWinning(false);
+      lastAuctionIdRef.current = freshAuction?.id;
+    }
+  }, [freshAuction?.id]);
+
+  // Calculate minimum bid using standard increments
+  const currentPrice = freshAuction
+    ? Number(freshAuction.currentPrice ?? freshAuction.startingBid ?? selectedVariant?.price ?? 0)
     : 0;
+  const minIncrement = freshAuction ? Number(freshAuction.minIncrement ?? 0) : 0;
+  const minBid = calculateNextMinBid(currentPrice, minIncrement);
 
   // Always call useForm to maintain hook order
   const bidForm = useForm({
@@ -78,11 +127,26 @@ export function AuctionBidCard({
     },
   });
 
+  // Auto-update bid input with suggested minimum bid amount
+  const { setFieldValue } = bidForm;
+  const initializedRef = useRef(false);
+
+  // Initialize bid input on first mount
   useEffect(() => {
-    if (freshAuction && minBid > 0) {
-      bidForm.setFieldValue("amount", String(minBid));
+    if (freshAuction && minBid > 0 && !initializedRef.current) {
+      const formattedBid = minBid.toFixed(2);
+      setFieldValue("amount", formattedBid);
+      initializedRef.current = true;
     }
-  }, [minBid, freshAuction, bidForm]);
+  }, [freshAuction, minBid, setFieldValue]);
+
+  // Update bid amount when minBid changes (after initialization)
+  useEffect(() => {
+    if (initializedRef.current && freshAuction && minBid > 0) {
+      const formattedBid = minBid.toFixed(2);
+      setFieldValue("amount", formattedBid);
+    }
+  }, [minBid, freshAuction, setFieldValue]);
 
   const bidMutation = useMutation({
     mutationFn: async ({
@@ -94,14 +158,37 @@ export function AuctionBidCard({
       auctionId: string;
       amount: string;
     }) => {
-      if (!user?.id) throw new Error("You must be signed in to place a bid");
-      await placeBidApi(shopSlug, auctionId, { amount });
+      // Check authentication before making the API call
+      if (!isSignedIn || !user?.id) {
+        throw new Error("You must be signed in to place a bid. Please sign in and try again.");
+      }
+
+      // Get token from client-side session
+      const token = await getToken();
+      if (!token) {
+        throw new Error("Unable to get authentication token. Please sign in again.");
+      }
+
+      // Clean token if it has more than 3 parts (malformed/duplicated)
+      const tokenParts = token.split(".");
+      const cleanToken = tokenParts.length > 3 ? tokenParts.slice(0, 3).join(".") : token;
+
+      if (tokenParts.length > 3) {
+        console.warn("[Client] Token has more than 3 parts, using first 3 parts only");
+      }
+
+      await placeBid(shopSlug, auctionId, amount, cleanToken);
     },
     onSuccess: async () => {
+      // Invalidate React Query cache to trigger refetch
       queryClient.invalidateQueries({
         queryKey: ["product", productIdentifier],
       });
-      await revalidateProductClient(productIdentifier);
+      // Revalidate server cache (debounced - only call once)
+      // Don't await to avoid blocking UI
+      revalidateProductClient(productIdentifier).catch(() => {
+        // Silently fail - revalidation is best effort
+      });
       bidForm.reset();
       toast.success("Bid placed successfully!");
     },
@@ -118,7 +205,7 @@ export function AuctionBidCard({
       {isLoadingFresh ? (
         <AuctionTimerSkeleton />
       ) : (
-        <AuctionTimerSlot auction={freshAuction ?? auction} />
+        <AuctionTimerSlot auction={freshAuction ?? auction} isUserWinning={isUserWinning} />
       )}
 
       {/* Anti-Snipe Notice */}
@@ -205,23 +292,26 @@ export function AuctionBidCard({
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
                     className="pl-8 h-12"
-                    disabled={isDisabled || bidMutation.isPending}
+                    disabled={isDisabled || bidMutation.isPending || !isSignedIn}
                   />
                 </div>
                 <Button
                   type="submit"
                   variant="auction"
                   size="lg"
-                  disabled={isDisabled || bidMutation.isPending}
+                  disabled={isDisabled || bidMutation.isPending || !isSignedIn}
                   className="h-12"
                 >
                   <Gavel className="h-5 w-5" />
-                  Place Bid
+                  {isSignedIn ? "Place Bid" : "Sign in to bid"}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground text-center">
                 Minimum bid: ${minBid.toFixed(2)}
               </p>
+              {!isSignedIn && (
+                <p className="text-sm text-amber-600 text-center">Please sign in to place a bid</p>
+              )}
               {field.state.meta.errors.length > 0 && (
                 <p className="text-sm text-destructive text-center">
                   {typeof field.state.meta.errors[0] === "string"

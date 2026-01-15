@@ -1,20 +1,24 @@
 "use client";
 
 import { Clock } from "lucide-react";
-import { useEffect, useState } from "react";
-import type { ApiProduct } from "@/lib/services/products.service";
+import { memo, useEffect, useRef, useState } from "react";
+import type { ApiProduct } from "@/lib/api/products";
 import { cn } from "@/lib/utils";
 
 type Props = {
   auction: NonNullable<ApiProduct["variants"][0]["auction"]>;
+  isUserWinning?: boolean;
 };
 
 /**
  * Dynamic slot: Auction timer (needs real-time data)
+ * Optimized to only update when display value changes
  */
-export function AuctionTimerSlot({ auction }: Props) {
+function AuctionTimerSlotComponent({ auction, isUserWinning = false }: Props) {
   const [timeLeft, setTimeLeft] = useState("");
   const [isEnding, setIsEnding] = useState(false);
+  const lastDisplayValueRef = useRef<string>("");
+  const lastIsEndingRef = useRef<boolean>(false);
 
   useEffect(() => {
     const updateTimer = () => {
@@ -23,8 +27,14 @@ export function AuctionTimerSlot({ auction }: Props) {
       const diff = endsAt - now;
 
       if (diff <= 0) {
-        setTimeLeft("Ended");
-        setIsEnding(false);
+        const displayValue = "Ended";
+        const ending = false;
+        if (lastDisplayValueRef.current !== displayValue || lastIsEndingRef.current !== ending) {
+          setTimeLeft(displayValue);
+          setIsEnding(ending);
+          lastDisplayValueRef.current = displayValue;
+          lastIsEndingRef.current = ending;
+        }
         return;
       }
 
@@ -32,15 +42,24 @@ export function AuctionTimerSlot({ auction }: Props) {
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
 
+      let displayValue: string;
       if (hours > 0) {
-        setTimeLeft(`${hours}h ${minutes}m`);
+        displayValue = `${hours}h ${minutes}m`;
       } else if (minutes > 0) {
-        setTimeLeft(`${minutes}m ${seconds}s`);
+        displayValue = `${minutes}m ${seconds}s`;
       } else {
-        setTimeLeft(`${seconds}s`);
+        displayValue = `${seconds}s`;
       }
 
-      setIsEnding(diff < 5 * 60 * 1000); // Less than 5 minutes
+      const ending = diff < 5 * 60 * 1000; // Less than 5 minutes
+
+      // Only update state if display value or ending state actually changed
+      if (lastDisplayValueRef.current !== displayValue || lastIsEndingRef.current !== ending) {
+        setTimeLeft(displayValue);
+        setIsEnding(ending);
+        lastDisplayValueRef.current = displayValue;
+        lastIsEndingRef.current = ending;
+      }
     };
 
     updateTimer();
@@ -52,18 +71,21 @@ export function AuctionTimerSlot({ auction }: Props) {
 
   const getTimerBackground = () => {
     if (isAuctionEnded) return "bg-slate-100";
+    if (isUserWinning) return "bg-emerald-50";
     if (isEnding) return "bg-destructive/10";
     return "bg-warning/10";
   };
 
   const getTimerIconColor = () => {
     if (isAuctionEnded) return "text-slate-600";
+    if (isUserWinning) return "text-emerald-600";
     if (isEnding) return "text-destructive";
     return "text-warning";
   };
 
   const getTimerTextColor = () => {
     if (isAuctionEnded) return "text-slate-600";
+    if (isUserWinning) return "text-emerald-700";
     if (isEnding) return "text-destructive";
     return "";
   };
@@ -82,3 +104,6 @@ export function AuctionTimerSlot({ auction }: Props) {
     </div>
   );
 }
+
+// Memoize to prevent unnecessary rerenders
+export const AuctionTimerSlot = memo(AuctionTimerSlotComponent);
