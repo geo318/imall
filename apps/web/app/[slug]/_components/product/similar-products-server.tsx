@@ -1,3 +1,5 @@
+"use server";
+
 import { ProductCard } from "@/components/marketing/product-card";
 import { mapApiProductToMarketing } from "@/lib/marketing";
 import { getAnyProductsServer, getShopProductsServer } from "@/lib/server/products";
@@ -11,9 +13,10 @@ type Props = {
 /**
  * Server component to fetch and display similar products
  * Excludes the current product from the list
- * Caching is handled by the underlying data fetching functions
+ * Uses Cache Components for PPR
  */
 export async function SimilarProductsServer({ currentProductId, shopSlug, limit = 4 }: Props) {
+  "use cache";
   // Fetch products (from same shop if shopSlug provided, otherwise any products)
   const products = shopSlug
     ? await getShopProductsServer(shopSlug, limit + 1)

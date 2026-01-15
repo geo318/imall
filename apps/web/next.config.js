@@ -32,6 +32,8 @@ loadRootEnv();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Enable Cache Components for PPR (Partial Prerendering)
+  // Use 'use cache' directive granularly in functions/components that don't access runtime APIs
   cacheComponents: true,
   images: {
     remotePatterns: [

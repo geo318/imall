@@ -6,6 +6,7 @@ import { FeaturedProducts } from "./featured-products";
 import type { MarketingProduct } from "./product-card";
 
 async function FeaturedProductsContent({ limit = 24 }: Readonly<{ limit?: number }>) {
+  "use cache";
   const data = await getAnyProductsServer(limit);
   const products: MarketingProduct[] = data.map((product) => mapApiProductToMarketing(product));
 
