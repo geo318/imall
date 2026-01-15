@@ -10,10 +10,11 @@
     "start": "bun --env-file ../../.env dist/index.js"
   },
   "dependencies": {
+    "@clerk/backend": "^2.29.2",
     "@repo/db": "*",
     "@repo/shared": "*",
-    "elysia": "^1.1.12",
     "drizzle-orm": "^0.45.1",
+    "elysia": "^1.1.12",
     "pg": "^8.11.3",
     "zod": "^3.23.8"
   },

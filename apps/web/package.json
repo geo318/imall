@@ -11,7 +11,9 @@
     "check-types": "bun run --bun next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/elements": "^0.24.3",
     "@clerk/nextjs": "^6.36.5",
+    "@clerk/shared": "^3.42.0",
     "@repo/shared": "*",
     "@repo/ui": "*",
     "@tanstack/react-query": "^5.66.2",
@@ -37,5 +39,8 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "typescript": "5.9.2"
+  },
+  "overrides": {
+    "@clerk/shared": "^3.42.0"
   }
 }

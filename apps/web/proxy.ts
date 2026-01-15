@@ -13,7 +13,7 @@ const isPublicRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   const pathname = req.nextUrl.pathname;
 
-  // Skip reserved route check for API routes - they're handled by app/api/[...path]/route.ts
+  // Skip reserved route check for API routes (revalidate, etc.)
   if (pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
@@ -37,5 +37,8 @@ export default clerkMiddleware(async (auth, req) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)", "/"],
+  matcher: [
+    "/((?!_next/static|_next/image|_next/data|_next/webpack-hmr|__nextjs_original-stack-frame|favicon.ico).*)",
+    "/",
+  ],
 };
