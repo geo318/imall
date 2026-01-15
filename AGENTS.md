@@ -10,6 +10,9 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 
 ## Recent changes
 
+- Hardened Clerk auth for bids: Next proxy now forwards existing Authorization headers, falls back to Clerk session (`getToken` with `integration_fallback`, then `__session` cookie), and backend auth plugin trims/validates tokens (Clerk verifyToken with clock skew tolerance; no default admin role). Cart routes register the auth plugin directly (global auth plugin removed to avoid double runs). Typed cart params for TS and `bun tsc --noEmit` now passes.
+- Proxy middleware matcher excludes Next internals (`/_next/*`, dev stack frame) to avoid blocking the dev server.
+- Implemented proper Clerk backend authentication using `@clerk/backend` SDK. The `authPlugin` in `apps/api/src/context.ts` verifies Clerk JWT tokens (Clerk backend helper) extracting `userId`, `sessionId`, `orgId`, and other claims from verified tokens. Updated `AuthContext` type to match Clerk's Auth object structure. Added authorization checks to cart routes to ensure users can only access their own carts (guest carts remain accessible via cartId). Frontend already correctly sends tokens via Next.js proxy route. Removed demo header fallback authentication - all requests now require valid Clerk JWT tokens.
 - Tightened Clerk env validation (server + client) and wired `ClerkProvider` to the validated env.
 - Added monorepo-root env loading for the web app with a fallback to avoid `@next/env` missing-module errors when hoisted.
 - Fixed browser-side env validation failures by feeding a curated `runtimeEnv` into `createEnv` and explicitly setting `isServer`.
@@ -19,6 +22,13 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Wired TanStack React Query into the web app (provider in `app/layout.tsx`) with API helpers in `apps/web/lib/api` and mapping in `apps/web/lib/marketing.ts`; product/marketing pages now fetch on the client, using picsum-backed assets in `apps/web/assets`.
 - Refreshed marketing surface (home/products/about/vendors/faq) so cards link to `/[shopSlug]/[productSlug]` (old `/p/` redirects) and vendor promos link to `/[shopSlug]`; seed data slugs align with those links.
 - Added `/api/products` (randomized) so marketing/product grids can pull products across tenants without relying on env defaults; `/api/shops` exists for listing tenants. API product detail now attaches auctions per variant; CORS is handled via a manual preflight handler in `apps/api/src/index.ts`.
+- Implemented Clerk Elements-based authentication with Google and Facebook OAuth support. Created reusable SVG icon components (`GoogleIcon`, `FacebookIcon`) in `app/(auth)/_components/`. OAuth buttons trigger redirect-based authentication flow.
+- Fixed ClerkProvider integration: Created `ClerkContextProvider` with `ClerkReadyContext` to ensure Clerk Elements only render after Clerk is fully initialized. Wrapped in Suspense boundary in layout to prevent navigation blocking.
+- Separated `MarketingNav` into client wrapper (`MarketingNavClient`) that uses Clerk hooks, wrapped in Suspense in `app/page.tsx` to prevent blocking. Fixed `Copyright` component to use `"use cache"` directive for static year rendering.
+- Fixed auth page layout: Left branding panel and right form panel now both scroll independently (`overflow-y-auto`) instead of left panel being sticky.
+- Refactored token handling: Created reusable token utilities (`extractTokenFromHeader`, `verifyClerkToken`) in `apps/api/src/utils/token.ts` for consistent token extraction and verification. Simplified `authPlugin` to use these utilities. Kept manual token verification fallback in auction routes since authPlugin doesn't always run reliably.
+- Improved auction bidding UX: Implemented standard bid increments (avoid fractional steps), auto-populate bid input on first mount, added green styling to timer block when user is winning. Replaced polling with WebSocket for real-time updates.
+- Removed redundant logging: Cleaned up excessive `console.log` statements, using `logger` utility for environment-aware logging instead.
 
 ## Known gaps / follow-ups
 
@@ -27,6 +37,73 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - If Next is upgraded and `@next/env` behavior changes, re-check `apps/web/next.config.js` to keep root `.env` loading intact.
 - Web grids/detail pages depend on the API at `NEXT_PUBLIC_DOMAIN`; run `bun run dev:all` and seed the DB to avoid connection errors in dev.
 - Vendor names in marketing/shop cards currently use slug/env fallbacks until the API exposes tenant metadata.
+
+## Critical Dos and Don'ts
+
+### Authentication & Tokens
+
+**DO:**
+- Use `getToken()` without parameters in client components (no template)
+- Use token utilities (`extractTokenFromHeader`, `verifyClerkToken`) for consistent handling
+- Keep manual token verification fallback in auction routes (authPlugin doesn't always run)
+- Handle malformed tokens (5+ parts) by extracting first 3 parts
+- Use single `Authorization` header (not both `authorization` and `Authorization`)
+
+**DON'T:**
+- Never use `getToken({ template: "default" })` - Clerk doesn't have a "default" template
+- Don't set both `authorization` and `Authorization` headers (causes concatenation)
+- Don't assume authPlugin always populates auth context - always have fallback
+
+### Auction Bidding
+
+**DO:**
+- Use standard bid increments (`calculateNextMinBid`) - avoid fractional steps
+- Auto-populate bid input on first mount with minimum bid amount
+- Use WebSocket (`useAuctionWebSocket`) for real-time updates, not polling
+- Track winning state via WebSocket messages and show green timer when user is winning
+- Format bid amounts to 2 decimal places
+
+**DON'T:**
+- Don't use fractional increments ($0.50) - use standard patterns ($1, $5, $10, etc.)
+- Don't poll when WebSocket is available
+- Don't update state unnecessarily - use refs to track changes
+
+### Performance & State
+
+**DO:**
+- Use `useRef` to track previous values and prevent unnecessary updates
+- Memoize callbacks with `useCallback` to prevent infinite loops
+- Separate initialization from updates with different `useEffect` hooks
+- Use `React.memo` for expensive components like timers
+- Only update timer state when displayed value actually changes
+
+**DON'T:**
+- Don't include `setState` functions in dependency arrays (they're stable)
+- Don't update state on every render - check if values changed first
+- Don't create new objects/arrays in render that cause rerenders
+
+### Logging
+
+**DO:**
+- Use `logger` utility from `apps/api/src/utils/logger.ts` for environment-aware logging
+- Keep essential error logs for debugging production issues
+
+**DON'T:**
+- Don't use `console.log` in production - use `logger.debug()` which only logs in dev
+- Don't log sensitive data (tokens, passwords)
+- Remove redundant logs that don't add value
+
+### Common Issues
+
+**Token has 5 parts instead of 3**: Use `extractTokenFromHeader()` which extracts first 3 parts
+
+**authPlugin doesn't populate auth**: Keep manual verification fallback in critical routes
+
+**Infinite useEffect loops**: Use refs to track previous values, memoize callbacks, stable dependencies
+
+**Bid input empty on first load**: Use separate `useEffect` for initialization with `initializedRef`
+
+**Timer rerenders too frequently**: Only update when displayed value changes, use `React.memo`
 
 ## How to use this log
 
