@@ -1,0 +1,1 @@
+ALTER TABLE "auctions" ADD COLUMN "highest_bidder_id" varchar(256);

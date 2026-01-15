@@ -15,6 +15,13 @@
       "when": 1767820686974,
       "tag": "0001_brainy_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768507860417,
+      "tag": "0002_watery_rhodey",
+      "breakpoints": true
     }
   ]
 }

@@ -221,6 +221,7 @@ export const orderItems = pgTable("order_items", {
 // Auctions table defines auctions tied to a variant. Only one unit is sold
 // per auction in this simplified model. `currentPrice` caches the
 // highest bid. `highestBidId` references the current highest bid.
+// `highestBidderId` stores the Clerk user ID (externalAuthId) of the highest bidder for quick lookups.
 export const auctions = pgTable("auctions", {
   id: uuid("id").defaultRandom().primaryKey(),
   tenantId: uuid("tenant_id")
@@ -238,6 +239,7 @@ export const auctions = pgTable("auctions", {
   buyNowPrice: numeric("buy_now_price", { precision: 12, scale: 2 }),
   currentPrice: numeric("current_price", { precision: 12, scale: 2 }),
   highestBidId: uuid("highest_bid_id"),
+  highestBidderId: varchar("highest_bidder_id", { length: 256 }), // Clerk user ID (externalAuthId)
 });
 
 export const bids = pgTable("bids", {
