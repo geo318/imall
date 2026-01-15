@@ -1,5 +1,5 @@
 import { Elysia } from "elysia";
-import { authPlugin, bidPayloadSchema, env, listQuerySchema } from "./context";
+import { bidPayloadSchema, env, listQuerySchema } from "./context";
 import { auctionsRoutes, startAuctionCloser } from "./routes/auctions";
 import { cartRoutes } from "./routes/carts";
 import { inventoryRoutes } from "./routes/inventory";
@@ -15,8 +15,7 @@ if (cartRoutes) {
 
 const corsHeaders = (origin: string | null) => {
   const headers: Record<string, string> = {
-    "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, X-Demo-User, X-Demo-Role",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
@@ -49,7 +48,6 @@ const app = new Elysia({ prefix: "/api" })
       set.headers[key] = value;
     }
   })
-  .use(authPlugin)
   .use(cartRoutes) // Single cart (can hold items from multiple shops) - register early to avoid conflicts
   .use(shopsRoutes)
   .use(allProductsRoutes)

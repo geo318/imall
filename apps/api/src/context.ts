@@ -1,17 +1,25 @@
-import { db, inventoryLedger, products, tenants, variants } from "@repo/db";
+import { db, inventoryLedger, tenants } from "@repo/db";
 import { INVENTORY_REASONS, env as sharedEnv } from "@repo/shared";
 import { and, eq, sum } from "drizzle-orm";
 import { Elysia } from "elysia";
 import type { ElysiaWS } from "elysia/dist/ws";
 
 import { z } from "zod";
+import { logger } from "./utils/logger";
+import { extractTokenFromHeader, verifyClerkToken } from "./utils/token";
 
 export const env = sharedEnv;
 
 /* ---------- Auth ---------- */
 export type AuthContext = {
-  userId?: string;
+  userId: string | null;
+  sessionId: string | null;
+  orgId: string | null;
+  orgRole: string | null;
+  orgSlug: string | null;
   role?: "admin" | "staff" | "viewer";
+  // Additional Clerk auth properties
+  claims?: Record<string, unknown>;
 };
 
 type AuthSingleton = {
@@ -21,54 +29,58 @@ type AuthSingleton = {
   resolve: Record<string, never>;
 };
 
-export type WsContext<
-  Extras extends Record<string, unknown> = Record<string, never>,
-> = ElysiaWS<{ auth?: AuthContext } & Extras>;
+export type WsContext<Extras extends Record<string, unknown> = Record<string, never>> = ElysiaWS<
+  { auth?: AuthContext } & Extras
+>;
 
 export const authPlugin = new Elysia<"", AuthSingleton>({
   name: "auth",
 }).derive(async ({ request }) => {
-  // Check for Clerk JWT token in Authorization header
   const authHeader = request.headers.get("authorization");
-  let userId: string | undefined;
-  let role: AuthContext["role"] = "admin";
+  const method = request.method;
+  const pathname = new URL(request.url).pathname;
 
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.substring(7);
-    // TODO: Verify Clerk JWT token and extract userId
-    // For now, we'll extract from token if it's a valid format
-    // In production, verify with Clerk's public key
-    try {
-      // Basic JWT parsing (without verification for now)
-      const parts = token.split(".");
-      if (parts.length === 3 && parts[1]) {
-        const payload = JSON.parse(atob(parts[1]));
-        userId = payload.sub || payload.user_id;
-        // Extract role from token if available
-        if (payload.role) {
-          role = payload.role;
-        }
-      }
-    } catch {
-      // Invalid token format, fall back to demo headers
-    }
-  }
+  // Extract token using utility
+  const token = extractTokenFromHeader(authHeader);
 
-  // Fall back to demo headers if no token
-  if (!userId) {
-    const demoUser = request.headers.get("x-demo-user");
-    const demoRole =
-      (request.headers.get("x-demo-role") as AuthContext["role"]) ?? "admin";
-    userId = demoUser ?? undefined;
-    role = demoRole;
-  }
-
-  return {
-    auth: {
-      userId,
-      role,
-    } satisfies AuthContext,
+  let authContext: AuthContext = {
+    userId: null,
+    sessionId: null,
+    orgId: null,
+    orgRole: null,
+    orgSlug: null,
+    role: undefined,
+    claims: undefined,
   };
+
+  if (token) {
+    try {
+      const verified = await verifyClerkToken(token);
+      authContext = {
+        userId: verified.userId,
+        sessionId: verified.sessionId,
+        orgId: verified.orgId,
+        orgRole: verified.orgRole,
+        orgSlug: verified.orgSlug,
+        role: verified.role,
+        claims: verified.claims,
+      };
+
+      logger.debug(`[Auth] ${method} ${pathname} - Authenticated:`, {
+        userId: authContext.userId,
+        sessionId: authContext.sessionId,
+      });
+    } catch (error) {
+      // Token verification failed - auth context remains unauthenticated
+      logger.debug(`[Auth] ${method} ${pathname} - Token verification failed:`, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else {
+    logger.debug(`[Auth] ${method} ${pathname} - No Authorization header found`);
+  }
+
+  return { auth: authContext };
 });
 
 export function requireAdmin(ctx: AuthContext) {
@@ -102,9 +114,9 @@ export const listQuerySchema = z.object({
     .refine((v) => Number.isFinite(v) && v > 0 && v <= 200, "Limit invalid"),
 });
 
-export const createCartSchema = z.object({
-  userId: z.string().uuid().optional(),
-});
+// Note: userId is now extracted from Clerk auth token, not from request body
+// This schema is kept for backward compatibility but is no longer used
+export const createCartSchema = z.object({});
 
 export const cartItemSchema = z.object({
   variantId: z.string().uuid(),
@@ -137,12 +149,7 @@ export async function getAvailableStock(tenantId: string, variantId: string) {
   const [row] = await db
     .select({ onHand: sum(inventoryLedger.delta) })
     .from(inventoryLedger)
-    .where(
-      and(
-        eq(inventoryLedger.tenantId, tenantId),
-        eq(inventoryLedger.variantId, variantId),
-      ),
-    );
+    .where(and(eq(inventoryLedger.tenantId, tenantId), eq(inventoryLedger.variantId, variantId)));
   // PostgreSQL sum() returns null when no rows exist, convert to 0
   const stock = row?.onHand ? Number(row.onHand) : 0;
   return stock;

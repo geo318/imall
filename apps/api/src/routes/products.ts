@@ -2,21 +2,14 @@ import { auctions, db, products, tenants, variants } from "@repo/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import {
-  getAvailableStock,
-  getTenantIdBySlug,
-  listQuerySchema,
-} from "../context";
+import { getAvailableStock, getTenantIdBySlug, listQuerySchema } from "../context";
 
 export const productsRoutes = new Elysia({
   prefix: "/shops/:shopSlug/products",
 })
   .get("/", async ({ params, query, set }) => {
     try {
-      console.log(
-        "[Products Route] Fetching products for shop:",
-        params.shopSlug,
-      );
+      console.log("[Products Route] Fetching products for shop:", params.shopSlug);
       console.log("[Products Route] Query params:", query);
 
       const tenantId = await getTenantIdBySlug(params.shopSlug);
@@ -32,7 +25,6 @@ export const productsRoutes = new Elysia({
         .from(products)
         .where(eq(products.tenantId, tenantId))
         .limit(limit);
-      console.log("[Products Route] Found products:", productRows.length);
 
       if (productRows.length === 0) {
         return [];
@@ -83,20 +75,14 @@ export const productsRoutes = new Elysia({
         set.status = err.status;
         return { error: err.statusText || "Not found" };
       }
-      console.error(
-        "[Products Route] Failed to list products for shop:",
-        params.shopSlug,
-      );
+      console.error("[Products Route] Failed to list products for shop:", params.shopSlug);
       console.error("[Products Route] Error:", err);
       if (err instanceof Error) {
         console.error("[Products Route] Error name:", err.name);
         console.error("[Products Route] Error message:", err.message);
         console.error("[Products Route] Error stack:", err.stack);
         // Check if it's a tenant not found error
-        if (
-          err.name === "TenantNotFound" ||
-          err.message.includes("Tenant not found")
-        ) {
+        if (err.name === "TenantNotFound" || err.message.includes("Tenant not found")) {
           set.status = 404;
           return {
             error: "Shop not found",
@@ -119,12 +105,7 @@ export const productsRoutes = new Elysia({
       const [product] = await db
         .select()
         .from(products)
-        .where(
-          and(
-            eq(products.tenantId, tenantId),
-            eq(products.slug, params.productSlug),
-          ),
-        )
+        .where(and(eq(products.tenantId, tenantId), eq(products.slug, params.productSlug)))
         .limit(1);
 
       if (!product) {
@@ -168,13 +149,8 @@ export const productsRoutes = new Elysia({
       // Serialize dates to ISO strings for JSON response and add availability
       const serializedVariants = await Promise.all(
         productVariants.map(async (variant) => {
-          const auction = variantAuctions.find(
-            (a) => a.variantId === variant.id,
-          );
-          const availableQty = await getAvailableStock(
-            product.tenantId,
-            variant.id,
-          );
+          const auction = variantAuctions.find((a) => a.variantId === variant.id);
+          const availableQty = await getAvailableStock(product.tenantId, variant.id);
 
           if (!auction) {
             return {
@@ -224,9 +200,7 @@ export const productsRoutes = new Elysia({
   });
 
 // Helper to extract short ID from product identifier (format: slug-{shortId})
-function parseProductIdentifier(
-  identifier: string,
-): { slug: string; shortId: string } | null {
+function parseProductIdentifier(identifier: string): { slug: string; shortId: string } | null {
   // Format: product-slug-abc12345 where abc12345 is 8-char short ID
   const parts = identifier.split("-");
   if (parts.length < 2) return null;
@@ -274,17 +248,12 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           .innerJoin(tenants, eq(products.tenantId, tenants.id))
           .orderBy(sql`random()`)
           .limit(limit);
-        console.log(
-          "[All Products Route] Query succeeded, got",
-          rows.length,
-          "rows",
-        );
+        console.log("[All Products Route] Query succeeded, got", rows.length, "rows");
       } catch (queryErr) {
         console.error("[All Products Route] Query failed:", queryErr);
         throw queryErr;
       }
 
-      console.log("[All Products Route] Found products:", rows.length);
       if (rows.length === 0) return [];
 
       const productIds = rows.map((r) => r.id);
@@ -317,10 +286,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
       }
 
       const variantIds = Array.from(variantByProduct.values()).map((v) => v.id);
-      console.log(
-        "[All Products Route] Variant IDs for auctions:",
-        variantIds.length,
-      );
+      console.log("[All Products Route] Variant IDs for auctions:", variantIds.length);
 
       const auctionRows =
         variantIds.length === 0
@@ -401,10 +367,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         .string()
         .optional()
         .transform((v) => (v ? Number(v) : 24))
-        .refine(
-          (v) => Number.isFinite(v) && v > 0 && v <= 100,
-          "Limit invalid",
-        ),
+        .refine((v) => Number.isFinite(v) && v > 0 && v <= 100, "Limit invalid"),
       offset: z
         .string()
         .optional()
@@ -420,23 +383,16 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         .string()
         .optional()
         .transform((v) => (v ? Number(v) : undefined))
-        .refine(
-          (v) => v === undefined || (Number.isFinite(v) && v >= 0),
-          "minPrice invalid",
-        ),
+        .refine((v) => v === undefined || (Number.isFinite(v) && v >= 0), "minPrice invalid"),
       maxPrice: z
         .string()
         .optional()
         .transform((v) => (v ? Number(v) : undefined))
-        .refine(
-          (v) => v === undefined || (Number.isFinite(v) && v >= 0),
-          "maxPrice invalid",
-        ),
+        .refine((v) => v === undefined || (Number.isFinite(v) && v >= 0), "maxPrice invalid"),
     });
 
     try {
-      const { limit, offset, q, type, sort, minPrice, maxPrice } =
-        searchSchema.parse(query);
+      const { limit, offset, q, type, sort, minPrice, maxPrice } = searchSchema.parse(query);
 
       const qLike = q ? `%${q}%` : null;
       const hasAuctionSql = sql<boolean>`
@@ -484,23 +440,17 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
 
       // HAVING for min/max price
       const havingClauses: any[] = [];
-      if (minPrice !== undefined)
-        havingClauses.push(sql`${minPriceSql} >= ${minPrice}`);
-      if (maxPrice !== undefined)
-        havingClauses.push(sql`${minPriceSql} <= ${maxPrice}`);
+      if (minPrice !== undefined) havingClauses.push(sql`${minPriceSql} >= ${minPrice}`);
+      if (maxPrice !== undefined) havingClauses.push(sql`${minPriceSql} <= ${maxPrice}`);
       if (havingClauses.length > 0) {
         base = (base as any).having(sql.join(havingClauses, sql` AND `));
       }
 
       if (sort === "random") base = (base as any).orderBy(sql`random()`);
-      if (sort === "newest")
-        base = (base as any).orderBy(sql`${products.createdAt} desc`);
-      if (sort === "oldest")
-        base = (base as any).orderBy(sql`${products.createdAt} asc`);
-      if (sort === "priceAsc")
-        base = (base as any).orderBy(sql`${minPriceSql} asc`);
-      if (sort === "priceDesc")
-        base = (base as any).orderBy(sql`${minPriceSql} desc`);
+      if (sort === "newest") base = (base as any).orderBy(sql`${products.createdAt} desc`);
+      if (sort === "oldest") base = (base as any).orderBy(sql`${products.createdAt} asc`);
+      if (sort === "priceAsc") base = (base as any).orderBy(sql`${minPriceSql} asc`);
+      if (sort === "priceDesc") base = (base as any).orderBy(sql`${minPriceSql} desc`);
 
       const rows = await (base as any).limit(limit).offset(offset);
 
@@ -625,9 +575,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
               ? auction.startsAt.toISOString()
               : String(auction.startsAt),
           endsAt:
-            auction.endsAt instanceof Date
-              ? auction.endsAt.toISOString()
-              : String(auction.endsAt),
+            auction.endsAt instanceof Date ? auction.endsAt.toISOString() : String(auction.endsAt),
         };
 
         return {

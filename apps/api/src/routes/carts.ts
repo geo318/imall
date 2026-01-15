@@ -11,30 +11,21 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import {
-  cartItemSchema,
-  createCartSchema,
-  getAvailableStock,
-  INVENTORY_REASONS,
-} from "../context";
+import { authPlugin, cartItemSchema, getAvailableStock, INVENTORY_REASONS } from "../context";
 
 // Cart routes - single cart that can hold items from multiple shops
 export const cartRoutes = new Elysia({ prefix: "/carts" })
+  .use(authPlugin)
   .get("/", async () => {
     console.log("[Cart Route] GET /carts - Health check");
     return { status: "ok", message: "Cart routes are working" };
   })
-  .post("/", async ({ body, set }) => {
+  .post("/", async ({ auth, set }) => {
     console.log("[Cart Route] POST /carts - Creating cart");
     try {
-      let payload: unknown = body;
-      if (payload && typeof payload === "object") {
-        payload = createCartSchema.parse(payload);
-      } else {
-        payload = {};
-      }
-      const { userId } = payload as { userId?: string };
-      console.log("[Cart Route] Creating cart with userId:", userId);
+      // Use userId from verified Clerk auth token, not from request body
+      const userId = auth?.userId;
+      console.log("[Cart Route] Creating cart with userId from auth:", userId);
 
       // Create cart (single cart across shops). tenantId is nullable by design.
       const [inserted] = await db
@@ -60,9 +51,9 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       };
     }
   })
-  .get("/:cartId", async ({ params, set }) => {
+  .get("/:cartId", async ({ params, auth, set }) => {
+    const { cartId } = params as { cartId: string };
     try {
-      const cartId = params.cartId;
       // Get cart (do not scope by tenant; items can be from multiple tenants)
       const [cart] = await db
         .select({
@@ -79,6 +70,13 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       if (!cart) {
         set.status = 404;
         return { error: "Cart not found" };
+      }
+
+      // Authorization: If cart has a userId, ensure the authenticated user matches
+      // Guest carts (userId === null) are accessible to anyone with the cartId
+      if (cart.userId && auth?.userId !== cart.userId) {
+        set.status = 403;
+        return { error: "Forbidden: You don't have access to this cart" };
       }
 
       // Get all items from this cart (items can be from different tenants)
@@ -103,10 +101,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       // Attach availability for each item (small N, ok for cart sizes)
       const itemsWithAvailability = await Promise.all(
         items.map(async (item) => {
-          const availableQty = await getAvailableStock(
-            item.tenantId,
-            item.variantId,
-          );
+          const availableQty = await getAvailableStock(item.tenantId, item.variantId);
           return { ...item, availableQty };
         }),
       );
@@ -117,7 +112,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         set.status = err.status;
         return { error: err.statusText || "Not found" };
       }
-      console.error("[Cart Route] Failed to load cart:", params.cartId);
+      console.error("[Cart Route] Failed to load cart:", cartId);
       console.error("[Cart Route] Error:", err);
       set.status = 500;
       return {
@@ -126,17 +121,16 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       };
     }
   })
-  .post("/:cartId/items", async ({ params, body, set }) => {
+  .post("/:cartId/items", async ({ params, body, auth, set }) => {
+    const { cartId } = params as { cartId: string };
     let payload: unknown;
     try {
       payload = cartItemSchema.parse(body);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Invalid item payload";
+      const message = err instanceof Error ? err.message : "Invalid item payload";
       return new Response(message, { status: 400 });
     }
     const { variantId, qty } = payload as z.infer<typeof cartItemSchema>;
-    const cartId = params.cartId;
 
     try {
       const result = await db.transaction(async (tx) => {
@@ -150,51 +144,41 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           throw new Response("Variant not found", { status: 404 });
         }
 
-        // Verify cart exists
+        // Verify cart exists and user has access
         const [cart] = await tx
-          .select({ id: carts.id })
+          .select({ id: carts.id, userId: carts.userId })
           .from(carts)
           .where(eq(carts.id, cartId))
           .limit(1);
         if (!cart) {
           throw new Response("Cart not found", { status: 404 });
         }
+        // Authorization: If cart has a userId, ensure the authenticated user matches
+        if (cart.userId && auth?.userId !== cart.userId) {
+          throw new Response("Forbidden: You don't have access to this cart", { status: 403 });
+        }
 
         // Check if item already exists in cart
         const [existing] = await tx
           .select({ id: cartItems.id, qty: cartItems.qty })
           .from(cartItems)
-          .where(
-            and(
-              eq(cartItems.cartId, cartId),
-              eq(cartItems.variantId, variantId),
-            ),
-          )
+          .where(and(eq(cartItems.cartId, cartId), eq(cartItems.variantId, variantId)))
           .limit(1);
 
         let itemId: string;
         let newQty: number;
         if (existing) {
           newQty = existing.qty + qty;
-          const available = await getAvailableStock(
-            variant.tenantId,
-            variantId,
-          );
+          const available = await getAvailableStock(variant.tenantId, variantId);
           if (available < newQty) {
             throw new Error(`INSUFFICIENT_STOCK:${available}`);
           }
-          await tx
-            .update(cartItems)
-            .set({ qty: newQty })
-            .where(eq(cartItems.id, existing.id));
+          await tx.update(cartItems).set({ qty: newQty }).where(eq(cartItems.id, existing.id));
           itemId = existing.id;
         } else {
           itemId = crypto.randomUUID();
           newQty = qty;
-          const available = await getAvailableStock(
-            variant.tenantId,
-            variantId,
-          );
+          const available = await getAvailableStock(variant.tenantId, variantId);
           if (available < newQty) {
             throw new Error(`INSUFFICIENT_STOCK:${available}`);
           }
@@ -207,10 +191,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           });
         }
 
-        await tx
-          .update(carts)
-          .set({ updatedAt: new Date() })
-          .where(eq(carts.id, cartId));
+        await tx.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, cartId));
 
         return { itemId, qty: newQty };
       });
@@ -227,7 +208,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           message: `Only ${available} available`,
         };
       }
-      console.error("[Cart Route] Failed to add item to cart:", params.cartId);
+      console.error("[Cart Route] Failed to add item to cart:", cartId);
       console.error("[Cart Route] Error:", err);
       set.status = 500;
       return {
@@ -236,7 +217,8 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       };
     }
   })
-  .patch("/:cartId/items/:itemId", async ({ params, body, set }) => {
+  .patch("/:cartId/items/:itemId", async ({ params, body, auth, set }) => {
+    const { cartId, itemId } = params as { cartId: string; itemId: string };
     const updateSchema = z.object({
       qty: z.coerce.number().int(),
     });
@@ -249,21 +231,21 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       return new Response(message, { status: 400 });
     }
 
-    const cartId = params.cartId;
-    const itemId = params.itemId;
     const qty = payload.qty;
 
     try {
       const result = await db.transaction(async (tx) => {
-        // Verify item belongs to cart
+        // Verify item belongs to cart and user has access
         const [item] = await tx
           .select({
             id: cartItems.id,
             qty: cartItems.qty,
             tenantId: cartItems.tenantId,
             variantId: cartItems.variantId,
+            cartUserId: carts.userId,
           })
           .from(cartItems)
+          .innerJoin(carts, eq(cartItems.cartId, carts.id))
           .where(and(eq(cartItems.id, itemId), eq(cartItems.cartId, cartId)))
           .limit(1);
 
@@ -271,28 +253,24 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           throw new Response("Cart item not found", { status: 404 });
         }
 
+        // Authorization: If cart has a userId, ensure the authenticated user matches
+        if (item.cartUserId && auth?.userId !== item.cartUserId) {
+          throw new Response("Forbidden: You don't have access to this cart", { status: 403 });
+        }
+
         if (qty <= 0) {
           await tx.delete(cartItems).where(eq(cartItems.id, itemId));
-          await tx
-            .update(carts)
-            .set({ updatedAt: new Date() })
-            .where(eq(carts.id, cartId));
+          await tx.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, cartId));
           return { removed: true, itemId };
         }
 
-        const available = await getAvailableStock(
-          item.tenantId,
-          item.variantId,
-        );
+        const available = await getAvailableStock(item.tenantId, item.variantId);
         if (available < qty) {
           throw new Error(`INSUFFICIENT_STOCK:${available}`);
         }
 
         await tx.update(cartItems).set({ qty }).where(eq(cartItems.id, itemId));
-        await tx
-          .update(carts)
-          .set({ updatedAt: new Date() })
-          .where(eq(carts.id, cartId));
+        await tx.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, cartId));
         return { removed: false, itemId, qty };
       });
 
@@ -308,11 +286,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           message: `Only ${available} available`,
         };
       }
-      console.error(
-        "[Cart Route] Failed to update cart item:",
-        params.cartId,
-        params.itemId,
-      );
+      console.error("[Cart Route] Failed to update cart item:", cartId, itemId);
       console.error("[Cart Route] Error:", err);
       set.status = 500;
       return {
@@ -321,37 +295,35 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       };
     }
   })
-  .delete("/:cartId/items/:itemId", async ({ params, set }) => {
-    const cartId = params.cartId;
-    const itemId = params.itemId;
+  .delete("/:cartId/items/:itemId", async ({ params, auth, set }) => {
+    const { cartId, itemId } = params as { cartId: string; itemId: string };
 
     try {
       await db.transaction(async (tx) => {
         const [item] = await tx
-          .select({ id: cartItems.id })
+          .select({ id: cartItems.id, cartUserId: carts.userId })
           .from(cartItems)
+          .innerJoin(carts, eq(cartItems.cartId, carts.id))
           .where(and(eq(cartItems.id, itemId), eq(cartItems.cartId, cartId)))
           .limit(1);
         if (!item) {
           throw new Response("Cart item not found", { status: 404 });
         }
 
+        // Authorization: If cart has a userId, ensure the authenticated user matches
+        if (item.cartUserId && auth?.userId !== item.cartUserId) {
+          throw new Response("Forbidden: You don't have access to this cart", { status: 403 });
+        }
+
         await tx.delete(cartItems).where(eq(cartItems.id, itemId));
-        await tx
-          .update(carts)
-          .set({ updatedAt: new Date() })
-          .where(eq(carts.id, cartId));
+        await tx.update(carts).set({ updatedAt: new Date() }).where(eq(carts.id, cartId));
       });
 
       set.status = 204;
       return;
     } catch (err) {
       if (err instanceof Response) return err;
-      console.error(
-        "[Cart Route] Failed to remove cart item:",
-        params.cartId,
-        params.itemId,
-      );
+      console.error("[Cart Route] Failed to remove cart item:", cartId, itemId);
       console.error("[Cart Route] Error:", err);
       set.status = 500;
       return {
@@ -360,8 +332,8 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       };
     }
   })
-  .post("/:cartId/checkout", async ({ params, set }) => {
-    const cartId = params.cartId;
+  .post("/:cartId/checkout", async ({ params, auth, set }) => {
+    const { cartId } = params as { cartId: string };
 
     try {
       const result = await db.transaction(async (tx) => {
@@ -370,6 +342,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           .select({
             cartId: carts.id,
             status: carts.status,
+            userId: carts.userId,
             variantId: cartItems.variantId,
             tenantId: cartItems.tenantId, // Each item's tenant
             qty: cartItems.qty,
@@ -385,6 +358,13 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         if (cartWithItems.length === 0) {
           throw new Response("Cart not found", { status: 404 });
         }
+
+        // Authorization: If cart has a userId, ensure the authenticated user matches
+        const cartUserId = cartWithItems[0]?.userId;
+        if (cartUserId && auth?.userId !== cartUserId) {
+          throw new Response("Forbidden: You don't have access to this cart", { status: 403 });
+        }
+
         if (cartWithItems[0]?.status !== "open") {
           throw new Response("Cart is not open", { status: 409 });
         }
@@ -397,13 +377,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
             tenantId: string;
             qty: number;
             price: string;
-          } =>
-            Boolean(
-              row.variantId &&
-              row.tenantId &&
-              row.qty !== null &&
-              row.price !== null,
-            ),
+          } => Boolean(row.variantId && row.tenantId && row.qty !== null && row.price !== null),
         );
         if (items.length === 0) {
           throw new Response("Cart is empty", { status: 400 });
@@ -415,10 +389,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
             continue;
           }
 
-          const available = await getAvailableStock(
-            item.tenantId,
-            item.variantId,
-          );
+          const available = await getAvailableStock(item.tenantId, item.variantId);
           if (available < (item.qty ?? 0)) {
             throw new Response("Insufficient stock", { status: 409 });
           }
@@ -492,7 +463,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       return result;
     } catch (err) {
       if (err instanceof Response) return err;
-      console.error("[Cart Route] Failed to checkout cart:", params.cartId);
+      console.error("[Cart Route] Failed to checkout cart:", cartId);
       console.error("[Cart Route] Error:", err);
       set.status = 500;
       return {
