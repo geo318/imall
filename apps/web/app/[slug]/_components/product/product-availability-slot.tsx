@@ -28,9 +28,8 @@ export function ProductAvailabilitySlot({ product, selectedVariantId, productIde
   const { refetch } = useQuery({
     queryKey: ["product", productIdentifier],
     queryFn: async () => {
-      const response = await fetch(`/api/products/${productIdentifier}`);
-      if (!response.ok) throw new Error("Failed to fetch");
-      return response.json();
+      const { getProductByIdentifier } = await import("@/app/actions/products");
+      return getProductByIdentifier(productIdentifier);
     },
     enabled: false, // Only refetch on demand
   });
@@ -43,11 +42,25 @@ export function ProductAvailabilitySlot({ product, selectedVariantId, productIde
     toast.loading("Checking availability...", { id: "check-availability" });
     try {
       const result = await refetch();
+      if (result.error) {
+        throw result.error;
+      }
       if (!result.data) {
+        toast.error("Failed to check availability", {
+          id: "check-availability",
+          description: "No data received from server",
+        });
         return;
       }
       const variant = result.data.variants.find((v: { id: string }) => v.id === selectedVariantId);
-      if (variant?.availableQty === undefined) {
+      if (!variant) {
+        toast.error("Failed to check availability", {
+          id: "check-availability",
+          description: "Variant not found",
+        });
+        return;
+      }
+      if (variant.availableQty === undefined) {
         toast.success("Stock information retrieved", {
           id: "check-availability",
           description: "Product is available for purchase",
@@ -65,10 +78,11 @@ export function ProductAvailabilitySlot({ product, selectedVariantId, productIde
           description: "This item is currently unavailable",
         });
       }
-    } catch {
+    } catch (error) {
       toast.error("Failed to check availability", {
         id: "check-availability",
-        description: "Could not fetch current stock information",
+        description:
+          error instanceof Error ? error.message : "Could not fetch current stock information",
       });
     }
   };
