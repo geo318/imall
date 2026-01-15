@@ -1,2 +1,2 @@
-export type { Shop } from "../services/shops.service";
-export { getShops as fetchShops } from "../services/shops.service";
+export type { Shop } from "../../app/actions/shops";
+export { getShops as fetchShops } from "../../app/actions/shops";

@@ -1,11 +1,15 @@
-export type { ApiProduct } from "../services/products.service";
+export type {
+  ApiProduct,
+  ProductSearchParams,
+  ProductSearchResponse,
+} from "../../app/actions/products";
 export {
   getAnyProducts as fetchAnyProducts,
   getProductByIdentifier as fetchProductByIdentifier,
   getProductBySlug as fetchProductBySlug,
   getShopProducts as fetchShopProducts,
   searchProducts,
-} from "../services/products.service";
+} from "../../app/actions/products";
 
 // Helper to generate product identifier from product data (slug + short ID)
 export function getProductIdentifier(

@@ -1,4 +1,3 @@
-export type { Cart, CartItem } from "../services/cart.service";
 export {
   addToCart,
   checkoutCart,
@@ -6,4 +5,5 @@ export {
   getCart,
   removeCartItem,
   updateCartItemQty,
-} from "../services/cart.service";
+} from "../../actions/carts";
+export type { Cart, CartItem } from "../services/cart.service"; // Keep types from service for now
