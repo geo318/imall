@@ -2,15 +2,19 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { Suspense } from "react";
+
+import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
-import { LayoutClient } from "./layout-client";
+import { QueryProvider } from "../context/query-provider";
+import { LayoutWrapper } from "./_components/layout-wrapper";
+import { ClerkProviderWrapper } from "./_components/clerk-provider-wrapper";
 
 const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
+  src: "../public/fonts/GeistVF.woff",
   variable: "--font-geist-sans",
 });
 const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
+  src: "../public/fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
 });
 
@@ -19,7 +23,7 @@ export const metadata: Metadata = {
   description: "Tenant-based shops with carts, auctions, inventory, and admin workspace.",
 };
 
-// PPR: Static shell with client providers in Suspense
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -29,8 +33,13 @@ export default function RootLayout({
     <html lang="en">
       <body className={cn("font-sans antialiased", geistSans.variable, geistMono.variable)}>
         <Suspense fallback={null}>
-          <LayoutClient>{children}</LayoutClient>
+          <ClerkProviderWrapper>
+            <QueryProvider>
+              <LayoutWrapper>{children}</LayoutWrapper>
+            </QueryProvider>
+          </ClerkProviderWrapper>
         </Suspense>
+        <Toaster />
       </body>
     </html>
   );
