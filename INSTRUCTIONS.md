@@ -114,7 +114,7 @@ This document contains important instructions, dos and don'ts based on lessons l
 ### ✅ DO
 
 - **Validate env vars**: Always validate environment variables using the shared env schema
-- **Use NEXT_PUBLIC_ prefix**: Use `NEXT_PUBLIC_` prefix for client-accessible environment variables
+- **Use NEXT*PUBLIC* prefix**: Use `NEXT_PUBLIC_` prefix for client-accessible environment variables
 - **Document required vars**: Document all required environment variables in README or env.example
 
 ### ❌ DON'T
@@ -140,18 +140,23 @@ This document contains important instructions, dos and don'ts based on lessons l
 ## Common Issues & Solutions
 
 ### Issue: Token has 5 parts instead of 3
+
 **Solution**: This happens when headers are concatenated. Use `extractTokenFromHeader()` which extracts the first 3 parts.
 
 ### Issue: authPlugin doesn't populate auth context
+
 **Solution**: Keep manual token verification fallback in critical routes like auction bids.
 
 ### Issue: Infinite useEffect loops
+
 **Solution**: Use refs to track previous values, memoize callbacks, and only include stable dependencies.
 
 ### Issue: Bid input is empty on first load
+
 **Solution**: Use separate `useEffect` for initialization with `initializedRef` to track first mount.
 
 ### Issue: Timer rerenders too frequently
+
 **Solution**: Only update state when displayed value changes, use `React.memo`, and optimize update intervals.
 
 ## File Structure
@@ -175,6 +180,7 @@ apps/
 ## Quick Reference
 
 ### Token Extraction
+
 ```typescript
 import { extractTokenFromHeader, verifyClerkToken } from "../utils/token";
 
@@ -185,12 +191,14 @@ if (token) {
 ```
 
 ### Client Token
+
 ```typescript
 const { getToken } = useAuth();
 const token = await getToken(); // No template parameter!
 ```
 
 ### Standard Bid Increments
+
 ```typescript
 import { calculateNextMinBid } from "@/lib/utils/bid-increments";
 
@@ -198,6 +206,7 @@ const minBid = calculateNextMinBid(currentPrice, minIncrement);
 ```
 
 ### WebSocket Hook
+
 ```typescript
 useAuctionWebSocket({
   shopSlug,

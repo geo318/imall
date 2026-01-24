@@ -29,6 +29,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Refactored token handling: Created reusable token utilities (`extractTokenFromHeader`, `verifyClerkToken`) in `apps/api/src/utils/token.ts` for consistent token extraction and verification. Simplified `authPlugin` to use these utilities. Kept manual token verification fallback in auction routes since authPlugin doesn't always run reliably.
 - Improved auction bidding UX: Implemented standard bid increments (avoid fractional steps), auto-populate bid input on first mount, added green styling to timer block when user is winning. Replaced polling with WebSocket for real-time updates.
 - Removed redundant logging: Cleaned up excessive `console.log` statements, using `logger` utility for environment-aware logging instead.
+- Added admin catalog editing experience plus sharing/favorites telemetry: the admin catalog cards/form now call the backend via new admin API proxies (products, uploads), and product/favorites UI gained header favorites, share slot, view tracker, and Next API routes backed by the backend favorites/webhooks.
 
 ## Known gaps / follow-ups
 
@@ -43,6 +44,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 ### Authentication & Tokens
 
 **DO:**
+
 - Use `getToken()` without parameters in client components (no template)
 - Use token utilities (`extractTokenFromHeader`, `verifyClerkToken`) for consistent handling
 - Keep manual token verification fallback in auction routes (authPlugin doesn't always run)
@@ -50,6 +52,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Use single `Authorization` header (not both `authorization` and `Authorization`)
 
 **DON'T:**
+
 - Never use `getToken({ template: "default" })` - Clerk doesn't have a "default" template
 - Don't set both `authorization` and `Authorization` headers (causes concatenation)
 - Don't assume authPlugin always populates auth context - always have fallback
@@ -57,6 +60,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 ### Auction Bidding
 
 **DO:**
+
 - Use standard bid increments (`calculateNextMinBid`) - avoid fractional steps
 - Auto-populate bid input on first mount with minimum bid amount
 - Use WebSocket (`useAuctionWebSocket`) for real-time updates, not polling
@@ -64,6 +68,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Format bid amounts to 2 decimal places
 
 **DON'T:**
+
 - Don't use fractional increments ($0.50) - use standard patterns ($1, $5, $10, etc.)
 - Don't poll when WebSocket is available
 - Don't update state unnecessarily - use refs to track changes
@@ -71,6 +76,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 ### Performance & State
 
 **DO:**
+
 - Use `useRef` to track previous values and prevent unnecessary updates
 - Memoize callbacks with `useCallback` to prevent infinite loops
 - Separate initialization from updates with different `useEffect` hooks
@@ -78,6 +84,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Only update timer state when displayed value actually changes
 
 **DON'T:**
+
 - Don't include `setState` functions in dependency arrays (they're stable)
 - Don't update state on every render - check if values changed first
 - Don't create new objects/arrays in render that cause rerenders
@@ -85,10 +92,12 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 ### Logging
 
 **DO:**
+
 - Use `logger` utility from `apps/api/src/utils/logger.ts` for environment-aware logging
 - Keep essential error logs for debugging production issues
 
 **DON'T:**
+
 - Don't use `console.log` in production - use `logger.debug()` which only logs in dev
 - Don't log sensitive data (tokens, passwords)
 - Remove redundant logs that don't add value
