@@ -1,6 +1,7 @@
 import { Elysia } from "elysia";
 import { bidPayloadSchema, env, listQuerySchema } from "./context";
 import { adminProductsRoutes } from "./routes/admin-products";
+import { adminShopRoutes } from "./routes/admin-shops";
 import { adminUploadRoutes } from "./routes/admin-upload";
 import { auctionsRoutes, startAuctionCloser } from "./routes/auctions";
 import { cartRoutes } from "./routes/carts";
@@ -61,6 +62,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(auctionsRoutes)
   .use(favoritesRoutes)
   .use(adminProductsRoutes)
+  .use(adminShopRoutes)
   .use(adminUploadRoutes)
   .onStart(() => {
     console.log("[API] Routes registered:");

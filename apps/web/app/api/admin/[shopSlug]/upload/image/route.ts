@@ -1,42 +1,13 @@
-import { auth } from "@clerk/nextjs/server";
 import { type NextRequest, NextResponse } from "next/server";
-
+import { getAdminToken } from "@/app/api/admin/utils";
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || `http://localhost:3001`;
-
-async function getAuthToken(): Promise<string | null> {
-  try {
-    const authResult = await auth();
-
-    if (!authResult.userId) {
-      return null;
-    }
-
-    // Try to get the session token
-    let token = await authResult.getToken();
-
-    // Fallback to integration_fallback template if session token not available
-    if (!token) {
-      try {
-        token = await authResult.getToken({
-          template: "integration_fallback",
-        });
-      } catch (_fallbackError) {
-        // Silently fail - will return null
-      }
-    }
-
-    return token;
-  } catch (_error) {
-    return null;
-  }
-}
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ shopSlug: string }> },
 ) {
   const { shopSlug } = await params;
-  const token = await getAuthToken();
+  const token = await getAdminToken();
 
   if (!token) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
