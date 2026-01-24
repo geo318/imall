@@ -6,10 +6,7 @@
  * @param minIncrement - Minimum increment from auction settings
  * @returns Standard increment amount (always a whole number)
  */
-export function calculateStandardIncrement(
-  currentPrice: number,
-  minIncrement: number,
-): number {
+export function calculateStandardIncrement(currentPrice: number, minIncrement: number): number {
   // Ensure we have a valid price
   if (currentPrice < 0) {
     return Math.max(1, Math.ceil(minIncrement));
@@ -52,13 +49,10 @@ export function calculateStandardIncrement(
  * @param minIncrement - Minimum increment from auction settings
  * @returns Next minimum bid amount (rounded to avoid fractional cents)
  */
-export function calculateNextMinBid(
-  currentPrice: number,
-  minIncrement: number,
-): number {
+export function calculateNextMinBid(currentPrice: number, minIncrement: number): number {
   const increment = calculateStandardIncrement(currentPrice, minIncrement);
   const nextBid = currentPrice + increment;
-  
+
   // Round to 2 decimal places to avoid floating point issues
   return Math.round(nextBid * 100) / 100;
 }

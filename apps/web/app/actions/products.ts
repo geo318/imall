@@ -1,9 +1,10 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { cacheLife, cacheTag } from "next/cache";
 import { env } from "@repo/shared";
-import { CACHE_LIFE, CACHE_TAGS } from "@/lib/constants";
+import { cacheLife, cacheTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/constants";
+import type { Product } from "@/lib/types/products";
 
 /**
  * Helper to get Clerk token for backend requests
@@ -76,36 +77,6 @@ async function backendRequest(
   return response;
 }
 
-export type ApiProduct = {
-  id: string;
-  slug: string;
-  title: string;
-  description: string | null;
-  tenantSlug?: string;
-  tenantName?: string;
-  createdAt?: string;
-  hasAuction?: boolean;
-  variants: {
-    id: string;
-    sku: string | null;
-    price: string;
-    currency: string;
-    availableQty?: number;
-    auction?: {
-      id: string;
-      status: string | null;
-      startsAt: string;
-      endsAt: string;
-      startingBid?: string | null;
-      minIncrement?: string | null;
-      buyNowPrice?: string | null;
-      currentPrice?: string | null;
-      highestBidId?: string | null;
-      highestBidderId?: string | null;
-    } | null;
-  }[];
-};
-
 export type ProductSearchParams = {
   limit?: number;
   offset?: number;
@@ -117,7 +88,7 @@ export type ProductSearchParams = {
 };
 
 export type ProductSearchResponse = {
-  items: ApiProduct[];
+  items: Product[];
   nextOffset: number | null;
 };
 
@@ -125,7 +96,7 @@ export type ProductSearchResponse = {
  * Get products for a specific shop
  * Cached for PPR - public data, no auth required
  */
-export async function getShopProducts(shopSlug: string, limit = 20): Promise<ApiProduct[]> {
+export async function getShopProducts(shopSlug: string, limit = 20): Promise<Product[]> {
   "use cache";
   cacheLife({ stale: 60, expire: 3600 }); // 1m stale, 1h expire
   cacheTag(CACHE_TAGS.PRODUCTS);
@@ -148,10 +119,53 @@ export async function getShopProducts(shopSlug: string, limit = 20): Promise<Api
 }
 
 /**
+ * Search products for a specific shop with pagination and filtering
+ * Cached for PPR - public data, no auth required
+ */
+export async function searchShopProducts(
+  shopSlug: string,
+  params: {
+    limit?: number;
+    offset?: number;
+    q?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    sort?: "newest" | "oldest" | "priceAsc" | "priceDesc";
+  },
+): Promise<ProductSearchResponse> {
+  "use cache";
+  cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
+  cacheTag(CACHE_TAGS.PRODUCTS);
+  cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
+
+  // Public endpoint - no auth token needed
+  const response = await backendRequest(`/shops/${shopSlug}/products`, {
+    params: {
+      limit: params.limit,
+      offset: params.offset,
+      q: params.q,
+      minPrice: params.minPrice,
+      maxPrice: params.maxPrice,
+      sort: params.sort,
+    },
+    token: null, // Explicitly no token for public data
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("not-found");
+    }
+    throw new Error("Failed to search shop products");
+  }
+
+  return response.json();
+}
+
+/**
  * Get product by identifier (slug + short ID)
  * Cached for PPR - public data, no auth required
  */
-export async function getProductByIdentifier(productIdentifier: string): Promise<ApiProduct> {
+export async function getProductByIdentifier(productIdentifier: string): Promise<Product> {
   "use cache";
   cacheLife({ stale: 30, expire: 1800 }); // 30s stale, 30m expire
   cacheTag(CACHE_TAGS.PRODUCT);
@@ -176,7 +190,7 @@ export async function getProductByIdentifier(productIdentifier: string): Promise
  * Get product by shop slug and product slug
  * Cached for PPR - public data, no auth required
  */
-export async function getProductBySlug(shopSlug: string, productSlug: string): Promise<ApiProduct> {
+export async function getProductBySlug(shopSlug: string, productSlug: string): Promise<Product> {
   "use cache";
   cacheLife({ stale: 30, expire: 1800 }); // 30s stale, 30m expire
   cacheTag(CACHE_TAGS.PRODUCT);
@@ -201,7 +215,7 @@ export async function getProductBySlug(shopSlug: string, productSlug: string): P
  * Get random products
  * Cached for PPR - public data, no auth required
  */
-export async function getAnyProducts(limit = 20): Promise<ApiProduct[]> {
+export async function getAnyProducts(limit = 20): Promise<Product[]> {
   "use cache";
   cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
   cacheTag(CACHE_TAGS.PRODUCTS);

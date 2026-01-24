@@ -29,6 +29,7 @@ These components use Clerk Elements to provide a custom authentication UI:
 ### OAuth Icons
 
 Reusable SVG icon components for OAuth providers:
+
 - `GoogleIcon`: Google branding icon
 - `FacebookIcon`: Facebook branding icon
 

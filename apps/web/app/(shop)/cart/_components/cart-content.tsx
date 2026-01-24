@@ -3,11 +3,11 @@
 import { Button } from "@repo/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { getCart, removeCartItem, updateCartItemQty } from "@/actions/carts";
+import LazyImage from "@/components/shared/lazy-image";
 import { CartSkeleton } from "@/components/skeletons/cart-skeleton";
 import type { CartItem } from "@/lib/api/cart";
 import { getProductIdentifier } from "@/lib/api/products";
@@ -189,10 +189,12 @@ export function CartContent() {
                     isSoldOut && "opacity-30",
                   )}
                 >
-                  <Image
-                    src={`https://picsum.photos/seed/${item.productSlug}/200/200`}
+                  <LazyImage
+                    src={item.productImageUrl || ""}
                     alt={item.productTitle}
-                    fill
+                    width={96}
+                    height={96}
+                    wrapperContainerStyles="absolute inset-0"
                     className="object-cover"
                   />
                 </div>

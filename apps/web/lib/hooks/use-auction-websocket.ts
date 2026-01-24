@@ -6,7 +6,13 @@ import { useEffect, useRef, useState } from "react";
 
 type AuctionWebSocketMessage =
   | { type: "subscribed"; auctionId: string }
-  | { type: "bid"; auctionId: string; amount: string; bidderId?: string; endsAt: string }
+  | {
+      type: "bid";
+      auctionId: string;
+      amount: string;
+      bidderId?: string;
+      endsAt: string;
+    }
   | { type: "auction.finished"; auctionId: string; reason: string }
   | { type: "error"; error: string };
 

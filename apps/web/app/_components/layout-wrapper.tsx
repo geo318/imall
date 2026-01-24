@@ -1,6 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 import { Footer } from "@/components/footer/footer";
 import { HeaderClient } from "@/components/header-client";
 
@@ -9,15 +10,8 @@ import { HeaderClient } from "@/components/header-client";
  * Excludes them from auth pages which have their own layout
  */
 export function LayoutWrapper({ children }: Readonly<{ children: React.ReactNode }>) {
-  const [isAuthPage, setIsAuthPage] = useState(false);
-
-  useEffect(() => {
-    // Check pathname on client side only to avoid "uncached data" errors during build
-    if (typeof window !== "undefined") {
-      const pathname = window.location.pathname;
-      setIsAuthPage(pathname?.startsWith("/sign-in") || pathname?.startsWith("/sign-up") || false);
-    }
-  }, []);
+  const pathname = usePathname();
+  const isAuthPage = pathname?.startsWith("/sign-in") || pathname?.startsWith("/sign-up") || false;
 
   if (isAuthPage) {
     return <>{children}</>;

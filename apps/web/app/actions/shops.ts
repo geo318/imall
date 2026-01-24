@@ -1,9 +1,9 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { cacheLife, cacheTag } from "next/cache";
 import { env } from "@repo/shared";
-import { CACHE_LIFE, CACHE_TAGS } from "@/lib/constants";
+import { cacheLife, cacheTag } from "next/cache";
+import { CACHE_TAGS } from "@/lib/constants";
 
 /**
  * Helper to get Clerk token for backend requests

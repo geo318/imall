@@ -6,11 +6,12 @@ import { createContext, useContext, useEffect, useState } from "react";
 const ClerkReadyContext = createContext<boolean>(false);
 
 export function useClerkReady() {
+  const contextValue = useContext(ClerkReadyContext);
   // During SSR/build, Clerk context won't be available, so return false
   if (typeof window === "undefined") {
     return false;
   }
-  return useContext(ClerkReadyContext);
+  return contextValue;
 }
 
 function ClerkReadyDetector({ onReady }: { onReady: () => void }) {

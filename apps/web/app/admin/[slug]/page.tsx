@@ -6,8 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
 import { Textarea } from "@repo/ui/textarea";
+import { useQuery } from "@tanstack/react-query";
+import { Package } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
+import type { ApiProduct } from "@/lib/api/products";
 
 const sections = [
   {
@@ -40,6 +43,31 @@ const sections = [
 export default function AdminShopPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
 
+  const {
+    data: products,
+    isLoading: productsLoading,
+    error: productsError,
+  } = useQuery<ApiProduct[]>({
+    queryKey: ["admin-products", slug],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/${slug}/products`);
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        if (response.status === 401) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Authentication required. Please sign in.");
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to fetch products");
+      }
+      return response.json();
+    },
+    retry: false, // Don't retry on auth errors
+  });
+
+  const productCount = products?.length ?? 0;
+  const totalVariants = products?.reduce((sum, p) => sum + (p.variants?.length ?? 0), 0) ?? 0;
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-10">
@@ -70,7 +98,11 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
                   <CardHeader>
                     <div className="flex items-center justify-between gap-2">
                       <CardTitle className="text-base">{section.title}</CardTitle>
-                      <Badge variant="outline">WIP</Badge>
+                      {section.href === "catalog" ? (
+                        <Badge variant="secondary">Active</Badge>
+                      ) : (
+                        <Badge variant="outline">WIP</Badge>
+                      )}
                     </div>
                     <CardDescription>{section.desc}</CardDescription>
                   </CardHeader>
@@ -84,6 +116,55 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
                 </Card>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Product Summary */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-slate-600" />
+                <CardTitle>Product Overview</CardTitle>
+              </div>
+              <Link href={`/admin/${slug}/catalog`}>
+                <Button variant="outline" size="sm">
+                  Manage Catalog
+                </Button>
+              </Link>
+            </div>
+            <CardDescription>Quick stats for your product catalog</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {productsLoading ? (
+              <div className="text-center py-8 text-slate-600">Loading products...</div>
+            ) : productsError ? (
+              <div className="text-center py-8">
+                <p className="text-red-600 font-semibold mb-2">
+                  {productsError instanceof Error
+                    ? productsError.message
+                    : "Failed to load products"}
+                </p>
+                <p className="text-sm text-slate-600">Please sign in to access admin features.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="text-2xl font-bold text-slate-900">{productCount}</div>
+                  <div className="text-sm text-slate-600">Total Products</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="text-2xl font-bold text-slate-900">{totalVariants}</div>
+                  <div className="text-sm text-slate-600">Total Variants</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="text-2xl font-bold text-slate-900">
+                    {products?.filter((p) => p.hasAuction).length ?? 0}
+                  </div>
+                  <div className="text-sm text-slate-600">Products with Auctions</div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

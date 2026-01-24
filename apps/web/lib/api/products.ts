@@ -1,5 +1,5 @@
+export type { ApiProduct, Product } from "@/lib/types/products";
 export type {
-  ApiProduct,
   ProductSearchParams,
   ProductSearchResponse,
 } from "../../app/actions/products";
@@ -9,6 +9,7 @@ export {
   getProductBySlug as fetchProductBySlug,
   getShopProducts as fetchShopProducts,
   searchProducts,
+  searchShopProducts,
 } from "../../app/actions/products";
 
 // Helper to generate product identifier from product data (slug + short ID)

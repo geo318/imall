@@ -9,6 +9,7 @@ export type CartItem = {
   productId: string;
   productTitle: string;
   productSlug: string;
+  productImageUrl?: string | null;
   price: string;
   currency: string;
   sku: string | null;

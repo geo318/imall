@@ -2,12 +2,9 @@
 
 import { env } from "@repo/shared";
 import { cacheLife, cacheTag } from "next/cache";
+import type { Product } from "@/lib/types/products";
 import { CACHE_TAGS } from "../constants";
-import type {
-  ApiProduct,
-  ProductSearchParams,
-  ProductSearchResponse,
-} from "../services/products.service";
+import type { ProductSearchParams, ProductSearchResponse } from "../services/products.service";
 
 const API_BASE = env.BACKEND_URL || "http://localhost:3001";
 
@@ -15,7 +12,7 @@ const API_BASE = env.BACKEND_URL || "http://localhost:3001";
  * Server-side function to fetch products for a shop
  * Uses Cache Components with 'use cache' directive for PPR
  */
-export async function getShopProductsServer(shopSlug: string, limit = 20): Promise<ApiProduct[]> {
+export async function getShopProductsServer(shopSlug: string, limit = 20): Promise<Product[]> {
   "use cache";
   cacheLife({ stale: 60, expire: 3600 }); // 1m stale, 1h expire
   cacheTag(CACHE_TAGS.PRODUCTS);
@@ -30,14 +27,16 @@ export async function getShopProductsServer(shopSlug: string, limit = 20): Promi
     throw new Error("Failed to load products");
   }
 
-  return response.json();
+  const data = await response.json();
+  // Handle both old format (array) and new format ({ items, nextOffset })
+  return Array.isArray(data) ? data : data.items || [];
 }
 
 /**
  * Server-side function to fetch a product by identifier
  * Uses Cache Components with 'use cache' directive for PPR
  */
-export async function getProductByIdentifierServer(productIdentifier: string): Promise<ApiProduct> {
+export async function getProductByIdentifierServer(productIdentifier: string): Promise<Product> {
   "use cache";
   cacheLife({ stale: 30, expire: 1800 }); // 30s stale, 30m expire
   cacheTag(CACHE_TAGS.PRODUCT);
@@ -88,7 +87,7 @@ export async function searchProductsServer(
  * Server-side function to fetch random products
  * Uses Cache Components with 'use cache' directive for PPR
  */
-export async function getAnyProductsServer(limit = 20): Promise<ApiProduct[]> {
+export async function getAnyProductsServer(limit = 20): Promise<Product[]> {
   "use cache";
   cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
   cacheTag(CACHE_TAGS.PRODUCTS);

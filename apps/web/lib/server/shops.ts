@@ -1,6 +1,6 @@
-import { cacheLife, cacheTag } from "next/cache";
 import { env } from "@repo/shared";
-import { CACHE_LIFE, CACHE_TAGS } from "../constants";
+import { cacheLife, cacheTag } from "next/cache";
+import { CACHE_TAGS } from "../constants";
 
 const API_BASE = env.BACKEND_URL || "http://localhost:3001";
 

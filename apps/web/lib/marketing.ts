@@ -1,6 +1,7 @@
 import type { MarketingProduct } from "@/components/marketing/product-card";
 import type { ApiProduct } from "./api/products";
 import { getProductIdentifier } from "./api/products";
+import { getPrimaryImage } from "./utils/images";
 
 export function mapApiProductToMarketing(product: ApiProduct): MarketingProduct {
   const firstVariant = product.variants?.[0];
@@ -19,6 +20,9 @@ export function mapApiProductToMarketing(product: ApiProduct): MarketingProduct 
     : undefined;
   // endsAt is passed to client component for dynamic calculation
   const endsAt = auction?.endsAt ?? undefined;
+  // Get primary image using helper
+  const imageUrl = getPrimaryImage(product.images) || "";
+
   return {
     id: product.id,
     slug: product.slug,
@@ -26,7 +30,7 @@ export function mapApiProductToMarketing(product: ApiProduct): MarketingProduct 
     price: firstVariant ? Number(firstVariant.price) : null,
     currency: firstVariant?.currency ?? null,
     vendor: shopName,
-    image: `https://picsum.photos/seed/${product.slug}/800/800`,
+    image: imageUrl || "",
     href: `/${productIdentifier}`,
     isAuction,
     currentBid: isAuction && currentBid ? currentBid : undefined,

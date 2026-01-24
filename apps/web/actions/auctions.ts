@@ -89,13 +89,13 @@ async function backendRequest(
   if (token) {
     // Only set Authorization header (standard HTTP header name)
     // Setting both 'authorization' and 'Authorization' can cause header concatenation issues
-    headers["Authorization"] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
     console.log("[Server Action] backendRequest - Token added to headers:", {
       hasToken: true,
       tokenLength: token.length,
       tokenPrefix: token.substring(0, 30),
-      authorizationHeader: headers["authorization"]?.substring(0, 40),
-      AuthorizationHeader: headers["Authorization"]?.substring(0, 40),
+      authorizationHeader: headers.authorization?.substring(0, 40),
+      AuthorizationHeader: headers.Authorization?.substring(0, 40),
     });
   } else {
     console.error("[Server Action] backendRequest - No token available:", {

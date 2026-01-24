@@ -3,6 +3,7 @@
 // During build, Next.js injects NEXT_PUBLIC_ vars, so this should be safe
 export function getClerkPublishableKey(): string {
   // Use a type assertion to tell Next.js this is a build-time constant
-  const key = (process.env as { NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?: string }).NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const key = (process.env as { NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?: string })
+    .NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   return key || "";
 }

@@ -60,15 +60,15 @@ function AuctionTimerComponent({ endsAt }: Props) {
     };
 
     updateTimer();
-    
+
     // Use a longer interval for product cards (30 seconds) to reduce rerenders
     // Only update more frequently when close to ending (< 1 hour)
     const endsAtTime = new Date(endsAt).getTime();
     const diffMs = endsAtTime - Date.now();
     const intervalMs = diffMs < 60 * 60 * 1000 ? 1000 : 30 * 1000; // 1s if < 1 hour, else 30s
-    
+
     intervalRef.current = setInterval(updateTimer, intervalMs);
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

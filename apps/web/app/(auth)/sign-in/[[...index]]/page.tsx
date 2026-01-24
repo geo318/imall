@@ -1,12 +1,14 @@
 import { Heart, Shield, Zap } from "lucide-react";
 import Link from "next/link";
-import { Suspense } from "react";
 import { MarketHubLogo } from "@/assets";
-import { SignInSkeleton } from "../../_components/sign-in-skeleton";
 import { SignInSlot } from "../../_components/sign-in-slot";
 
 const features = [
-  { icon: Shield, title: "Secure Shopping", desc: "Your data is always protected" },
+  {
+    icon: Shield,
+    title: "Secure Shopping",
+    desc: "Your data is always protected",
+  },
   { icon: Zap, title: "Fast Checkout", desc: "Quick and seamless experience" },
   { icon: Heart, title: "Save Favorites", desc: "Build your wishlist" },
 ];

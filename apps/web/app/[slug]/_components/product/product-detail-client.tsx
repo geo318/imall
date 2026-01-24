@@ -1,23 +1,21 @@
 "use client";
 
 import { Badge } from "@repo/ui/badge";
-import { Button } from "@repo/ui/button";
-import {
-  ArrowLeft,
-  CheckCircle,
-  Gavel,
-  Heart,
-  Share2,
-  ShieldCheck,
-  Star,
-  Truck,
-} from "lucide-react";
-import Image from "next/image";
+import { ArrowLeft, CheckCircle, Gavel, Heart, ShieldCheck, Star, Truck } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import LazyImage from "@/components/shared/lazy-image";
 import type { ApiProduct } from "@/lib/api/products";
 import { cn } from "@/lib/utils";
-import { ProductActionsSlot, ProductAvailabilitySlot, ProductPriceSlot } from "./";
+import {
+  ProductActionsSlot,
+  ProductAvailabilitySlot,
+  ProductFavoriteButton,
+  ProductPriceSlot,
+  ProductShareSlot,
+  ProductStatusBanner,
+  ProductViewTracker,
+} from "./";
 
 type Props = {
   product: ApiProduct;
@@ -38,14 +36,17 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
   const shopSlug = product.tenantSlug ?? "demo-shop";
   const shopName = product.tenantName ?? shopSlug;
 
-  const productImages = [
-    `https://picsum.photos/seed/${product.slug}-1/800/800`,
-    `https://picsum.photos/seed/${product.slug}-2/800/800`,
-    `https://picsum.photos/seed/${product.slug}-3/800/800`,
-  ];
+  // Use actual product images, filter out invalid URLs
+  const productImages = product.images
+    ? product.images
+        .map((img) => img.url)
+        .filter((url): url is string => Boolean(url && url.trim() !== ""))
+    : [];
 
   return (
     <div className="container py-6">
+      {/* Track product view */}
+      <ProductViewTracker productId={product.id} />
       {/* Static: Back Button */}
       <Link
         href={`/${shopSlug}`}
@@ -55,49 +56,53 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
         Back to Products
       </Link>
 
+      {/* Status Banner - shows if product is deleted or draft */}
+      <ProductStatusBanner deletedAt={product.deletedAt} draft={product.draft} />
+
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         {/* Static: Images */}
         <div className="space-y-4">
           <div className="relative aspect-square overflow-hidden rounded-2xl bg-secondary">
-            {productImages[selectedImage] && (
-              <Image
-                src={productImages[selectedImage]}
-                alt={product.title}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 50vw"
-              />
-            )}
+            <LazyImage
+              src={productImages[selectedImage]}
+              alt={product.title}
+              width={800}
+              height={800}
+              className="h-full w-full"
+            />
+
             {auction && (
-              <Badge className="absolute top-4 left-4 bg-warning text-warning-foreground gap-1">
+              <Badge className="absolute top-4 left-4 bg-warning text-warning-foreground gap-1 z-10">
                 <Gavel className="h-3 w-3" />
                 Live Auction
               </Badge>
             )}
           </div>
-          <div className="flex gap-3 overflow-x-auto pb-2">
-            {productImages.map((image, index) => (
-              <button
-                key={image}
-                type="button"
-                onClick={() => setSelectedImage(index)}
-                className={cn(
-                  "flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-colors",
-                  selectedImage === index
-                    ? "border-primary"
-                    : "border-transparent opacity-60 hover:opacity-100",
-                )}
-              >
-                <Image
-                  src={image}
-                  alt=""
-                  width={80}
-                  height={80}
-                  className="h-full w-full object-cover"
-                />
-              </button>
-            ))}
-          </div>
+          {productImages.length > 1 && (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {productImages.map((image, index) => (
+                <button
+                  key={image}
+                  type="button"
+                  onClick={() => setSelectedImage(index)}
+                  className={cn(
+                    "flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-colors",
+                    selectedImage === index
+                      ? "border-primary"
+                      : "border-transparent opacity-60 hover:opacity-100",
+                  )}
+                >
+                  <LazyImage
+                    src={image}
+                    alt={`${product.title} - Image ${index + 1}`}
+                    width={80}
+                    height={80}
+                    className="h-full w-full"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Static: Details Container */}
@@ -212,11 +217,11 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
             />
           )}
 
-          {/* Static: Share Button */}
-          <Button variant="ghost" className="w-full" size="sm">
-            <Share2 className="h-4 w-4 mr-2" />
-            Share Product
-          </Button>
+          {/* Favorite Button */}
+          <ProductFavoriteButton productId={product.id} />
+
+          {/* Share Product */}
+          <ProductShareSlot product={product} productIdentifier={productIdentifier} />
         </div>
       </div>
     </div>

@@ -4,7 +4,11 @@ import { MarketHubLogo } from "@/assets";
 import { SignUpSlot } from "../../_components/sign-up-slot";
 
 const features = [
-  { icon: Shield, title: "Secure Shopping", desc: "Your data is always protected" },
+  {
+    icon: Shield,
+    title: "Secure Shopping",
+    desc: "Your data is always protected",
+  },
   { icon: Zap, title: "Fast Checkout", desc: "Quick and seamless experience" },
   { icon: Heart, title: "Save Favorites", desc: "Build your wishlist" },
 ];

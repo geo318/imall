@@ -12,6 +12,7 @@ import { getCart } from "@/actions/carts";
 import { MarketHubLogo } from "@/assets";
 import type { CartItem } from "@/lib/api/cart";
 import { cn } from "@/lib/utils";
+import { HeaderFavorites } from "./header-favorites";
 
 const navLinks = [
   { href: "/products", label: "Products" },
@@ -127,6 +128,7 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-2 flex-shrink-0 ml-auto">
+          <HeaderFavorites />
           <Button variant="ghost" size="sm" className="rounded-full relative">
             <Link href="/cart">
               <ShoppingBag className="h-5 w-5" />
@@ -211,6 +213,7 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
               )}
             </div>
           </form>
+          <HeaderFavorites />
           <Button variant="ghost" size="sm" className="rounded-full relative">
             <Link href="/cart">
               <ShoppingBag className="h-5 w-5" />

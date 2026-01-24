@@ -1,7 +1,9 @@
+"use client";
+
 import { Badge } from "@repo/ui/badge";
 import { Gavel } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
+import LazyImage from "@/components/shared/lazy-image";
 import { AuctionTimer } from "./auction-timer";
 
 export type MarketingProduct = {
@@ -20,7 +22,6 @@ export type MarketingProduct = {
 };
 
 export function ProductCard({
-  id,
   title,
   price,
   currency,
@@ -37,16 +38,21 @@ export function ProductCard({
       <div className="card-hover relative overflow-hidden rounded-2xl bg-card border border-border/50">
         {/* Image */}
         <div className="relative aspect-square overflow-hidden bg-secondary">
-          <Image
-            src={image}
-            alt={title}
-            fill
-            className="object-cover transition duration-500 group-hover:scale-105"
-            sizes="(min-width: 1024px) 25vw, 50vw"
-            priority={id === "1"}
-          />
+          {image ? (
+            <LazyImage
+              src={image}
+              alt={title}
+              width={400}
+              height={400}
+              className="transition duration-500 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              No image
+            </div>
+          )}
           {(isAuction || tag) && (
-            <Badge className="absolute top-3 left-3 bg-amber-200 text-amber-950 gap-1">
+            <Badge className="absolute top-3 left-3 bg-amber-200 text-amber-950 gap-1 z-10">
               <Gavel className="h-3 w-3" />
               {tag ?? "Auction"}
             </Badge>

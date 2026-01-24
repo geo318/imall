@@ -1,35 +1,6 @@
 import axios from "axios";
+import type { Product } from "@/lib/types/products";
 import { tryCatch } from "../utils";
-
-export type ApiProduct = {
-  id: string;
-  slug: string;
-  title: string;
-  description: string | null;
-  tenantSlug?: string;
-  tenantName?: string;
-  createdAt?: string;
-  hasAuction?: boolean;
-  variants: {
-    id: string;
-    sku: string | null;
-    price: string;
-    currency: string;
-    availableQty?: number;
-    auction?: {
-      id: string;
-      status: string | null;
-      startsAt: string;
-      endsAt: string;
-      startingBid?: string | null;
-      minIncrement?: string | null;
-      buyNowPrice?: string | null;
-      currentPrice?: string | null;
-      highestBidId?: string | null;
-      highestBidderId?: string | null;
-    } | null;
-  }[];
-};
 
 export type ProductSearchParams = {
   limit?: number;
@@ -42,13 +13,13 @@ export type ProductSearchParams = {
 };
 
 export type ProductSearchResponse = {
-  items: ApiProduct[];
+  items: Product[];
   nextOffset: number | null;
 };
 
-export async function getShopProducts(shopSlug: string, limit = 20): Promise<ApiProduct[]> {
+export async function getShopProducts(shopSlug: string, limit = 20): Promise<Product[]> {
   const [data, error] = await tryCatch(
-    axios.get<ApiProduct[]>(`/api/shops/${shopSlug}/products`, {
+    axios.get<Product[]>(`/api/shops/${shopSlug}/products`, {
       params: { limit },
     }),
   );
@@ -63,8 +34,35 @@ export async function getShopProducts(shopSlug: string, limit = 20): Promise<Api
   return data.data;
 }
 
-export async function getProductByIdentifier(productIdentifier: string): Promise<ApiProduct> {
-  const [data, error] = await tryCatch(axios.get<ApiProduct>(`/api/products/${productIdentifier}`));
+export async function searchShopProducts(
+  shopSlug: string,
+  params: {
+    limit?: number;
+    offset?: number;
+    q?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    sort?: "newest" | "oldest" | "priceAsc" | "priceDesc";
+  },
+): Promise<ProductSearchResponse> {
+  const [data, error] = await tryCatch(
+    axios.get<ProductSearchResponse>(`/api/shops/${shopSlug}/products`, {
+      params,
+    }),
+  );
+
+  if (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) {
+      throw new Error("not-found");
+    }
+    throw new Error("Failed to search shop products");
+  }
+
+  return data.data;
+}
+
+export async function getProductByIdentifier(productIdentifier: string): Promise<Product> {
+  const [data, error] = await tryCatch(axios.get<Product>(`/api/products/${productIdentifier}`));
 
   if (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
@@ -76,9 +74,9 @@ export async function getProductByIdentifier(productIdentifier: string): Promise
   return data.data;
 }
 
-export async function getProductBySlug(shopSlug: string, productSlug: string): Promise<ApiProduct> {
+export async function getProductBySlug(shopSlug: string, productSlug: string): Promise<Product> {
   const [data, error] = await tryCatch(
-    axios.get<ApiProduct>(`/api/shops/${shopSlug}/products/${productSlug}`),
+    axios.get<Product>(`/api/shops/${shopSlug}/products/${productSlug}`),
   );
 
   if (error) {
@@ -91,9 +89,9 @@ export async function getProductBySlug(shopSlug: string, productSlug: string): P
   return data.data;
 }
 
-export async function getAnyProducts(limit = 20): Promise<ApiProduct[]> {
+export async function getAnyProducts(limit = 20): Promise<Product[]> {
   const [data, error] = await tryCatch(
-    axios.get<ApiProduct[]>("/api/products", {
+    axios.get<Product[]>("/api/products", {
       params: { limit },
     }),
   );

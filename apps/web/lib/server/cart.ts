@@ -1,6 +1,4 @@
 import { env } from "@repo/shared";
-// Removed cacheLife/cacheTag imports - cacheComponents disabled
-import { CACHE_LIFE, CACHE_TAGS } from "../constants";
 import type { Cart } from "../services/cart.service";
 
 const API_BASE = env.BACKEND_URL || "http://localhost:3001";

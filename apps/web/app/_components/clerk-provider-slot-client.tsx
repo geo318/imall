@@ -7,11 +7,12 @@ import { createContext, useContext, useEffect, useState } from "react";
 const ClerkReadyContext = createContext<boolean>(false);
 
 export function useClerkReady() {
+  const contextValue = useContext(ClerkReadyContext);
   // During SSR/build, Clerk context won't be available, so return false
   if (typeof window === "undefined") {
     return false;
   }
-  return useContext(ClerkReadyContext);
+  return contextValue;
 }
 
 function ClerkReadyDetector({ onReady }: { onReady: () => void }) {
@@ -31,10 +32,10 @@ function ClerkReadyDetector({ onReady }: { onReady: () => void }) {
   return null;
 }
 
-export function ClerkProviderSlotClient({ 
-  children, 
-  publishableKey 
-}: { 
+export function ClerkProviderSlotClient({
+  children,
+  publishableKey,
+}: {
   children: React.ReactNode;
   publishableKey: string;
 }) {
@@ -48,9 +49,7 @@ export function ClerkProviderSlotClient({
     // This prevents "useUser outside ClerkProvider" errors
     return (
       <ClerkProvider publishableKey="">
-        <ClerkReadyContext.Provider value={false}>
-          {children}
-        </ClerkReadyContext.Provider>
+        <ClerkReadyContext.Provider value={false}>{children}</ClerkReadyContext.Provider>
       </ClerkProvider>
     );
   }
@@ -58,10 +57,7 @@ export function ClerkProviderSlotClient({
   return (
     <ClerkProvider publishableKey={publishableKey}>
       <ClerkReadyDetector onReady={() => setClerkReady(true)} />
-      <ClerkReadyContext.Provider value={clerkReady}>
-        {children}
-      </ClerkReadyContext.Provider>
+      <ClerkReadyContext.Provider value={clerkReady}>{children}</ClerkReadyContext.Provider>
     </ClerkProvider>
   );
 }
-
