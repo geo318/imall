@@ -122,7 +122,10 @@ export const auctionsRoutes = new Elysia({
     return results;
   })
   .post("/:auctionId/bids", async ({ params, body, auth, request }) => {
-    const { shopSlug, auctionId } = params as { shopSlug: string; auctionId: string };
+    const { shopSlug, auctionId } = params as {
+      shopSlug: string;
+      auctionId: string;
+    };
 
     // Validate payload
     let payload: ReturnType<typeof bidPayloadSchema.parse>;
@@ -341,7 +344,10 @@ export const auctionsRoutes = new Elysia({
     }
   })
   .post("/:auctionId/buy-now", async ({ params }) => {
-    const { shopSlug, auctionId } = params as { shopSlug: string; auctionId: string };
+    const { shopSlug, auctionId } = params as {
+      shopSlug: string;
+      auctionId: string;
+    };
     const tenantId = await getTenantIdBySlug(shopSlug);
     try {
       const order = await db.transaction(async (tx) => {

@@ -1,47 +1,119 @@
 import { auctions, bids, db, products, tenants, users, variants } from "@repo/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNull,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { getAvailableStock, getTenantIdBySlug, listQuerySchema } from "../context";
+
+const shopProductsQuerySchema = z.object({
+  limit: z
+    .string()
+    .optional()
+    .transform((v) => (v ? Number(v) : 20))
+    .refine((v) => Number.isFinite(v) && v > 0 && v <= 100, "Limit invalid"),
+  offset: z
+    .string()
+    .optional()
+    .transform((v) => (v ? Number(v) : 0))
+    .refine((v) => Number.isFinite(v) && v >= 0, "Offset invalid"),
+  q: z.string().optional(),
+  minPrice: z
+    .string()
+    .optional()
+    .transform((v) => (v ? Number(v) : undefined))
+    .refine((v) => v === undefined || (Number.isFinite(v) && v >= 0), "minPrice invalid"),
+  maxPrice: z
+    .string()
+    .optional()
+    .transform((v) => (v ? Number(v) : undefined))
+    .refine((v) => v === undefined || (Number.isFinite(v) && v >= 0), "maxPrice invalid"),
+  sort: z.enum(["newest", "oldest", "priceAsc", "priceDesc"]).optional().default("newest"),
+});
 
 export const productsRoutes = new Elysia({
   prefix: "/shops/:shopSlug/products",
 })
   .get("/", async ({ params, query, set }) => {
     try {
-      console.log("[Products Route] Fetching products for shop:", params.shopSlug);
-      console.log("[Products Route] Query params:", query);
-
       const tenantId = await getTenantIdBySlug(params.shopSlug);
-      console.log("[Products Route] Tenant ID:", tenantId);
+      const { limit, offset, q, minPrice, maxPrice, sort } = shopProductsQuerySchema.parse(query);
 
-      const { limit } = listQuerySchema.parse(query);
-      console.log("[Products Route] Limit:", limit);
+      const qLike = q ? `%${q}%` : undefined;
+      const minPriceSql = sql<number>`min(${variants.price})`;
 
-      // Fetch products
-      console.log("[Products Route] Executing products query...");
-      const productRows = await db
-        .select()
-        .from(products)
-        .where(eq(products.tenantId, tenantId))
-        .limit(limit);
-
-      if (productRows.length === 0) {
-        return [];
+      // Build where clauses - filter out soft-deleted products
+      const whereClauses: SQL[] = [eq(products.tenantId, tenantId), isNull(products.deletedAt)];
+      if (qLike) {
+        const searchCondition = or(
+          ilike(products.title, qLike),
+          ilike(products.description, qLike),
+        );
+        if (searchCondition) {
+          whereClauses.push(searchCondition);
+        }
       }
 
-      const productIds = productRows.map((p) => p.id);
+      // Build base query
+      const baseQuery = db
+        .select({
+          id: products.id,
+          slug: products.slug,
+          title: products.title,
+          description: products.description,
+          category: products.category,
+          imageUrls: products.imageUrls,
+          status: products.status,
+          createdAt: products.createdAt,
+          price: minPriceSql,
+          currency: sql<string>`min(${variants.currency})`,
+        })
+        .from(products)
+        .innerJoin(variants, eq(variants.productId, products.id))
+        .where(and(...whereClauses))
+        .groupBy(products.id);
 
-      // Fetch variants for all products
-      type VariantRow = {
-        id: string;
-        productId: string;
-        sku: string | null;
-        price: string;
-        currency: string;
-      };
+      // HAVING for min/max price
+      const havingClauses: SQL[] = [];
+      if (minPrice !== undefined) havingClauses.push(gte(minPriceSql, minPrice));
+      if (maxPrice !== undefined) havingClauses.push(lte(minPriceSql, maxPrice));
+      const filteredQuery =
+        havingClauses.length > 0 ? baseQuery.having(and(...havingClauses)) : baseQuery;
 
-      const variantRows: VariantRow[] =
+      // Apply sorting
+      const orderBy =
+        sort === "oldest"
+          ? asc(products.createdAt)
+          : sort === "priceAsc"
+            ? asc(minPriceSql)
+            : sort === "priceDesc"
+              ? desc(minPriceSql)
+              : desc(products.createdAt);
+
+      const rows = await filteredQuery.orderBy(orderBy).limit(limit).offset(offset);
+
+      if (rows.length === 0) {
+        return {
+          items: [],
+          nextOffset: null,
+        };
+      }
+
+      const productIds = rows.map((row) => row.id);
+
+      // Fetch full variants for all products
+      const variantRows =
         productIds.length > 0
           ? await db
               .select({
@@ -54,6 +126,7 @@ export const productsRoutes = new Elysia({
               .from(variants)
               .where(inArray(variants.productId, productIds))
           : [];
+      type VariantRow = (typeof variantRows)[number];
 
       // Group variants by product
       const variantsByProduct = new Map<string, VariantRow[]>();
@@ -63,13 +136,46 @@ export const productsRoutes = new Elysia({
         variantsByProduct.set(variant.productId, existing);
       }
 
-      // Combine products with their variants
-      const result = productRows.map((product) => ({
-        ...product,
-        variants: variantsByProduct.get(product.id) ?? [],
+      // Get images from comma-delimited strings in products
+      const imagesByProduct = new Map<
+        string,
+        Array<{ id: string; url: string; isPrimary: boolean }>
+      >();
+      for (const row of rows) {
+        if (row.imageUrls) {
+          const imageUrls = row.imageUrls
+            .split(",")
+            .map((url) => url.trim())
+            .filter((url) => url.length > 0);
+
+          imagesByProduct.set(
+            row.id,
+            imageUrls.map((url, index) => ({
+              id: `img-${index}`,
+              url,
+              isPrimary: index === 0,
+            })),
+          );
+        }
+      }
+
+      // Combine products with their variants and images
+      const items = rows.map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        description: row.description,
+        category: row.category,
+        status: row.status,
+        createdAt: row.createdAt,
+        variants: variantsByProduct.get(row.id) ?? [],
+        images: imagesByProduct.get(row.id) ?? [],
       }));
 
-      return result;
+      return {
+        items,
+        nextOffset: rows.length < limit ? null : offset + limit,
+      };
     } catch (err) {
       if (err instanceof Response) {
         set.status = err.status;
@@ -101,11 +207,17 @@ export const productsRoutes = new Elysia({
     try {
       const tenantId = await getTenantIdBySlug(params.shopSlug);
 
-      // Fetch product and variants separately for proper typing
+      // Fetch product and variants separately for proper typing - exclude soft-deleted products
       const [product] = await db
         .select()
         .from(products)
-        .where(and(eq(products.tenantId, tenantId), eq(products.slug, params.productSlug)))
+        .where(
+          and(
+            eq(products.tenantId, tenantId),
+            eq(products.slug, params.productSlug),
+            isNull(products.deletedAt),
+          ),
+        )
         .limit(1);
 
       if (!product) {
@@ -195,9 +307,22 @@ export const productsRoutes = new Elysia({
         }),
       );
 
+      // Get images from comma-delimited string
+      const images = product.imageUrls
+        ? product.imageUrls
+            .split(",")
+            .map((url, index) => ({
+              id: `img-${index}`,
+              url: url.trim(),
+              isPrimary: index === 0, // First image is primary
+            }))
+            .filter((img) => img.url.length > 0)
+        : [];
+
       return {
         ...product,
         variants: serializedVariants,
+        images,
       };
     } catch (err) {
       if (err instanceof Response) return err;
@@ -260,6 +385,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           })
           .from(products)
           .innerJoin(tenants, eq(products.tenantId, tenants.id))
+          .where(sql`${products.deletedAt} IS NULL`) // Exclude soft-deleted products
           .orderBy(sql`random()`)
           .limit(limit);
         console.log("[All Products Route] Query succeeded, got", rows.length, "rows");
@@ -408,7 +534,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
     try {
       const { limit, offset, q, type, sort, minPrice, maxPrice } = searchSchema.parse(query);
 
-      const qLike = q ? `%${q}%` : null;
+      const qLike = q ? `%${q}%` : undefined;
       const hasAuctionSql = sql<boolean>`
         exists (
           select 1
@@ -419,22 +545,27 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
       `;
       const minPriceSql = sql<number>`min(${variants.price})`;
 
-      const whereClauses: any[] = [];
+      const whereClauses: SQL[] = [isNull(products.deletedAt)];
       if (qLike) {
-        whereClauses.push(
-          sql`(${products.title} ILIKE ${qLike} OR ${products.description} ILIKE ${qLike})`,
+        const searchCondition = or(
+          ilike(products.title, qLike),
+          ilike(products.description, qLike),
         );
+        if (searchCondition) {
+          whereClauses.push(searchCondition);
+        }
       }
-      if (type === "auction") whereClauses.push(sql`${hasAuctionSql} = true`);
-      if (type === "buyNow") whereClauses.push(sql`${hasAuctionSql} = false`);
+      if (type === "auction") whereClauses.push(eq(hasAuctionSql, true));
+      if (type === "buyNow") whereClauses.push(eq(hasAuctionSql, false));
 
       // Build base query with aggregates for price and hasAuction.
-      let base = db
+      const baseQuery = db
         .select({
           id: products.id,
           slug: products.slug,
           title: products.title,
           description: products.description,
+          imageUrls: products.imageUrls,
           createdAt: products.createdAt,
           tenantSlug: tenants.shopSlug,
           tenantName: tenants.name,
@@ -445,47 +576,71 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         .from(products)
         .innerJoin(tenants, eq(products.tenantId, tenants.id))
         .innerJoin(variants, eq(variants.productId, products.id))
+        .where(and(...whereClauses))
         .groupBy(products.id, tenants.shopSlug, tenants.name);
 
-      if (whereClauses.length > 0) {
-        // drizzle-orm types are strict; use raw sql for combined where
-        base = (base as any).where(sql.join(whereClauses, sql` AND `));
-      }
-
       // HAVING for min/max price
-      const havingClauses: any[] = [];
-      if (minPrice !== undefined) havingClauses.push(sql`${minPriceSql} >= ${minPrice}`);
-      if (maxPrice !== undefined) havingClauses.push(sql`${minPriceSql} <= ${maxPrice}`);
-      if (havingClauses.length > 0) {
-        base = (base as any).having(sql.join(havingClauses, sql` AND `));
+      const havingClauses: SQL[] = [];
+      if (minPrice !== undefined) havingClauses.push(gte(minPriceSql, minPrice));
+      if (maxPrice !== undefined) havingClauses.push(lte(minPriceSql, maxPrice));
+      const filteredQuery =
+        havingClauses.length > 0 ? baseQuery.having(and(...havingClauses)) : baseQuery;
+
+      const orderBy =
+        sort === "random"
+          ? sql`random()`
+          : sort === "oldest"
+            ? asc(products.createdAt)
+            : sort === "priceAsc"
+              ? asc(minPriceSql)
+              : sort === "priceDesc"
+                ? desc(minPriceSql)
+                : desc(products.createdAt);
+
+      const rows = await filteredQuery.orderBy(orderBy).limit(limit).offset(offset);
+
+      // Get images from comma-delimited strings in products
+      const imagesByProduct = new Map<
+        string,
+        Array<{ id: string; url: string; isPrimary: boolean }>
+      >();
+      for (const row of rows) {
+        if (row.imageUrls) {
+          const imageUrls = row.imageUrls
+            .split(",")
+            .map((url) => url.trim())
+            .filter((url) => url.length > 0);
+
+          imagesByProduct.set(
+            row.id,
+            imageUrls.map((url, index) => ({
+              id: `img-${index}`,
+              url,
+              isPrimary: index === 0,
+            })),
+          );
+        }
       }
 
-      if (sort === "random") base = (base as any).orderBy(sql`random()`);
-      if (sort === "newest") base = (base as any).orderBy(sql`${products.createdAt} desc`);
-      if (sort === "oldest") base = (base as any).orderBy(sql`${products.createdAt} asc`);
-      if (sort === "priceAsc") base = (base as any).orderBy(sql`${minPriceSql} asc`);
-      if (sort === "priceDesc") base = (base as any).orderBy(sql`${minPriceSql} desc`);
-
-      const rows = await (base as any).limit(limit).offset(offset);
-
-      const items = rows.map((r: any) => ({
-        id: r.id,
-        slug: r.slug,
-        title: r.title,
-        description: r.description,
-        createdAt: r.createdAt,
-        tenantSlug: r.tenantSlug,
-        tenantName: r.tenantName,
-        hasAuction: Boolean(r.hasAuction),
+      const items = rows.map((row) => ({
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        description: row.description,
+        createdAt: row.createdAt,
+        tenantSlug: row.tenantSlug,
+        tenantName: row.tenantName,
+        hasAuction: Boolean(row.hasAuction),
         variants: [
           {
             id: "summary",
             sku: null,
-            price: String(r.price ?? "0"),
-            currency: r.currency ?? "USD",
+            price: String(row.price ?? "0"),
+            currency: row.currency ?? "USD",
             auction: null,
           },
         ],
+        images: imagesByProduct.get(row.id) ?? [],
       }));
 
       return {
@@ -501,7 +656,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
       };
     }
   })
-  .get("/:productIdentifier", async ({ params, set }) => {
+  .get("/:productIdentifier", async ({ params, set, request }) => {
     try {
       const parsed = parseProductIdentifier(params.productIdentifier);
       if (!parsed) {
@@ -511,6 +666,46 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
 
       const { slug, shortId } = parsed;
 
+      // Check if user is authenticated and is the owner
+      let isOwner = false;
+      let includeDeleted = false;
+
+      try {
+        const { ensureAuth, verifyTenantAccess } = await import("../utils/auth");
+        const effectiveAuth = await ensureAuth(undefined, request);
+        if (effectiveAuth?.userId) {
+          // Try to find product first to get tenantId
+          const [productForTenant] = await db
+            .select({
+              tenantId: products.tenantId,
+              deletedAt: products.deletedAt,
+              draft: products.draft,
+            })
+            .from(products)
+            .where(eq(products.slug, slug))
+            .limit(1);
+
+          if (productForTenant) {
+            const hasAccess = await verifyTenantAccess(
+              effectiveAuth.userId,
+              productForTenant.tenantId,
+            );
+            if (hasAccess) {
+              isOwner = true;
+              includeDeleted = true; // Owner can see deleted products
+            }
+          }
+        }
+      } catch {
+        // Not authenticated or not owner - continue with normal flow
+      }
+
+      // Build where clause - include deleted/draft if owner
+      const whereConditions: SQL[] = [eq(products.slug, slug)];
+      if (!includeDeleted) {
+        whereConditions.push(isNull(products.deletedAt));
+      }
+
       // Find product by slug and verify short ID matches
       const productRows = await db
         .select({
@@ -518,21 +713,31 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           slug: products.slug,
           title: products.title,
           description: products.description,
+          category: products.category,
+          imageUrls: products.imageUrls,
           tenantId: products.tenantId,
           status: products.status,
           createdAt: products.createdAt,
+          deletedAt: products.deletedAt,
+          draft: products.draft,
           tenantSlug: tenants.shopSlug,
           tenantName: tenants.name,
         })
         .from(products)
         .innerJoin(tenants, eq(products.tenantId, tenants.id))
-        .where(eq(products.slug, slug))
+        .where(and(...whereConditions))
         .limit(10); // Limit to avoid too many results
 
       // Find the product where short ID matches
       const product = productRows.find((p) => getShortId(p.id) === shortId);
 
       if (!product) {
+        set.status = 404;
+        return "Product not found";
+      }
+
+      // If product is deleted or draft and user is not owner, return 404
+      if ((product.deletedAt || product.draft) && !isOwner) {
         set.status = 404;
         return "Product not found";
       }
@@ -612,9 +817,28 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         };
       });
 
+      // Get images from comma-delimited string
+      const images = product.imageUrls
+        ? product.imageUrls
+            .split(",")
+            .map((url, index) => ({
+              id: `img-${index}`,
+              url: url.trim(),
+              isPrimary: index === 0, // First image is primary
+            }))
+            .filter((img) => img.url.length > 0)
+        : [];
+
       return {
         ...product,
         variants: serializedVariants,
+        images,
+        deletedAt: product.deletedAt
+          ? product.deletedAt instanceof Date
+            ? product.deletedAt.toISOString()
+            : String(product.deletedAt)
+          : null,
+        draft: product.draft ?? false,
       };
     } catch (err) {
       if (err instanceof Response) return err;
@@ -627,5 +851,57 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         error: "Failed to load product",
         message: err instanceof Error ? err.message : String(err),
       };
+    }
+  })
+  .post("/:productIdentifier/track-view", async ({ params, body }) => {
+    try {
+      const parsed = parseProductIdentifier(params.productIdentifier);
+      let productId: string;
+
+      if (!parsed) {
+        // If it's a UUID, use it directly
+        productId = params.productIdentifier;
+      } else {
+        const { slug, shortId } = parsed;
+
+        // Find product by slug
+        const productRows = await db
+          .select({
+            id: products.id,
+            slug: products.slug,
+          })
+          .from(products)
+          .where(and(eq(products.slug, slug), sql`${products.deletedAt} IS NULL`))
+          .limit(10);
+
+        // Find the product where short ID matches
+        const product = productRows.find((p) => getShortId(p.id) === shortId);
+
+        if (!product) {
+          return { success: false, error: "Product not found" };
+        }
+
+        productId = product.id;
+      }
+
+      // Parse request body to check if this is a unique view
+      let isUnique = false;
+      try {
+        if (body && typeof body === "object") {
+          const bodyObj = body as { isUnique?: boolean };
+          isUnique = bodyObj.isUnique ?? false;
+        }
+      } catch {
+        // If body parsing fails, default to non-unique
+        isUnique = false;
+      }
+
+      const { trackProductView } = await import("../utils/product-stats");
+      await trackProductView(productId, isUnique);
+      return { success: true };
+    } catch (error) {
+      console.error("[Products] Error tracking view:", error);
+      // Don't fail the request - view tracking is not critical
+      return { success: false };
     }
   });

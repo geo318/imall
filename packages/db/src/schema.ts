@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   numeric,
   pgTable,
@@ -62,7 +63,11 @@ export const products = pgTable(
     slug: varchar("slug", { length: 128 }).notNull(),
     title: varchar("title", { length: 256 }).notNull(),
     description: text("description"),
+    category: varchar("category", { length: 128 }).notNull(), // Product category (mandatory)
+    imageUrls: text("image_urls"), // Comma-delimited string of image URLs
     status: varchar("status", { length: 32 }).default("active"),
+    draft: boolean("draft").default(false).notNull(), // Draft status
+    deletedAt: timestamp("deleted_at"), // Soft delete timestamp
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
@@ -100,7 +105,7 @@ export const productImages = pgTable("product_images", {
     .references(() => tenants.id)
     .notNull(),
   productId: uuid("product_id")
-    .references(() => products.id)
+    .references(() => products.id, { onDelete: "cascade" })
     .notNull(),
   assetId: uuid("asset_id").notNull(),
   sortOrder: integer("sort_order").default(0),
@@ -256,3 +261,47 @@ export const bids = pgTable("bids", {
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Product stats table tracks metrics for products (views, cart additions, etc.)
+export const productStats = pgTable(
+  "product_stats",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    productId: uuid("product_id")
+      .references(() => products.id)
+      .notNull(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    viewsTotal: integer("views_total").default(0).notNull(), // Total page views
+    viewsUnique: integer("views_unique").default(0).notNull(), // Unique visitors
+    addedToCart: integer("added_to_cart").default(0).notNull(), // Times added to cart
+    loved: integer("loved").default(0).notNull(), // Times loved/favorited (<3)
+    sold: integer("sold").default(0).notNull(), // Units sold
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    productIdIdx: uniqueIndex("product_stats_product_id_unique").on(table.productId),
+  }),
+);
+
+// Favorites table stores user's favorite products
+export const favorites = pgTable(
+  "favorites",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    productId: uuid("product_id")
+      .references(() => products.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userIdProductIdIdx: uniqueIndex("favorites_user_product_unique").on(
+      table.userId,
+      table.productId,
+    ),
+  }),
+);

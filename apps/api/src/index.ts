@@ -1,7 +1,11 @@
 import { Elysia } from "elysia";
 import { bidPayloadSchema, env, listQuerySchema } from "./context";
+import { adminProductsRoutes } from "./routes/admin-products";
+import { adminUploadRoutes } from "./routes/admin-upload";
 import { auctionsRoutes, startAuctionCloser } from "./routes/auctions";
 import { cartRoutes } from "./routes/carts";
+import { favoritesRoutes } from "./routes/favorites";
+import { imageRoutes } from "./routes/images";
 import { inventoryRoutes } from "./routes/inventory";
 import { allProductsRoutes, productsRoutes } from "./routes/products";
 import { shopsRoutes } from "./routes/shops";
@@ -49,11 +53,15 @@ const app = new Elysia({ prefix: "/api" })
     }
   })
   .use(cartRoutes) // Single cart (can hold items from multiple shops) - register early to avoid conflicts
+  .use(imageRoutes) // Image serving - register early to avoid conflicts
   .use(shopsRoutes)
   .use(allProductsRoutes)
   .use(productsRoutes)
   .use(inventoryRoutes)
   .use(auctionsRoutes)
+  .use(favoritesRoutes)
+  .use(adminProductsRoutes)
+  .use(adminUploadRoutes)
   .onStart(() => {
     console.log("[API] Routes registered:");
     console.log("[API]   - /api/shops");

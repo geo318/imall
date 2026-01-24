@@ -92,17 +92,28 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           productId: products.id,
           productTitle: products.title,
           productSlug: products.slug,
+          productImageUrls: products.imageUrls,
         })
         .from(cartItems)
         .innerJoin(variants, eq(cartItems.variantId, variants.id))
         .innerJoin(products, eq(variants.productId, products.id))
         .where(eq(cartItems.cartId, cartId));
 
-      // Attach availability for each item (small N, ok for cart sizes)
+      // Attach availability and parse image URLs for each item (small N, ok for cart sizes)
       const itemsWithAvailability = await Promise.all(
         items.map(async (item) => {
           const availableQty = await getAvailableStock(item.tenantId, item.variantId);
-          return { ...item, availableQty };
+
+          // Parse image URLs from comma-delimited string
+          const productImageUrl = item.productImageUrls
+            ? item.productImageUrls.split(",")[0]?.trim() || null
+            : null;
+
+          return {
+            ...item,
+            availableQty,
+            productImageUrl,
+          };
         }),
       );
 
@@ -155,7 +166,9 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         }
         // Authorization: If cart has a userId, ensure the authenticated user matches
         if (cart.userId && auth?.userId !== cart.userId) {
-          throw new Response("Forbidden: You don't have access to this cart", { status: 403 });
+          throw new Response("Forbidden: You don't have access to this cart", {
+            status: 403,
+          });
         }
 
         // Check if item already exists in cart
@@ -255,7 +268,9 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
 
         // Authorization: If cart has a userId, ensure the authenticated user matches
         if (item.cartUserId && auth?.userId !== item.cartUserId) {
-          throw new Response("Forbidden: You don't have access to this cart", { status: 403 });
+          throw new Response("Forbidden: You don't have access to this cart", {
+            status: 403,
+          });
         }
 
         if (qty <= 0) {
@@ -312,7 +327,9 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
 
         // Authorization: If cart has a userId, ensure the authenticated user matches
         if (item.cartUserId && auth?.userId !== item.cartUserId) {
-          throw new Response("Forbidden: You don't have access to this cart", { status: 403 });
+          throw new Response("Forbidden: You don't have access to this cart", {
+            status: 403,
+          });
         }
 
         await tx.delete(cartItems).where(eq(cartItems.id, itemId));
@@ -362,7 +379,9 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         // Authorization: If cart has a userId, ensure the authenticated user matches
         const cartUserId = cartWithItems[0]?.userId;
         if (cartUserId && auth?.userId !== cartUserId) {
-          throw new Response("Forbidden: You don't have access to this cart", { status: 403 });
+          throw new Response("Forbidden: You don't have access to this cart", {
+            status: 403,
+          });
         }
 
         if (cartWithItems[0]?.status !== "open") {

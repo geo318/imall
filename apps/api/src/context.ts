@@ -36,9 +36,13 @@ export type WsContext<Extras extends Record<string, unknown> = Record<string, ne
 export const authPlugin = new Elysia<"", AuthSingleton>({
   name: "auth",
 }).derive(async ({ request }) => {
-  const authHeader = request.headers.get("authorization");
   const method = request.method;
   const pathname = new URL(request.url).pathname;
+
+  // Try both lowercase and capitalized header names (HTTP headers are case-insensitive but some implementations are strict)
+  const authHeaderLower = request.headers.get("authorization");
+  const authHeaderUpper = request.headers.get("Authorization");
+  const authHeader = authHeaderLower || authHeaderUpper;
 
   // Extract token using utility
   const token = extractTokenFromHeader(authHeader);
