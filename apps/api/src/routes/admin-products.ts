@@ -10,13 +10,45 @@ import {
   products,
   variants,
 } from "@repo/db";
-import { slugify } from "@repo/shared";
-import { and, eq, inArray, isNotNull, isNull, not, type SQL } from "drizzle-orm";
+import { INVENTORY_REASONS, slugify } from "@repo/shared";
+import { and, eq, ilike, inArray, isNotNull, isNull, not, or, sum, type SQL } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { authPlugin, getTenantIdBySlug } from "../context";
 import { getStorage } from "../storage";
 import { ensureAuth, requireAuth, verifyTenantAccess } from "../utils/auth";
+
+const optionalNumberString = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === "number") return value.toString();
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
+  z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid number").optional(),
+);
+
+const optionalIntegerString = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === "number") return value.toString();
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
+  z.string().regex(/^\d+$/, "Invalid stock quantity").optional(),
+);
+
+const optionalDateTimeString = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
+  z.string().optional(),
+);
 
 const productSchema = z.object({
   title: z.string().min(1).max(256),
@@ -33,14 +65,15 @@ const productSchema = z.object({
   variants: z.array(
     z.object({
       sku: z.string().optional(),
-      price: z.string(),
+      price: optionalNumberString,
       currency: z.string().default("USD"),
       isAuction: z.boolean().optional(),
-      auctionStartBid: z.string().optional(),
-      auctionMinIncrement: z.string().optional(),
-      auctionBuyNow: z.string().optional(),
-      auctionStartsAt: z.string().optional(),
-      auctionEndsAt: z.string().optional(),
+      stock: optionalIntegerString,
+      auctionStartBid: optionalNumberString,
+      auctionMinIncrement: optionalNumberString,
+      auctionBuyNow: optionalNumberString,
+      auctionStartsAt: optionalDateTimeString,
+      auctionEndsAt: optionalDateTimeString,
     }),
   ),
   images: z
@@ -57,7 +90,36 @@ const productSchema = z.object({
         }),
     )
     .optional(),
+}).superRefine((data, ctx) => {
+  if (!data.isAuction) {
+    const missingPrice = data.variants.some(
+      (variant) => !variant.price || Number(variant.price) <= 0,
+    );
+    if (missingPrice) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["variants"],
+        message: "All variants must have a valid price greater than 0",
+      });
+    }
+  } else {
+    const hasValidAuction = data.variants.some(
+      (variant) =>
+        Boolean(variant.auctionStartBid) &&
+        Boolean(variant.auctionEndsAt) &&
+        new Date(variant.auctionEndsAt as string) > new Date(),
+    );
+    if (!hasValidAuction) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["variants"],
+        message: "Auction variants require a start bid and a future end time",
+      });
+    }
+  }
 });
+
+type VariantInput = z.infer<typeof productSchema>["variants"][number];
 
 function determineSlug({
   requestedSlug,
@@ -82,8 +144,39 @@ function determineSlug({
   return crypto.randomUUID().replace(/-/g, "").substring(0, 8);
 }
 
+function resolveVariantPrice(variant: VariantInput, isAuction: boolean) {
+  if (variant.price) {
+    return variant.price;
+  }
+  if (isAuction) {
+    return (
+      variant.auctionStartBid ||
+      variant.auctionBuyNow ||
+      "0"
+    );
+  }
+  return "0";
+}
+
+function resolveStockQty(variant: VariantInput, isAuction: boolean) {
+  if (isAuction) {
+    return 0;
+  }
+  if (!variant.stock) {
+    return 0;
+  }
+  const qty = Number(variant.stock);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    return 0;
+  }
+  return Math.floor(qty);
+}
+
 const adminProductsQuerySchema = z.object({
   status: z.enum(["all", "active", "draft", "deleted"]).optional().default("active"),
+  search: z.string().trim().optional(),
+  sort: z.enum(["createdAt", "title", "price", "stock"]).optional().default("createdAt"),
+  order: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
 export const adminProductsRoutes = new Elysia({
@@ -113,7 +206,7 @@ export const adminProductsRoutes = new Elysia({
         );
       }
 
-      const { status } = adminProductsQuerySchema.parse(query);
+      const { status, search, sort, order } = adminProductsQuerySchema.parse(query);
 
       // Build where clause based on status filter
       const whereConditions: SQL[] = [eq(products.tenantId, tenantId)];
@@ -125,6 +218,23 @@ export const adminProductsRoutes = new Elysia({
         whereConditions.push(eq(products.draft, true));
       } else if (status === "deleted") {
         whereConditions.push(isNotNull(products.deletedAt));
+      }
+
+      if (search) {
+        const qLike = `%${search}%`;
+        const skuMatches = db
+          .select({ productId: variants.productId })
+          .from(variants)
+          .where(and(eq(variants.tenantId, tenantId), ilike(variants.sku, qLike)));
+        const searchCondition = or(
+          ilike(products.title, qLike),
+          ilike(products.slug, qLike),
+          ilike(products.category, qLike),
+          inArray(products.id, skuMatches),
+        );
+        if (searchCondition) {
+          whereConditions.push(searchCondition);
+        }
       }
 
       const productRows = await db
@@ -143,69 +253,163 @@ export const adminProductsRoutes = new Elysia({
         .from(products)
         .where(and(...whereConditions));
 
-      // Get variants, images, and stats for each product
-      const productsWithDetails = await Promise.all(
-        productRows.map(async (product) => {
-          const [productVariants, productStatsData] = await Promise.all([
-            db
+      if (productRows.length === 0) {
+        return [];
+      }
+
+      const productIds = productRows.map((product) => product.id);
+      const [variantRows, statsRows] = await Promise.all([
+        db
+          .select({
+            id: variants.id,
+            productId: variants.productId,
+            sku: variants.sku,
+            price: variants.price,
+            currency: variants.currency,
+          })
+          .from(variants)
+          .where(inArray(variants.productId, productIds)),
+        db.select().from(productStats).where(inArray(productStats.productId, productIds)),
+      ]);
+
+      const variantIds = variantRows.map((variant) => variant.id);
+      const [inventoryRows, auctionRows] = await Promise.all([
+        variantIds.length > 0
+          ? db
               .select({
-                id: variants.id,
-                sku: variants.sku,
-                price: variants.price,
-                currency: variants.currency,
+                variantId: inventoryLedger.variantId,
+                available: sum(inventoryLedger.delta),
               })
-              .from(variants)
-              .where(eq(variants.productId, product.id)),
-            db.select().from(productStats).where(eq(productStats.productId, product.id)).limit(1),
-          ]);
+              .from(inventoryLedger)
+              .where(inArray(inventoryLedger.variantId, variantIds))
+              .groupBy(inventoryLedger.variantId)
+          : Promise.resolve([]),
+        variantIds.length > 0
+          ? db
+              .select({
+                variantId: auctions.variantId,
+                startingBid: auctions.startingBid,
+                currentPrice: auctions.currentPrice,
+                buyNowPrice: auctions.buyNowPrice,
+              })
+              .from(auctions)
+              .where(inArray(auctions.variantId, variantIds))
+          : Promise.resolve([]),
+      ]);
 
-          // Get stats or create default
-          const statsRow = productStatsData[0];
-          const stats = statsRow
-            ? {
-                viewsTotal: statsRow.viewsTotal || 0,
-                viewsUnique: statsRow.viewsUnique || 0,
-                addedToCart: statsRow.addedToCart || 0,
-                loved: statsRow.loved || 0,
-                sold: statsRow.sold || 0,
-              }
-            : {
-                viewsTotal: 0,
-                viewsUnique: 0,
-                addedToCart: 0,
-                loved: 0,
-                sold: 0,
-              };
-
-          // Get images from comma-delimited string
-          const images = product.imageUrls
-            ? product.imageUrls
-                .split(",")
-                .map((url: string, index: number) => ({
-                  id: `img-${index}`,
-                  url: url.trim(),
-                  isPrimary: index === 0,
-                }))
-                .filter((img: { url: string }) => img.url.length > 0)
-            : [];
-
-          return {
-            ...product,
-            variants: productVariants,
-            images,
-            stats: {
-              viewsTotal: stats.viewsTotal || 0,
-              viewsUnique: stats.viewsUnique || 0,
-              addedToCart: stats.addedToCart || 0,
-              loved: stats.loved || 0,
-              sold: stats.sold || 0,
-            },
-            hasAuction: false, // TODO: Check if any variant has auction
-          };
-        }),
+      const inventoryMap = new Map(
+        inventoryRows.map((row) => [row.variantId, Number(row.available ?? 0)]),
       );
+      const auctionMap = new Map(auctionRows.map((row) => [row.variantId, row]));
+      const statsMap = new Map(statsRows.map((row) => [row.productId, row]));
+      const variantsByProductId = new Map<string, typeof variantRows>();
 
-      return productsWithDetails;
+      for (const variant of variantRows) {
+        const list = variantsByProductId.get(variant.productId) ?? [];
+        list.push(variant);
+        variantsByProductId.set(variant.productId, list);
+      }
+
+      const productsWithDetails = productRows.map((product) => {
+        const productVariants = (variantsByProductId.get(product.id) ?? []).map((variant) => ({
+          ...variant,
+          availableQty: inventoryMap.has(variant.id)
+            ? (inventoryMap.get(variant.id) ?? 0)
+            : undefined,
+        }));
+        const stockTotal = productVariants.reduce((sumQty, variant) => {
+          return sumQty + (variant.availableQty ?? 0);
+        }, 0);
+        const priceValues = productVariants
+          .map((variant) => Number(variant.price))
+          .filter((value) => Number.isFinite(value));
+        const priceMinValue =
+          priceValues.length > 0 ? Math.min(...priceValues) : null;
+        const currency =
+          productVariants.find((variant) => Number(variant.price) === priceMinValue)?.currency ||
+          productVariants[0]?.currency ||
+          "USD";
+        const hasAuction = productVariants.some((variant) => auctionMap.has(variant.id));
+        const auctionBids = productVariants
+          .map((variant) => auctionMap.get(variant.id))
+          .filter(Boolean);
+        const auctionStartValues = auctionBids
+          .map((row) => Number(row?.startingBid))
+          .filter((value) => Number.isFinite(value));
+        const auctionCurrentValues = auctionBids
+          .map((row) => Number(row?.currentPrice ?? row?.startingBid))
+          .filter((value) => Number.isFinite(value));
+
+        const statsRow = statsMap.get(product.id);
+        const stats = statsRow
+          ? {
+              viewsTotal: statsRow.viewsTotal || 0,
+              viewsUnique: statsRow.viewsUnique || 0,
+              addedToCart: statsRow.addedToCart || 0,
+              loved: statsRow.loved || 0,
+              sold: statsRow.sold || 0,
+            }
+          : {
+              viewsTotal: 0,
+              viewsUnique: 0,
+              addedToCart: 0,
+              loved: 0,
+              sold: 0,
+            };
+
+        // Get images from comma-delimited string
+        const images = product.imageUrls
+          ? product.imageUrls
+              .split(",")
+              .map((url: string, index: number) => ({
+                id: `img-${index}`,
+                url: url.trim(),
+                isPrimary: index === 0,
+              }))
+              .filter((img: { url: string }) => img.url.length > 0)
+          : [];
+
+        return {
+          ...product,
+          variants: productVariants,
+          variantCount: productVariants.length,
+          priceMin: priceMinValue,
+          currency,
+          stockTotal,
+          images,
+          stats: {
+            viewsTotal: stats.viewsTotal || 0,
+            viewsUnique: stats.viewsUnique || 0,
+            addedToCart: stats.addedToCart || 0,
+            loved: stats.loved || 0,
+            sold: stats.sold || 0,
+          },
+          hasAuction,
+          isAuction: hasAuction,
+          auctionStartingBid:
+            auctionStartValues.length > 0 ? Math.min(...auctionStartValues) : null,
+          auctionCurrentPrice:
+            auctionCurrentValues.length > 0 ? Math.max(...auctionCurrentValues) : null,
+        };
+      });
+
+      const direction = order === "asc" ? 1 : -1;
+      const sortedProducts = [...productsWithDetails].sort((a, b) => {
+        if (sort === "title") {
+          return direction * a.title.localeCompare(b.title);
+        }
+        if (sort === "price") {
+          return direction * ((a.priceMin ?? 0) - (b.priceMin ?? 0));
+        }
+        if (sort === "stock") {
+          return direction * ((a.stockTotal ?? 0) - (b.stockTotal ?? 0));
+        }
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return direction * (aTime - bTime);
+      });
+
+      return sortedProducts;
     } catch (error) {
       if (error instanceof Response) return error;
       console.error("[Admin Products] Error fetching products:", error);
@@ -303,6 +507,20 @@ export const adminProductsRoutes = new Elysia({
 
       // Get auctions for variants
       const variantIds = productVariants.map((v) => v.id);
+      const inventoryRows =
+        variantIds.length > 0
+          ? await db
+              .select({
+                variantId: inventoryLedger.variantId,
+                available: sum(inventoryLedger.delta),
+              })
+              .from(inventoryLedger)
+              .where(inArray(inventoryLedger.variantId, variantIds))
+              .groupBy(inventoryLedger.variantId)
+          : [];
+      const inventoryMap = new Map(
+        inventoryRows.map((row) => [row.variantId, Number(row.available ?? 0)]),
+      );
       const variantAuctions =
         variantIds.length > 0
           ? await db
@@ -329,10 +547,13 @@ export const adminProductsRoutes = new Elysia({
           const auction = variantAuctions.find((a) => a.variantId === v.id);
           return {
             ...v,
+            availableQty: inventoryMap.has(v.id) ? (inventoryMap.get(v.id) ?? 0) : undefined,
             auction: auction || null,
           };
         }),
         images,
+        hasAuction: variantAuctions.length > 0,
+        isAuction: variantAuctions.length > 0,
       };
     } catch (error) {
       console.error("[Admin Products] Error fetching single product:", error);
@@ -446,19 +667,32 @@ export const adminProductsRoutes = new Elysia({
 
         // Create variants and auctions
         for (const variantData of validated.variants) {
+          const resolvedPrice = resolveVariantPrice(variantData, validated.isAuction);
           const [variant] = await tx
             .insert(variants)
             .values({
               tenantId,
               productId: product.id,
               sku: variantData.sku || null,
-              price: variantData.price,
+              price: resolvedPrice,
               currency: variantData.currency || "USD",
             })
             .returning();
 
           if (!variant) {
             throw new Error("Failed to create variant");
+          }
+
+          const stockQty = resolveStockQty(variantData, validated.isAuction);
+          if (stockQty > 0) {
+            await tx.insert(inventoryLedger).values({
+              id: crypto.randomUUID(),
+              tenantId,
+              variantId: variant.id,
+              delta: stockQty,
+              reason: INVENTORY_REASONS.INIT,
+              refType: "initial",
+            });
           }
 
           // Create auction if needed
@@ -673,19 +907,32 @@ export const adminProductsRoutes = new Elysia({
         await tx.delete(variants).where(eq(variants.productId, productId));
 
         for (const variantData of validated.variants) {
+          const resolvedPrice = resolveVariantPrice(variantData, validated.isAuction);
           const [variant] = await tx
             .insert(variants)
             .values({
               tenantId,
               productId,
               sku: variantData.sku || null,
-              price: variantData.price,
+              price: resolvedPrice,
               currency: variantData.currency || "USD",
             })
             .returning();
 
           if (!variant) {
             throw new Error("Failed to create variant");
+          }
+
+          const stockQty = resolveStockQty(variantData, validated.isAuction);
+          if (stockQty > 0) {
+            await tx.insert(inventoryLedger).values({
+              id: crypto.randomUUID(),
+              tenantId,
+              variantId: variant.id,
+              delta: stockQty,
+              reason: INVENTORY_REASONS.INIT,
+              refType: "initial",
+            });
           }
 
           if (validated.isAuction && variantData.auctionStartBid) {
