@@ -10,6 +10,8 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 
 ## Recent changes
 
+- Added Render-aware build/start routing via `scripts/render.mjs` and updated root scripts to build/start only the matching service (web vs api) based on `RENDER_SERVICE_NAME`.
+- Render start now optionally runs `db:push` before boot when `RUN_MIGRATIONS` is enabled (intended for the API service).
 - Hardened Clerk auth for bids: Next proxy now forwards existing Authorization headers, falls back to Clerk session (`getToken` with `integration_fallback`, then `__session` cookie), and backend auth plugin trims/validates tokens (Clerk verifyToken with clock skew tolerance; no default admin role). Cart routes register the auth plugin directly (global auth plugin removed to avoid double runs). Typed cart params for TS and `bun tsc --noEmit` now passes.
 - Proxy middleware matcher excludes Next internals (`/_next/*`, dev stack frame) to avoid blocking the dev server.
 - Implemented proper Clerk backend authentication using `@clerk/backend` SDK. The `authPlugin` in `apps/api/src/context.ts` verifies Clerk JWT tokens (Clerk backend helper) extracting `userId`, `sessionId`, `orgId`, and other claims from verified tokens. Updated `AuthContext` type to match Clerk's Auth object structure. Added authorization checks to cart routes to ensure users can only access their own carts (guest carts remain accessible via cartId). Frontend already correctly sends tokens via Next.js proxy route. Removed demo header fallback authentication - all requests now require valid Clerk JWT tokens.
@@ -31,6 +33,12 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Removed redundant logging: Cleaned up excessive `console.log` statements, using `logger` utility for environment-aware logging instead.
 - Added admin catalog editing experience plus sharing/favorites telemetry: the admin catalog cards/form now call the backend via new admin API proxies (products, uploads), and product/favorites UI gained header favorites, share slot, view tracker, and Next API routes backed by the backend favorites/webhooks.
 - Added shop settings, inventory, and orders sections to the admin workspace along with backend proxies so merchants can view/update their tenant metadata, stock, and recent orders via the new admin routes.
+- Introduced a `shop_settings` schema + migration so tenants can persist bank/payout/order/inventory metadata dynamically and drive the admin UI sections.
+- Expanded admin APIs: orders now support PATCH updates, inventory routes accept reserve/release actions, and shop settings exposes discrete banking/payout/order/inventory fields plus forms for each setting area.
+- Admin catalog now supports per-variant stock inputs (non-auction), auction mode locks to a single variant and disables stock, and the product list is a compact searchable/sortable table with stock and auction indicators; the standalone inventory page was removed.
+- Catalog list now debounces search, paginates after 15 items, shows variant overview modal from price/stock cells, and uses stable variant keys to keep SKU edits responsive.
+- Admin dashboard now removes the implementation notes/auctions card, adds a shop overview with sales, inventory health, charts, and recent orders, and orders page shows Shopify-style mock fulfillment data when no real orders exist.
+- Added finance/returns/shipping/customer tables + migration, expanded admin shop routes to cover payouts/ledger, returns, shipping profiles, fulfillment rules, and customers (segments/messages), and added admin pages with mock fallback for those sections plus a generic admin proxy route.
 
 ## Known gaps / follow-ups
 
@@ -39,6 +47,8 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - If Next is upgraded and `@next/env` behavior changes, re-check `apps/web/next.config.js` to keep root `.env` loading intact.
 - Web grids/detail pages depend on the API at `NEXT_PUBLIC_DOMAIN`; run `bun run dev:all` and seed the DB to avoid connection errors in dev.
 - Vendor names in marketing/shop cards currently use slug/env fallbacks until the API exposes tenant metadata.
+- Admin sections for payouts, returns, shipping, and customers still use mock fallback in the UI; wire to live workflows and add operator forms once the underlying business flows are finalized.
+- Orders: replace mock fulfillment + line items with real API data once order item/fulfillment endpoints are implemented.
 
 ## Critical Dos and Don'ts
 
