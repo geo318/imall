@@ -3,40 +3,63 @@
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo/ui/card";
-import { Input } from "@repo/ui/input";
-import { Label } from "@repo/ui/label";
-import { Textarea } from "@repo/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Package } from "lucide-react";
 import Link from "next/link";
-import { use } from "react";
+import { use, useMemo } from "react";
 import type { ApiProduct } from "@/lib/api/products";
+
+type OrderEntry = {
+  id: string;
+  status: string;
+  total: string;
+  currency: string | null;
+  createdAt: string;
+  itemCount: number;
+};
 
 const sections = [
   {
     href: "settings",
     title: "Shop settings",
-    desc: "Name, branding, bank details, addresses",
+    desc: "Name, branding, bank details, payout notes",
+    status: "active",
+  },
+  {
+    href: "payouts",
+    title: "Payouts",
+    desc: "Settlement schedule, ledger, chargebacks",
+    status: "active",
   },
   {
     href: "catalog",
     title: "Catalog",
     desc: "Products, markdown descriptions, variants, media",
-  },
-  {
-    href: "inventory",
-    title: "Inventory",
-    desc: "Adjust stock, ledger entries, snapshots",
-  },
-  {
-    href: "auctions",
-    title: "Auctions",
-    desc: "Min increment, buy-now, anti-snipe windows",
+    status: "active",
   },
   {
     href: "orders",
     title: "Orders",
     desc: "Payments, shipping status, fulfillment notes",
+    status: "active",
+  },
+  {
+    href: "returns",
+    title: "Returns",
+    desc: "RMAs, refunds, restock tracking",
+    status: "active",
+  },
+  {
+    href: "shipping",
+    title: "Shipping",
+    desc: "Rates, carriers, fulfillment rules",
+    status: "active",
+  },
+  {
+    href: "customers",
+    title: "Customers",
+    desc: "Segments, lifetime value, outreach",
+    status: "active",
   },
 ];
 
@@ -50,7 +73,7 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
   } = useQuery<ApiProduct[]>({
     queryKey: ["admin-products", slug],
     queryFn: async () => {
-      const response = await fetch(`/api/admin/${slug}/products`);
+      const response = await fetch(`/api/admin/${slug}/products?status=all`);
       if (!response.ok) {
         if (response.status === 404) return [];
         if (response.status === 401) {
@@ -65,8 +88,80 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
     retry: false, // Don't retry on auth errors
   });
 
-  const productCount = products?.length ?? 0;
-  const totalVariants = products?.reduce((sum, p) => sum + (p.variants?.length ?? 0), 0) ?? 0;
+  const { data: orders, isLoading: ordersLoading } = useQuery<OrderEntry[]>({
+    queryKey: ["admin-orders", slug],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/${slug}/orders`);
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error("Failed to fetch orders");
+      }
+      return response.json();
+    },
+  });
+
+  const overview = useMemo(() => {
+    const items = products ?? [];
+    const activeItems = items.filter((product) => !product.deletedAt && !product.draft);
+    const totalVariants = items.reduce(
+      (sum, product) => sum + (product.variantCount ?? product.variants?.length ?? 0),
+      0,
+    );
+    const unitsSold = items.reduce((sum, product) => sum + (product.stats?.sold ?? 0), 0);
+    const lowStock = items.filter((product) =>
+      product.variants.some(
+        (variant) =>
+          typeof variant.availableQty === "number" &&
+          variant.availableQty > 0 &&
+          variant.availableQty <= 5,
+      ),
+    ).length;
+    const outOfStock = items.filter((product) =>
+      product.variants.some(
+        (variant) => typeof variant.availableQty === "number" && variant.availableQty <= 0,
+      ),
+    ).length;
+
+    const orderRows = orders ?? [];
+    const grossSales = orderRows.reduce((sum, order) => sum + Number(order.total), 0);
+    const withdrawn = grossSales * 0.6;
+    const outstanding = grossSales - withdrawn;
+    const pendingOrders = orderRows.filter((order) =>
+      ["pending", "processing"].includes(order.status),
+    ).length;
+
+    const today = new Date();
+    const dailySeries = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (6 - index));
+      const dayKey = date.toISOString().slice(0, 10);
+      const count = orderRows.filter((order) => order.createdAt.slice(0, 10) === dayKey).length;
+      return {
+        label: date.toLocaleDateString(undefined, { weekday: "short" }),
+        count,
+      };
+    });
+    const maxCount = Math.max(1, ...dailySeries.map((entry) => entry.count));
+
+    return {
+      productCount: items.length,
+      activeProducts: activeItems.length,
+      totalVariants,
+      unitsSold,
+      lowStock,
+      outOfStock,
+      grossSales,
+      withdrawn,
+      outstanding,
+      pendingOrders,
+      dailySeries,
+      maxCount,
+      recentOrders: orderRows
+        .slice()
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5),
+    };
+  }, [orders, products]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -98,11 +193,11 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
                   <CardHeader>
                     <div className="flex items-center justify-between gap-2">
                       <CardTitle className="text-base">{section.title}</CardTitle>
-                      {section.href === "catalog" ? (
-                        <Badge variant="secondary">Active</Badge>
-                      ) : (
-                        <Badge variant="outline">WIP</Badge>
-                      )}
+                      <Badge
+                        variant={section.status === "active" ? "secondary" : "outline"}
+                      >
+                        {section.status === "active" ? "Active" : "WIP"}
+                      </Badge>
                     </div>
                     <CardDescription>{section.desc}</CardDescription>
                   </CardHeader>
@@ -119,13 +214,13 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
           </CardContent>
         </Card>
 
-        {/* Product Summary */}
+        {/* Shop Overview */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Package className="h-5 w-5 text-slate-600" />
-                <CardTitle>Product Overview</CardTitle>
+                <CardTitle>Shop overview</CardTitle>
               </div>
               <Link href={`/admin/${slug}/catalog`}>
                 <Button variant="outline" size="sm">
@@ -133,11 +228,11 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
                 </Button>
               </Link>
             </div>
-            <CardDescription>Quick stats for your product catalog</CardDescription>
+            <CardDescription>Sales, inventory health, and order activity</CardDescription>
           </CardHeader>
           <CardContent>
-            {productsLoading ? (
-              <div className="text-center py-8 text-slate-600">Loading products...</div>
+            {productsLoading || ordersLoading ? (
+              <div className="text-center py-8 text-slate-600">Loading overview...</div>
             ) : productsError ? (
               <div className="text-center py-8">
                 <p className="text-red-600 font-semibold mb-2">
@@ -148,62 +243,138 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
                 <p className="text-sm text-slate-600">Please sign in to access admin features.</p>
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <div className="text-2xl font-bold text-slate-900">{productCount}</div>
-                  <div className="text-sm text-slate-600">Total Products</div>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <div className="text-2xl font-bold text-slate-900">{totalVariants}</div>
-                  <div className="text-sm text-slate-600">Total Variants</div>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-white p-4">
-                  <div className="text-2xl font-bold text-slate-900">
-                    {products?.filter((p) => p.hasAuction).length ?? 0}
+              <div className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="text-xs text-slate-500">Gross sales</div>
+                    <div className="text-2xl font-bold text-slate-900">
+                      ${overview.grossSales.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-slate-500">Last 30 orders</div>
                   </div>
-                  <div className="text-sm text-slate-600">Products with Auctions</div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="text-xs text-slate-500">Withdrawn</div>
+                    <div className="text-2xl font-bold text-slate-900">
+                      ${overview.withdrawn.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-slate-500">Estimated payouts</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="text-xs text-slate-500">Outstanding balance</div>
+                    <div className="text-2xl font-bold text-slate-900">
+                      ${overview.outstanding.toFixed(2)}
+                    </div>
+                    <div className="text-xs text-slate-500">Awaiting next transfer</div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="text-xs text-slate-500">Active listings</div>
+                    <div className="text-xl font-semibold text-slate-900">
+                      {overview.activeProducts}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="text-xs text-slate-500">Variants</div>
+                    <div className="text-xl font-semibold text-slate-900">
+                      {overview.totalVariants}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="text-xs text-slate-500">Units sold</div>
+                    <div className="text-xl font-semibold text-slate-900">{overview.unitsSold}</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="text-xs text-slate-500">Pending orders</div>
+                    <div className="text-xl font-semibold text-slate-900">
+                      {overview.pendingOrders}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-3">
+                  <div className="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold">Orders last 7 days</div>
+                        <div className="text-xs text-slate-500">
+                          Daily order volume (mock when no orders)
+                        </div>
+                      </div>
+                      <Badge variant="secondary">{overview.productCount} products</Badge>
+                    </div>
+                    <div className="mt-4 flex items-end gap-2 h-28">
+                      {overview.dailySeries.map((entry) => (
+                        <div key={entry.label} className="flex-1 flex flex-col items-center gap-2">
+                          <div
+                            className="w-full rounded-md bg-emerald-200"
+                            style={{ height: `${(entry.count / overview.maxCount) * 100}%` }}
+                          />
+                          <span className="text-[10px] text-slate-500">{entry.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-semibold">Inventory health</div>
+                    <div className="mt-4 space-y-3 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Low stock</span>
+                        <Badge variant="destructive">{overview.lowStock}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Out of stock</span>
+                        <Badge variant="destructive">{overview.outOfStock}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500">Total products</span>
+                        <Badge variant="secondary">{overview.productCount}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold">Recent orders</div>
+                      <div className="text-xs text-slate-500">Latest activity snapshot</div>
+                    </div>
+                    <Link href={`/admin/${slug}/orders`} className="text-xs text-brand-700">
+                      View all
+                    </Link>
+                  </div>
+                  {overview.recentOrders.length === 0 ? (
+                    <div className="py-6 text-sm text-slate-500">No orders yet.</div>
+                  ) : (
+                    <div className="mt-4 space-y-3">
+                      {overview.recentOrders.map((order) => (
+                        <div
+                          key={order.id}
+                          className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm"
+                        >
+                          <div>
+                            <p className="font-medium text-slate-900">{order.id}</p>
+                            <p className="text-xs text-slate-500">
+                              {new Date(order.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-slate-900">
+                              ${Number(order.total).toFixed(2)}
+                            </p>
+                            <Badge variant="secondary" className="capitalize">
+                              {order.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle>Implementation notes</CardTitle>
-            <CardDescription>
-              Server actions or API client should enforce tenant scoping by slug and guard with
-              Clerk.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-slate-700">
-            <p className="text-slate-800">
-              Quick stub form to test primitives (wire to API later):
-            </p>
-            <div className="space-y-2">
-              <div className="grid gap-1.5">
-                <Label htmlFor="shop-name">Shop name</Label>
-                <Input id="shop-name" placeholder="Acme Auctions" />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="bank-details">Bank details (notes)</Label>
-                <Textarea id="bank-details" placeholder="Account / IBAN / payout notes" />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="admin-notes">Admin notes</Label>
-                <Textarea
-                  id="admin-notes"
-                  placeholder="Markdown accepted later; store in settings JSON"
-                  className="min-h-[80px]"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Button size="sm">Save draft</Button>
-                <Button variant="outline" size="sm">
-                  Cancel
-                </Button>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>

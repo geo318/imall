@@ -29,29 +29,50 @@ export const imageFileSchema = z
     "File must be an image (PNG, JPEG, GIF, or WEBP)",
   );
 
+const optionalNumberString = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === "number") return value.toString();
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
+  z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a valid number").optional(),
+);
+
+const optionalIntegerString = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value === "number") return value.toString();
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
+  z.string().regex(/^\d+$/, "Must be a whole number").optional(),
+);
+
+const optionalDateTimeString = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  },
+  z.string().optional(),
+);
+
 // Variant schema
 export const variantSchema = z.object({
   sku: z.string().optional(),
-  price: z
-    .string()
-    .min(1, "Price is required")
-    .regex(/^\d+(\.\d{1,2})?$/, "Price must be a valid number with up to 2 decimal places"),
+  price: optionalNumberString,
   currency: z.string().default("USD"),
   isAuction: z.boolean().optional(),
-  auctionStartBid: z
-    .string()
-    .regex(/^\d+(\.\d{1,2})?$/, "Auction start bid must be a valid number")
-    .optional(),
-  auctionMinIncrement: z
-    .string()
-    .regex(/^\d+(\.\d{1,2})?$/, "Auction min increment must be a valid number")
-    .optional(),
-  auctionBuyNow: z
-    .string()
-    .regex(/^\d+(\.\d{1,2})?$/, "Auction buy now price must be a valid number")
-    .optional(),
-  auctionStartsAt: z.string().datetime().optional(),
-  auctionEndsAt: z.string().datetime().optional(),
+  stock: optionalIntegerString,
+  auctionStartBid: optionalNumberString,
+  auctionMinIncrement: optionalNumberString,
+  auctionBuyNow: optionalNumberString,
+  auctionStartsAt: optionalDateTimeString,
+  auctionEndsAt: optionalDateTimeString,
 });
 
 // Image item schema (for form state)
@@ -82,27 +103,34 @@ export const productFormSchema = z
       .array(variantSchema)
       .min(1, "At least one variant is required")
       .refine(
-        (variants) => variants.every((v) => v.price && parseFloat(v.price) > 0),
+        (variants) =>
+          variants.every((v) => !v.price || (!Number.isNaN(Number(v.price)) && Number(v.price) > 0)),
         "All variants must have a valid price greater than 0",
       ),
   })
   .refine(
-    (data) => {
-      // If isAuction is true, at least one variant should have auction fields
-      if (data.isAuction) {
-        return data.variants.some(
-          (v) =>
-            v.isAuction &&
-            v.auctionStartBid &&
-            v.auctionEndsAt &&
-            new Date(v.auctionEndsAt) > new Date(),
-        );
-      }
-      return true;
-    },
+    (data) =>
+      !data.isAuction ||
+      data.variants.length === 0 ||
+      data.variants.some(
+        (v) =>
+          v.auctionStartBid &&
+          v.auctionEndsAt &&
+          new Date(v.auctionEndsAt) > new Date(),
+      ),
     {
       message: "Auction products must have at least one variant with valid auction settings",
-      path: ["isAuction"],
+      path: ["variants"],
+    },
+  )
+  .refine(
+    (data) =>
+      data.isAuction ||
+      data.variants.length === 0 ||
+      data.variants.every((v) => v.price && Number(v.price) > 0),
+    {
+      message: "All variants must have a valid price greater than 0",
+      path: ["variants"],
     },
   );
 

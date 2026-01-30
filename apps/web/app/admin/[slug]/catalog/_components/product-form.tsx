@@ -9,7 +9,7 @@ import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { getImage } from "@/lib/utils/images";
@@ -38,6 +38,26 @@ type ProductFormResponse = ProductFormData & {
   hasAuction?: boolean;
 };
 
+type VariantWithExtras = ProductFormData["variants"][number] & {
+  availableQty?: number;
+  auction?: {
+    startingBid?: string | null;
+    minIncrement?: string | null;
+    buyNowPrice?: string | null;
+    startsAt?: string | null;
+    endsAt?: string | null;
+  };
+};
+
+const toDateTimeLocal = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value.slice(0, 16);
+  }
+  return date.toISOString().slice(0, 16);
+};
+
 export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props) {
   const queryClient = useQueryClient();
   const [images, setImages] = useState<ImageItem[]>([]);
@@ -61,7 +81,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       category: "",
       draft: false,
       isAuction: false,
-      variants: [{ price: "", currency: "USD" }],
+      variants: [{ price: "", currency: "USD", stock: "" }],
     },
     mode: "onChange",
   });
@@ -69,6 +89,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
   const isAuction = watch("isAuction");
   const watchedTitle = watch("title");
   const [isSlugDirty, setIsSlugDirty] = useState(false);
+  const previousAuctionRef = useRef(isAuction);
 
   // Load product data if editing
   const { data: productData, isLoading } = useQuery<ProductFormResponse | undefined>({
@@ -115,12 +136,23 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     const resetFormState = async () => {
       const hasProduct = Boolean(productId && productData);
       const normalizedCategory = productData?.category?.trim() || "";
-      const normalizedVariants = (
-        productData?.variants as Array<ProductFormData["variants"][number]> | undefined
-      )?.map((variant) => ({
-        ...variant,
-        currency: variant.currency || "USD",
-      }));
+      const normalizedVariants = (productData?.variants as VariantWithExtras[] | undefined)?.map(
+        (variant) => {
+          const auction = variant.auction;
+        return {
+          ...variant,
+          price: variant.price ?? "",
+          currency: variant.currency || "USD",
+          stock:
+            typeof variant.availableQty === "number" ? String(variant.availableQty) : "",
+          auctionStartBid: auction?.startingBid ?? "",
+          auctionMinIncrement: auction?.minIncrement ?? "",
+          auctionBuyNow: auction?.buyNowPrice ?? "",
+          auctionStartsAt: toDateTimeLocal(auction?.startsAt),
+          auctionEndsAt: toDateTimeLocal(auction?.endsAt),
+        };
+        },
+      );
       const isAuctionValue = productData?.isAuction ?? productData?.hasAuction ?? false;
       const initialSlug = slugify(productData?.slug ?? productData?.title ?? "");
 
@@ -131,7 +163,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         category: normalizedCategory || "",
         draft: false,
         isAuction: isAuctionValue,
-        variants: normalizedVariants ?? [{ price: "", currency: "USD" }],
+        variants: normalizedVariants ?? [{ price: "", currency: "USD", stock: "" }],
       };
 
       reset(formValues);
@@ -208,12 +240,38 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
 
   const isNewProduct = !productId;
 
+  useEffect(() => {
+    if (previousAuctionRef.current === isAuction) {
+      return;
+    }
+    previousAuctionRef.current = isAuction;
+
+    const currentVariants = getValues("variants") ?? [];
+    if (isAuction) {
+      const [first] = currentVariants;
+      const normalized = first ?? { price: "", currency: "USD", stock: "" };
+      const nextVariant = { ...normalized, stock: "" };
+      if (currentVariants.length !== 1 || normalized.stock) {
+        setValue("variants", [nextVariant], { shouldValidate: true });
+      }
+    } else if (currentVariants.length === 0) {
+      setValue("variants", [{ price: "", currency: "USD", stock: "" }], {
+        shouldValidate: true,
+      });
+    }
+  }, [getValues, isAuction, setValue]);
+
   const saveMutation = useMutation({
     mutationFn: async (
       data: Partial<ProductFormData> & {
         images: Array<{ id: string; url?: string; isPrimary: boolean }>;
       },
     ) => {
+      const normalizedVariants = (data.variants ?? []).map((variant) => ({
+        ...variant,
+        stock: data.isAuction ? undefined : variant.stock,
+      }));
+
       // Data is already validated by Zod, just ensure it's serializable
       const payload = {
         title: data.title,
@@ -222,7 +280,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         slug: data.slug || undefined,
         draft: data.draft ?? undefined,
         isAuction: data.isAuction ?? false,
-        variants: data.variants,
+        variants: normalizedVariants,
         images: data.images,
       };
 
@@ -325,24 +383,44 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
   const onFormSubmit = handleSubmit(
     (data) => {
       const validated = productFormSchema.parse(data);
+      if (validated.isAuction) {
+        const [first] = validated.variants;
+        onSubmit(
+          {
+            ...validated,
+            variants: first ? [first] : [],
+          },
+          false,
+        );
+        return;
+      }
       onSubmit(validated, false);
     },
     (errors) => {
       if (process.env.NODE_ENV === "development") {
         console.error("Form validation errors:", errors);
       }
-      const errorMessages = Object.entries(errors)
-        .map(([key, error]) => {
-          if (error?.message) return `${key}: ${error.message}`;
-          if (Array.isArray(error)) {
-            return `${key}: ${error.map((e) => e?.message || "invalid").join(", ")}`;
-          }
-          return `${key}: validation failed`;
-        })
-        .filter(Boolean)
-        .join(", ");
-      if (errorMessages) {
-        toast.error(`Please fix the following errors: ${errorMessages}`);
+      const collected = new Set<string>();
+      for (const error of Object.values(errors)) {
+        if (!error) continue;
+        if (Array.isArray(error)) {
+          error.forEach((entry) => {
+            if (entry?.message) collected.add(entry.message);
+          });
+        } else if (error.message) {
+          collected.add(error.message);
+        }
+      }
+
+      const filteredMessages = Array.from(collected).filter((message, _, list) => {
+        if (message.includes("At least one variant") && list.length > 1) {
+          return false;
+        }
+        return true;
+      });
+
+      if (filteredMessages.length > 0) {
+        toast.error(`Please fix the following errors: ${filteredMessages.join(", ")}`);
       } else {
         toast.error("Please check the form for errors");
       }

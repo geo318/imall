@@ -1,13 +1,14 @@
 "use client";
 
 import { Button } from "@repo/ui/button";
+import { Badge } from "@repo/ui/badge";
 import { Card, CardContent } from "@repo/ui/card";
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
 import { Plus, X } from "lucide-react";
 import type { VariantFormData } from "./product-form.schema";
 
-type Variant = VariantFormData;
+type Variant = VariantFormData & { id?: string };
 
 type Props = {
   variants: Partial<Variant>[];
@@ -17,12 +18,16 @@ type Props = {
 
 export function VariantForm({ variants, onVariantsChange, isAuction }: Props) {
   const addVariant = () => {
+    if (isAuction) {
+      return;
+    }
     onVariantsChange([
       ...variants,
       {
         price: "",
         currency: "USD",
         isAuction: isAuction,
+        stock: "",
         auctionStartBid: "",
         auctionMinIncrement: "",
         auctionBuyNow: "",
@@ -46,17 +51,28 @@ export function VariantForm({ variants, onVariantsChange, isAuction }: Props) {
 
   return (
     <div className="space-y-4">
-      {variants.map((variant, index) => (
-        <Card key={variant.sku || index}>
-          <CardContent className="p-4">
+      {variants.map((variant, index) => {
+        const label = isAuction ? "Auction setup" : `Variant ${index + 1}`;
+        return (
+          <Card
+            key={variant.id ?? index}
+            className={isAuction ? "border-2 border-amber-400 bg-amber-50/40" : undefined}
+          >
+            <CardContent className="p-4">
             <div className="flex items-start justify-between mb-4">
-              <h4 className="font-semibold">Variant {index + 1}</h4>
+              <div className="flex items-center gap-2">
+                <h4 className="font-semibold">{label}</h4>
+                {isAuction && (
+                  <Badge className="bg-amber-100 text-amber-900">Auction</Badge>
+                )}
+              </div>
               {variants.length > 1 && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   onClick={() => removeVariant(index)}
+                  disabled={isAuction}
                   className="text-destructive hover:text-destructive"
                 >
                   <X className="h-4 w-4" />
@@ -79,7 +95,7 @@ export function VariantForm({ variants, onVariantsChange, isAuction }: Props) {
                 <Label htmlFor={`currency-${index}`}>Currency</Label>
                 <Input
                   id={`currency-${index}`}
-                  value={variant.currency}
+                  value={variant.currency ?? ""}
                   onChange={(e) => updateVariant(index, "currency", e.target.value)}
                   placeholder="USD"
                 />
@@ -151,27 +167,53 @@ export function VariantForm({ variants, onVariantsChange, isAuction }: Props) {
                 </div>
               </div>
             ) : (
-              <div className="mt-4 space-y-2">
-                <Label htmlFor={`price-${index}`}>Price *</Label>
-                <Input
-                  id={`price-${index}`}
-                  type="number"
-                  step="0.01"
-                  value={variant.price}
-                  onChange={(e) => updateVariant(index, "price", e.target.value)}
-                  placeholder="0.00"
-                  required
-                />
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor={`price-${index}`}>Price *</Label>
+                  <Input
+                    id={`price-${index}`}
+                    type="number"
+                    step="0.01"
+                    value={variant.price ?? ""}
+                    onChange={(e) => updateVariant(index, "price", e.target.value)}
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`stock-${index}`}>Stock Qty</Label>
+                  <Input
+                    id={`stock-${index}`}
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={variant.stock ?? ""}
+                    onChange={(e) => updateVariant(index, "stock", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
               </div>
             )}
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        );
+      })}
 
-      <Button type="button" variant="outline" onClick={addVariant} className="w-full">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={addVariant}
+        className="w-full"
+        disabled={isAuction}
+      >
         <Plus className="h-4 w-4 mr-2" />
         Add Variant
       </Button>
+      {isAuction && (
+        <p className="text-xs text-muted-foreground">
+          Auctions use a single variant. Disable auction mode to add more.
+        </p>
+      )}
     </div>
   );
 }

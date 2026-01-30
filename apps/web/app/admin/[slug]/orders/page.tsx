@@ -1,8 +1,10 @@
 import { Metadata } from "next";
+import type { ApiProduct } from "@/lib/api/products";
+import { OrdersTable } from "./orders-table";
 
 const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "http://localhost:3000";
 
-type OrderEntry = {
+type ApiOrderEntry = {
   id: string;
   status: string;
   total: string;
@@ -11,7 +13,29 @@ type OrderEntry = {
   itemCount: number;
 };
 
-async function fetchOrders(slug: string): Promise<OrderEntry[]> {
+type OrderLineItem = {
+  id: string;
+  title: string;
+  sku: string | null;
+  qty: number;
+  price: number;
+  currency: string;
+};
+
+type OrderEntry = ApiOrderEntry & {
+  customerName: string;
+  customerEmail: string;
+  paymentStatus: "paid" | "pending" | "refunded";
+  fulfillmentStatus: "unfulfilled" | "partial" | "fulfilled";
+  shippingStatus: "pending" | "in_transit" | "delivered";
+  shippingMethod: string;
+  trackingNumber: string | null;
+  destination: string;
+  items: OrderLineItem[];
+  isMock?: boolean;
+};
+
+async function fetchOrders(slug: string): Promise<ApiOrderEntry[]> {
   const response = await fetch(`${DOMAIN}/api/admin/${slug}/orders`, {
     cache: "no-store",
   });
@@ -21,13 +45,122 @@ async function fetchOrders(slug: string): Promise<OrderEntry[]> {
   return response.json();
 }
 
+async function fetchProducts(slug: string): Promise<ApiProduct[]> {
+  const response = await fetch(`${DOMAIN}/api/admin/${slug}/products?status=active`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    return [];
+  }
+  return response.json();
+}
+
+function normalizeOrders(orders: ApiOrderEntry[]): OrderEntry[] {
+  return orders.map((order) => ({
+    ...order,
+    customerName: "Guest checkout",
+    customerEmail: "guest@example.com",
+    paymentStatus: order.status === "completed" ? "paid" : "pending",
+    fulfillmentStatus:
+      order.status === "completed"
+        ? "fulfilled"
+        : order.status === "processing"
+          ? "partial"
+          : "unfulfilled",
+    shippingStatus:
+      order.status === "completed"
+        ? "delivered"
+        : order.status === "processing"
+          ? "in_transit"
+          : "pending",
+    shippingMethod: "Standard shipping",
+    trackingNumber: null,
+    destination: "Customer address on file",
+    items: [
+      {
+        id: `${order.id}-item`,
+        title: "Order items",
+        sku: null,
+        qty: order.itemCount,
+        price: Number(order.total),
+        currency: order.currency ?? "USD",
+      },
+    ],
+  }));
+}
+
+function buildMockOrders(products: ApiProduct[]): OrderEntry[] {
+  if (products.length === 0) {
+    return [];
+  }
+
+  const customers = [
+    { name: "Ava Collins", email: "ava@example.com" },
+    { name: "Liam Stewart", email: "liam@example.com" },
+    { name: "Maya Patel", email: "maya@example.com" },
+    { name: "Noah Park", email: "noah@example.com" },
+    { name: "Sofia Gomez", email: "sofia@example.com" },
+  ];
+  const statuses: ApiOrderEntry["status"][] = ["pending", "processing", "completed"];
+
+  return products.slice(0, 8).map((product, index) => {
+    const variant = product.variants[0];
+    const priceValue = Number(variant?.price ?? product.priceMin ?? 24);
+    const qty = (index % 3) + 1;
+    const total = priceValue * qty;
+    const status = statuses[index % statuses.length];
+    const customer = customers[index % customers.length];
+    const createdAt = new Date(Date.now() - index * 36 * 60 * 60 * 1000).toISOString();
+    const items: OrderLineItem[] = [
+      {
+        id: `${product.id}-item`,
+        title: product.title,
+        sku: variant?.sku ?? null,
+        qty,
+        price: Number(priceValue),
+        currency: variant?.currency ?? product.currency ?? "USD",
+      },
+    ];
+
+    return {
+      id: `MOCK-${product.id.slice(0, 8)}`,
+      status,
+      total: total.toFixed(2),
+      currency: variant?.currency ?? product.currency ?? "USD",
+      createdAt,
+      itemCount: qty,
+      customerName: customer.name,
+      customerEmail: customer.email,
+      paymentStatus: status === "completed" ? "paid" : "pending",
+      fulfillmentStatus:
+        status === "completed" ? "fulfilled" : status === "processing" ? "partial" : "unfulfilled",
+      shippingStatus:
+        status === "completed" ? "delivered" : status === "processing" ? "in_transit" : "pending",
+      shippingMethod: "Standard shipping",
+      trackingNumber: status === "processing" ? "1Z9999999999999999" : null,
+      destination: "123 Market St, San Francisco, CA",
+      items,
+      isMock: true,
+    };
+  });
+}
+
 export const metadata: Metadata = {
   title: "Orders",
 };
 
 export default async function OrdersPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const orders = await fetchOrders(slug);
+  let orders = await fetchOrders(slug).catch(() => []);
+  let isMock = false;
+
+  if (orders.length === 0) {
+    const products = await fetchProducts(slug);
+    orders = buildMockOrders(products);
+    isMock = orders.length > 0;
+  } else {
+    orders = normalizeOrders(orders);
+  }
 
   return (
     <div className="container py-10 space-y-8">
@@ -35,46 +168,11 @@ export default async function OrdersPage({ params }: { params: Promise<{ slug: s
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Orders</p>
         <h1 className="text-3xl font-bold">Recent orders</h1>
         <p className="text-sm text-muted-foreground">
-          Track order status, totals, and item counts for the last 20 records.
+          Review orders and update statuses before notifying customers.
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3">Order</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Items</th>
-              <th className="px-4 py-3">Total</th>
-              <th className="px-4 py-3">Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
-                  No orders yet.
-                </td>
-              </tr>
-            ) : (
-              orders.map((order) => (
-                <tr key={order.id} className="border-t border-border">
-                  <td className="px-4 py-4 font-mono text-xs text-muted-foreground">{order.id}</td>
-                  <td className="px-4 py-4 font-semibold text-sm">{order.status}</td>
-                  <td className="px-4 py-4">{order.itemCount}</td>
-                  <td className="px-4 py-4 font-semibold">
-                    ${Number(order.total).toFixed(2)} {order.currency ?? "USD"}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-muted-foreground">
-                    {new Date(order.createdAt).toLocaleString()}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <OrdersTable shopSlug={slug} orders={orders} isMock={isMock} />
     </div>
   );
 }

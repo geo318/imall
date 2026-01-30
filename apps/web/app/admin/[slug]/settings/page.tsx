@@ -37,7 +37,11 @@ export default async function ShopSettingsPage({ params }: { params: Promise<{ s
         <ShopSettingsForm
           shopSlug={slug}
           initialName={settings.name ?? slug}
-          initialSettings={settings.settings ?? "{}"}
+          initialBankDetails={settings.bankDetails ?? null}
+          initialPayoutAccount={settings.payoutAccount ?? null}
+          initialPayoutNotes={settings.payoutNotes ?? null}
+          initialOrderNotes={settings.orderNotes ?? null}
+          initialInventoryNotes={settings.inventoryNotes ?? null}
         />
       </div>
     </div>

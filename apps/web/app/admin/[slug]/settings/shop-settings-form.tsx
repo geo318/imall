@@ -11,13 +11,29 @@ import { toast } from "sonner";
 type Props = {
   shopSlug: string;
   initialName: string;
-  initialSettings: string;
+  initialBankDetails: string | null;
+  initialPayoutAccount: string | null;
+  initialPayoutNotes: string | null;
+  initialOrderNotes: string | null;
+  initialInventoryNotes: string | null;
 };
 
-export function ShopSettingsForm({ shopSlug, initialName, initialSettings }: Props) {
+export function ShopSettingsForm({
+  shopSlug,
+  initialName,
+  initialBankDetails,
+  initialPayoutAccount,
+  initialPayoutNotes,
+  initialOrderNotes,
+  initialInventoryNotes,
+}: Props) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
-  const [settings, setSettings] = useState(() => initialSettings || "{}");
+  const [bankDetails, setBankDetails] = useState(initialBankDetails ?? "");
+  const [payoutAccount, setPayoutAccount] = useState(initialPayoutAccount ?? "");
+  const [payoutNotes, setPayoutNotes] = useState(initialPayoutNotes ?? "");
+  const [orderNotes, setOrderNotes] = useState(initialOrderNotes ?? "");
+  const [inventoryNotes, setInventoryNotes] = useState(initialInventoryNotes ?? "");
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -27,7 +43,14 @@ export function ShopSettingsForm({ shopSlug, initialName, initialSettings }: Pro
         const response = await fetch(`/api/admin/${shopSlug}/settings`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, settings }),
+          body: JSON.stringify({
+            name,
+            bankDetails,
+            payoutAccount,
+            payoutNotes,
+            orderNotes,
+            inventoryNotes,
+          }),
         });
 
         if (!response.ok) {
@@ -55,13 +78,54 @@ export function ShopSettingsForm({ shopSlug, initialName, initialSettings }: Pro
         />
       </div>
       <div className="space-y-1">
-        <Label htmlFor="shop-settings">Shop settings (JSON)</Label>
+        <Label htmlFor="bank-details">Bank details</Label>
         <Textarea
-          id="shop-settings"
-          value={settings}
-          onChange={(event) => setSettings(event.target.value)}
-          placeholder='{"theme":"dark"}'
-          className="min-h-[160px] font-mono text-xs"
+          id="bank-details"
+          value={bankDetails}
+          onChange={(event) => setBankDetails(event.target.value)}
+          placeholder="Bank name / IBAN / branch"
+          className="min-h-[100px]"
+        />
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-1">
+          <Label htmlFor="payout-account">Payout account</Label>
+          <Input
+            id="payout-account"
+            value={payoutAccount}
+            onChange={(event) => setPayoutAccount(event.target.value)}
+            placeholder="Account / IBAN"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="payout-notes">Payout notes</Label>
+          <Textarea
+            id="payout-notes"
+            value={payoutNotes}
+            onChange={(event) => setPayoutNotes(event.target.value)}
+            placeholder="Payment cadence or requirements"
+            className="min-h-[100px]"
+          />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="order-notes">Order notes</Label>
+        <Textarea
+          id="order-notes"
+          value={orderNotes}
+          onChange={(event) => setOrderNotes(event.target.value)}
+          placeholder="Fulfillment instructions"
+          className="min-h-[100px]"
+        />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="inventory-notes">Inventory notes</Label>
+        <Textarea
+          id="inventory-notes"
+          value={inventoryNotes}
+          onChange={(event) => setInventoryNotes(event.target.value)}
+          placeholder="Thresholds, restock policy"
+          className="min-h-[100px]"
         />
       </div>
       <div className="flex justify-end">
