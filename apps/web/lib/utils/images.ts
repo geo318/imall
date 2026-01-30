@@ -8,14 +8,20 @@
  * Get the API base URL from environment variables
  */
 function getApiBaseUrl(): string {
+  const normalize = (value: string) =>
+    value.startsWith("http://") || value.startsWith("https://") ? value : `http://${value}`;
+
   if (typeof window === "undefined") {
     // Server-side: use BACKEND_URL or DOMAIN
-    return process.env.BACKEND_URL || process.env.DOMAIN || "http://localhost:3001";
+    const raw = process.env.BACKEND_URL || process.env.DOMAIN || "http://localhost:3001";
+    return normalize(raw);
   }
   // Client-side: use NEXT_PUBLIC_BACKEND_URL or NEXT_PUBLIC_DOMAIN
-  return (
-    process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_DOMAIN || "http://localhost:3001"
-  );
+  const raw =
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_DOMAIN ||
+    "http://localhost:3001";
+  return normalize(raw);
 }
 
 /**
