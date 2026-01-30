@@ -30,7 +30,7 @@ services:
         fromService:
           type: web
           name: emakret-api
-          property: url
+          property: hostport
       - key: NEXT_PUBLIC_DOMAIN
         sync: false
       - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY

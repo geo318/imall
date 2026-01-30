@@ -12,7 +12,15 @@ const serverSchema = {
   PAYMENT_WEBHOOK_SECRET: z.string().optional(),
   SEED_SHOP_SLUG: z.string().default("demo-shop"),
   SEED_SHOP_NAME: z.string().default("Demo Shop"),
-  BACKEND_URL: z.string().url().default("http://localhost:3001"),
+  BACKEND_URL: z.preprocess(
+    (value) => {
+      if (typeof value === "string" && value.length > 0 && !/^https?:\/\//i.test(value)) {
+        return `http://${value}`;
+      }
+      return value;
+    },
+    z.string().url().default("http://localhost:3001"),
+  ),
 } as const;
 
 const clientSchema = {

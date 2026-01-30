@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { resolveBackendBase } from "../../../_utils/backend";
 import { getAdminToken } from "@/app/api/admin/utils";
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || `http://localhost:3001`;
+
+const API_BASE = resolveBackendBase();
 
 export async function POST(
   request: NextRequest,

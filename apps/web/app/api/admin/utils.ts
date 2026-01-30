@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
+import { resolveBackendBase } from "../_utils/backend";
 
-const API_BASE =
-  process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
+const API_BASE = resolveBackendBase();
 const API_PREFIX = "/api";
 
 function resolveApiPath(path: string) {

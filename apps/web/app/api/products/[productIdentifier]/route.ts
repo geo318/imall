@@ -1,7 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { type NextRequest, NextResponse } from "next/server";
+import { resolveBackendBase } from "../../_utils/backend";
 
-const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || `http://localhost:3001`;
+const API_BASE = resolveBackendBase();
 
 async function getAuthToken(): Promise<string | null> {
   try {
