@@ -70,7 +70,16 @@ export async function GET(
     const { shopSlug } = await params;
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get("status") || "active";
-    const response = await backendRequest(`/admin/${shopSlug}/products?status=${status}`);
+    const search = searchParams.get("search");
+    const sort = searchParams.get("sort");
+    const order = searchParams.get("order");
+
+    const query = new URLSearchParams({ status });
+    if (search) query.set("search", search);
+    if (sort) query.set("sort", sort);
+    if (order) query.set("order", order);
+
+    const response = await backendRequest(`/admin/${shopSlug}/products?${query.toString()}`);
 
     if (!response.ok) {
       const errorText = await response.text();

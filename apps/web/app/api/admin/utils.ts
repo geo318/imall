@@ -1,6 +1,19 @@
 import { auth } from "@clerk/nextjs/server";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || `http://localhost:3001`;
+const API_PREFIX = "/api";
+
+function resolveApiPath(path: string) {
+  if (path.startsWith(API_PREFIX)) {
+    return path;
+  }
+
+  if (path.startsWith("/")) {
+    return `${API_PREFIX}${path}`;
+  }
+
+  return `${API_PREFIX}/${path}`;
+}
 
 async function resolveToken(): Promise<string | null> {
   try {
@@ -61,7 +74,7 @@ export async function backendRequest(path: string, options: BackendRequestOption
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${API_BASE}${resolveApiPath(path)}`, {
     method: options.method ?? "GET",
     headers,
     body: body as BodyInit | undefined,
