@@ -3,6 +3,11 @@ import { backendRequest } from "@/app/api/admin/utils";
 
 const AUTH_ERROR_MESSAGE = "Authentication required. Please sign in to access admin features.";
 
+async function handleBackendError(response: Response, fallback: string) {
+  const errorText = await response.text();
+  return NextResponse.json({ error: errorText || fallback }, { status: response.status });
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ shopSlug: string }> },

@@ -185,6 +185,17 @@ const messageUpdateSchema = z.object({
   sentAt: optionalDate,
 });
 
+const toOptionalNumericString = (value?: number) => {
+  if (value === undefined) return undefined;
+  return value.toString();
+};
+
+const toNullableNumericString = (value?: number | null) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return value.toString();
+};
+
 async function getOrCreateShopSettings(tenantId: string) {
   const [existing] = await db
     .select()
@@ -252,7 +263,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
 
       const updates: Partial<
         Pick<
-          typeof shopSettings._infer,
+          typeof shopSettings.$inferInsert,
           | "bankDetails"
           | "payoutAccount"
           | "payoutNotes"
@@ -405,7 +416,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       .values({
         tenantId,
         status: payload.status ?? "scheduled",
-        amount: payload.amount,
+        amount: payload.amount.toString(),
         currency: payload.currency ?? "USD",
         scheduledFor: payload.scheduledFor,
         paidAt: payload.paidAt ?? null,
@@ -427,6 +438,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       .update(payouts)
       .set({
         ...payload,
+        amount: toOptionalNumericString(payload.amount),
         updatedAt: new Date(),
       })
       .where(and(eq(payouts.id, payoutId), eq(payouts.tenantId, tenantId)));
@@ -461,7 +473,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
         tenantId,
         payoutId: payload.payoutId ?? null,
         type: payload.type,
-        amount: payload.amount,
+        amount: payload.amount.toString(),
         currency: payload.currency ?? "USD",
         occurredAt: payload.occurredAt ?? new Date(),
         referenceType: payload.referenceType ?? null,
@@ -538,7 +550,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
           status: payload.status ?? "requested",
           reason: payload.reason ?? null,
           rmaNumber: payload.rmaNumber ?? null,
-          refundAmount: payload.refundAmount ?? null,
+          refundAmount: toNullableNumericString(payload.refundAmount) ?? null,
           refundCurrency: payload.refundCurrency ?? "USD",
           restockStatus: payload.restockStatus ?? "pending",
           requestedAt: payload.requestedAt ?? new Date(),
@@ -549,6 +561,10 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
           updatedAt: new Date(),
         })
         .returning();
+
+      if (!created) {
+        throw new Error("Failed to create return");
+      }
 
       if (payload.items?.length) {
         await tx.insert(returnItems).values(
@@ -578,6 +594,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       .update(returns)
       .set({
         ...payload,
+        refundAmount: toOptionalNumericString(payload.refundAmount),
         updatedAt: new Date(),
       })
       .where(and(eq(returns.id, returnId), eq(returns.tenantId, tenantId)));
@@ -614,12 +631,12 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
         carrier: payload.carrier ?? null,
         serviceLevel: payload.serviceLevel ?? null,
         rateType: payload.rateType ?? "flat",
-        flatRate: payload.flatRate ?? null,
+        flatRate: toNullableNumericString(payload.flatRate) ?? null,
         currency: payload.currency ?? "USD",
-        minOrderValue: payload.minOrderValue ?? null,
-        maxOrderValue: payload.maxOrderValue ?? null,
-        minWeight: payload.minWeight ?? null,
-        maxWeight: payload.maxWeight ?? null,
+        minOrderValue: toNullableNumericString(payload.minOrderValue) ?? null,
+        maxOrderValue: toNullableNumericString(payload.maxOrderValue) ?? null,
+        minWeight: toNullableNumericString(payload.minWeight) ?? null,
+        maxWeight: toNullableNumericString(payload.maxWeight) ?? null,
         estimatedMinDays: payload.estimatedMinDays ?? null,
         estimatedMaxDays: payload.estimatedMaxDays ?? null,
         active: payload.active ?? true,
@@ -638,6 +655,11 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       .update(shippingProfiles)
       .set({
         ...payload,
+        flatRate: toOptionalNumericString(payload.flatRate),
+        minOrderValue: toOptionalNumericString(payload.minOrderValue),
+        maxOrderValue: toOptionalNumericString(payload.maxOrderValue),
+        minWeight: toOptionalNumericString(payload.minWeight),
+        maxWeight: toOptionalNumericString(payload.maxWeight),
         updatedAt: new Date(),
       })
       .where(and(eq(shippingProfiles.id, profileId), eq(shippingProfiles.tenantId, tenantId)));
@@ -672,8 +694,8 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
         shippingProfileId: payload.shippingProfileId ?? null,
         priority: payload.priority ?? 0,
         destinationCountry: payload.destinationCountry ?? null,
-        minOrderValue: payload.minOrderValue ?? null,
-        maxOrderValue: payload.maxOrderValue ?? null,
+        minOrderValue: toNullableNumericString(payload.minOrderValue) ?? null,
+        maxOrderValue: toNullableNumericString(payload.maxOrderValue) ?? null,
         handlingDays: payload.handlingDays ?? null,
         active: payload.active ?? true,
         notes: payload.notes ?? null,
@@ -689,7 +711,11 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
 
     await db
       .update(fulfillmentRules)
-      .set(payload)
+      .set({
+        ...payload,
+        minOrderValue: toOptionalNumericString(payload.minOrderValue),
+        maxOrderValue: toOptionalNumericString(payload.maxOrderValue),
+      })
       .where(and(eq(fulfillmentRules.id, ruleId), eq(fulfillmentRules.tenantId, tenantId)));
 
     const [updated] = await db
@@ -726,7 +752,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
         phone: payload.phone ?? null,
         status: payload.status ?? "active",
         orderCount: payload.orderCount ?? 0,
-        totalSpent: payload.totalSpent ?? 0,
+        totalSpent: toOptionalNumericString(payload.totalSpent) ?? "0",
         currency: payload.currency ?? "USD",
         lastOrderAt: payload.lastOrderAt ?? null,
       })
@@ -741,7 +767,10 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
 
     await db
       .update(customers)
-      .set(payload)
+      .set({
+        ...payload,
+        totalSpent: toOptionalNumericString(payload.totalSpent),
+      })
       .where(and(eq(customers.id, customerId), eq(customers.tenantId, tenantId)));
 
     const [updated] = await db
@@ -888,7 +917,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
     const tenantId = await getTenantIdBySlug(shopSlug);
     const payload = messageUpdateSchema.parse(body);
 
-    const updates: Partial<typeof customerMessages._infer> = {};
+    const updates: Partial<typeof customerMessages.$inferInsert> = {};
     if (payload.status !== undefined) {
       updates.status = payload.status;
     }

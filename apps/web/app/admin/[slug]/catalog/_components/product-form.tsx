@@ -10,7 +10,7 @@ import { Label } from "@repo/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { getImage } from "@/lib/utils/images";
 import { ImageGalleryUpload } from "./image-gallery-upload";
@@ -72,8 +72,8 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     setValue,
     reset,
     formState: { errors },
-  } = useForm({
-    resolver: zodResolver(productFormSchema),
+  } = useForm<ProductFormData>({
+    resolver: zodResolver(productFormSchema) as Resolver<ProductFormData>,
     defaultValues: {
       title: "",
       description: "",
@@ -139,18 +139,17 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       const normalizedVariants = (productData?.variants as VariantWithExtras[] | undefined)?.map(
         (variant) => {
           const auction = variant.auction;
-        return {
-          ...variant,
-          price: variant.price ?? "",
-          currency: variant.currency || "USD",
-          stock:
-            typeof variant.availableQty === "number" ? String(variant.availableQty) : "",
-          auctionStartBid: auction?.startingBid ?? "",
-          auctionMinIncrement: auction?.minIncrement ?? "",
-          auctionBuyNow: auction?.buyNowPrice ?? "",
-          auctionStartsAt: toDateTimeLocal(auction?.startsAt),
-          auctionEndsAt: toDateTimeLocal(auction?.endsAt),
-        };
+          return {
+            ...variant,
+            price: variant.price ?? "",
+            currency: variant.currency || "USD",
+            stock: typeof variant.availableQty === "number" ? String(variant.availableQty) : "",
+            auctionStartBid: auction?.startingBid ?? "",
+            auctionMinIncrement: auction?.minIncrement ?? "",
+            auctionBuyNow: auction?.buyNowPrice ?? "",
+            auctionStartsAt: toDateTimeLocal(auction?.startsAt),
+            auctionEndsAt: toDateTimeLocal(auction?.endsAt),
+          };
         },
       );
       const isAuctionValue = productData?.isAuction ?? productData?.hasAuction ?? false;

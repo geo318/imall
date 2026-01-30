@@ -19,11 +19,14 @@ export async function getShopsServer(limit = 50): Promise<Shop[]> {
   cacheLife({ stale: 300, expire: 3600 }); // 5m stale, 1h expire
   cacheTag(CACHE_TAGS.SHOPS);
 
-  const response = await fetch(`${API_BASE}/api/shops?limit=${limit}`);
-
-  if (!response.ok) {
-    throw new Error("Failed to load shops");
+  try {
+    const response = await fetch(`${API_BASE}/api/shops?limit=${limit}`);
+    if (!response.ok) {
+      return [];
+    }
+    return response.json();
+  } catch (error) {
+    console.warn("Failed to fetch shops:", error);
+    return [];
   }
-
-  return response.json();
 }

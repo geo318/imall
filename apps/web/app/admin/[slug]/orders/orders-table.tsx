@@ -2,13 +2,7 @@
 
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@repo/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { Fragment, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -86,11 +80,14 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
   };
 
   const handleUpdate = (orderId: string) => {
-    const status = statusChanges[orderId];
+    const fallbackStatus = rows.find((order) => order.id === orderId)?.status;
+    const status = statusChanges[orderId] ?? fallbackStatus;
+    if (!status) {
+      toast.error("Select a status before updating");
+      return;
+    }
     if (isMock) {
-      setRows((prev) =>
-        prev.map((order) => (order.id === orderId ? { ...order, status } : order)),
-      );
+      setRows((prev) => prev.map((order) => (order.id === orderId ? { ...order, status } : order)));
       toast.success("Mock order updated");
       return;
     }
@@ -178,7 +175,9 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <Badge className={`capitalize ${paymentBadgeStyles[order.paymentStatus] || ""}`}>
+                    <Badge
+                      className={`capitalize ${paymentBadgeStyles[order.paymentStatus] || ""}`}
+                    >
                       {order.paymentStatus}
                     </Badge>
                   </td>

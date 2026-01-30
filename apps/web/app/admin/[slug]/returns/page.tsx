@@ -56,7 +56,7 @@ function buildMockReturns(products: ApiProduct[]): ReturnEntry[] {
   const statuses = ["requested", "approved", "received", "refunded"];
   return products.slice(0, 5).map((product, index) => ({
     id: `RMA-${product.id.slice(0, 6)}`,
-    status: statuses[index % statuses.length],
+    status: statuses[index % statuses.length] ?? "requested",
     rmaNumber: `RMA-${1000 + index}`,
     refundAmount: Number(product.priceMin ?? 25) * 0.8,
     refundCurrency: product.currency ?? "USD",

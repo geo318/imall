@@ -2,14 +2,7 @@
 
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@repo/ui/datatable";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@repo/ui/datatable";
 import { Input } from "@repo/ui/input";
 import { Modal, ModalBody, ModalHeader, ModalTitle } from "@repo/ui/modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
@@ -162,9 +155,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
     if (hasLow) {
       return <Badge variant="destructive">Low</Badge>;
     }
-    return (
-      <Badge className="bg-emerald-100 text-emerald-900">In stock</Badge>
-    );
+    return <Badge className="bg-emerald-100 text-emerald-900">In stock</Badge>;
   };
 
   return (
@@ -177,9 +168,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
             onChange={(event) => setSearch(event.target.value)}
             className="sm:max-w-xs"
           />
-          {isFetching && (
-            <span className="text-xs text-slate-500">Updating results...</span>
-          )}
+          {isFetching && <span className="text-xs text-slate-500">Updating results...</span>}
         </div>
         <Select value={sortSelection} onValueChange={setSortSelection}>
           <SelectTrigger className="sm:w-56">
@@ -220,8 +209,8 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                 const productIdentifier = getProductIdentifier(product);
                 const variantCount = product.variantCount ?? product.variants.length;
                 const hasAuction = Boolean(
-                  product.isAuction ||
-                    product.hasAuction ||
+                  product.hasAuction ||
+                    product.variants.some((variant) => Boolean(variant.auction)) ||
                     product.auctionStartingBid ||
                     product.auctionCurrentPrice,
                 );
@@ -232,11 +221,10 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                 const variantPrices = product.variants
                   .map((variant) => Number(variant.price))
                   .filter((value) => Number.isFinite(value));
-                const derivedPrice =
-                  variantPrices.length > 0 ? Math.min(...variantPrices) : null;
+                const derivedPrice = variantPrices.length > 0 ? Math.min(...variantPrices) : null;
                 const basePrice = Number.isFinite(primaryPrice)
                   ? primaryPrice
-                  : product.priceMin ?? derivedPrice;
+                  : (product.priceMin ?? derivedPrice);
                 const auctionPrice =
                   product.auctionCurrentPrice ?? product.auctionStartingBid ?? basePrice;
                 const priceValue = hasAuction ? auctionPrice : basePrice;
@@ -366,7 +354,8 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
       {products.length > PAGE_SIZE && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-slate-500">
-            Showing {startIndex + 1}-{Math.min(startIndex + PAGE_SIZE, products.length)} of {products.length}
+            Showing {startIndex + 1}-{Math.min(startIndex + PAGE_SIZE, products.length)} of{" "}
+            {products.length}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -405,11 +394,9 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                   {activeProduct.category || "Uncategorized"}
                 </p>
               </div>
-              {Boolean(
-                activeProduct.hasAuction ||
-                  activeProduct.auctionStartingBid ||
-                  activeProduct.auctionCurrentPrice,
-              ) ? (
+              {activeProduct.hasAuction ||
+              activeProduct.auctionStartingBid ||
+              activeProduct.auctionCurrentPrice ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                   Auction product. Current price:{" "}
                   {activeProduct.auctionCurrentPrice !== null &&

@@ -18,18 +18,24 @@ export async function getShopProductsServer(shopSlug: string, limit = 20): Promi
   cacheTag(CACHE_TAGS.PRODUCTS);
   cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
 
-  const response = await fetch(`${API_BASE}/api/shops/${shopSlug}/products?limit=${limit}`);
-
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error("not-found");
+  try {
+    const response = await fetch(`${API_BASE}/api/shops/${shopSlug}/products?limit=${limit}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("not-found");
+      }
+      return [];
     }
-    throw new Error("Failed to load products");
+    const data = await response.json();
+    // Handle both old format (array) and new format ({ items, nextOffset })
+    return Array.isArray(data) ? data : data.items || [];
+  } catch (error) {
+    if (error instanceof Error && error.message === "not-found") {
+      throw error;
+    }
+    console.warn("Failed to fetch shop products:", error);
+    return [];
   }
-
-  const data = await response.json();
-  // Handle both old format (array) and new format ({ items, nextOffset })
-  return Array.isArray(data) ? data : data.items || [];
 }
 
 /**
@@ -74,13 +80,16 @@ export async function searchProductsServer(
   if (params.limit) searchParams.set("limit", String(params.limit));
   if (params.offset) searchParams.set("offset", String(params.offset));
 
-  const response = await fetch(`${API_BASE}/api/products/search?${searchParams.toString()}`);
-
-  if (!response.ok) {
-    throw new Error("Failed to search products");
+  try {
+    const response = await fetch(`${API_BASE}/api/products/search?${searchParams.toString()}`);
+    if (!response.ok) {
+      return { items: [], nextOffset: null };
+    }
+    return response.json();
+  } catch (error) {
+    console.warn("Failed to search products:", error);
+    return { items: [], nextOffset: null };
   }
-
-  return response.json();
 }
 
 /**
@@ -92,15 +101,25 @@ export async function getAnyProductsServer(limit = 20): Promise<Product[]> {
   cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
   cacheTag(CACHE_TAGS.PRODUCTS);
 
-  const response = await fetch(`${API_BASE}/api/products?limit=${limit}`);
-
-  if (!response.ok) {
-    if (response.status === 404) {
-      // Fallback to shop products
-      return getShopProductsServer(env.SEED_SHOP_SLUG, limit);
+  try {
+    const response = await fetch(`${API_BASE}/api/products?limit=${limit}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        try {
+          return await getShopProductsServer(env.SEED_SHOP_SLUG, limit);
+        } catch {
+          return [];
+        }
+      }
+      return [];
     }
-    throw new Error("Failed to load products");
+    return response.json();
+  } catch (error) {
+    console.warn("Failed to fetch products:", error);
+    try {
+      return await getShopProductsServer(env.SEED_SHOP_SLUG, limit);
+    } catch {
+      return [];
+    }
   }
-
-  return response.json();
 }

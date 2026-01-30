@@ -39,6 +39,18 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Catalog list now debounces search, paginates after 15 items, shows variant overview modal from price/stock cells, and uses stable variant keys to keep SKU edits responsive.
 - Admin dashboard now removes the implementation notes/auctions card, adds a shop overview with sales, inventory health, charts, and recent orders, and orders page shows Shopify-style mock fulfillment data when no real orders exist.
 - Added finance/returns/shipping/customer tables + migration, expanded admin shop routes to cover payouts/ledger, returns, shipping profiles, fulfillment rules, and customers (segments/messages), and added admin pages with mock fallback for those sections plus a generic admin proxy route.
+- Fixed admin shop routes to coerce numeric payloads to strings for Drizzle numeric columns and replaced deprecated `_infer` usage with `$inferInsert` for update typings.
+- Fixed admin product form typing by casting the zod resolver to the form data type to keep React Hook Form and schema defaults aligned.
+- Admin catalog list now detects auction products via `hasAuction` or variant auction data (no `isAuction` field on API type).
+- Guarded mock order updates to ensure a status is selected before updating rows (avoids undefined status typing).
+- Mock order generator now falls back to a default status when indexing mock status list.
+- Admin shop overview now types optional product stats locally to safely compute units sold.
+- Mock returns generator now falls back to a default status when indexing mock status list.
+- Added missing backend error helper to the admin inventory API route.
+- Switched admin API proxy helper to use a `Headers` instance to avoid TypeScript indexing errors.
+- Updated shared env test import to include explicit `.js` extension for NodeNext module resolution.
+- Server-side shop fetch now returns an empty list instead of throwing when the API is unreachable (avoids build failures without the API).
+- Server-side product fetchers now return empty results on connection failures to allow Next builds without the API running.
 
 ## Known gaps / follow-ups
 

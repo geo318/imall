@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildEnv } from "../src/env";
+import { buildEnv } from "../src/env.js";
 
 describe("env schemas", () => {
   test("parses valid env and coerces port", () => {

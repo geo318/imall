@@ -56,22 +56,20 @@ export async function backendRequest(path: string, options: BackendRequestOption
     throw new Error("Unauthorized: Authentication required");
   }
 
-  const headers: HeadersInit = {
-    ...(options.headers ?? {}),
-  };
+  const headers = new Headers(options.headers ?? {});
 
   let body: unknown;
   if (options.body instanceof FormData) {
     body = options.body;
   } else if (options.body !== undefined) {
     body = JSON.stringify(options.body);
-    if (!headers["Content-Type"]) {
-      headers["Content-Type"] = "application/json";
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
     }
   }
 
-  if (!headers["Authorization"] && !headers.authorization) {
-    headers.Authorization = `Bearer ${token}`;
+  if (!headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
   const response = await fetch(`${API_BASE}${resolveApiPath(path)}`, {

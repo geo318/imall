@@ -18,6 +18,12 @@ type OrderEntry = {
   itemCount: number;
 };
 
+type ProductWithStats = ApiProduct & {
+  stats?: {
+    sold?: number;
+  };
+};
+
 const sections = [
   {
     href: "settings",
@@ -70,7 +76,7 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
     data: products,
     isLoading: productsLoading,
     error: productsError,
-  } = useQuery<ApiProduct[]>({
+  } = useQuery<ProductWithStats[]>({
     queryKey: ["admin-products", slug],
     queryFn: async () => {
       const response = await fetch(`/api/admin/${slug}/products?status=all`);

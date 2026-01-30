@@ -1,4 +1,4 @@
-import { Metadata } from "next";
+import type { Metadata } from "next";
 import type { ApiProduct } from "@/lib/api/products";
 import { OrdersTable } from "./orders-table";
 
@@ -108,7 +108,7 @@ function buildMockOrders(products: ApiProduct[]): OrderEntry[] {
     const priceValue = Number(variant?.price ?? product.priceMin ?? 24);
     const qty = (index % 3) + 1;
     const total = priceValue * qty;
-    const status = statuses[index % statuses.length];
+    const status = statuses[index % statuses.length] ?? "pending";
     const customer = customers[index % customers.length];
     const createdAt = new Date(Date.now() - index * 36 * 60 * 60 * 1000).toISOString();
     const items: OrderLineItem[] = [
@@ -129,8 +129,8 @@ function buildMockOrders(products: ApiProduct[]): OrderEntry[] {
       currency: variant?.currency ?? product.currency ?? "USD",
       createdAt,
       itemCount: qty,
-      customerName: customer.name,
-      customerEmail: customer.email,
+      customerName: customer?.name ?? "",
+      customerEmail: customer?.email ?? "",
       paymentStatus: status === "completed" ? "paid" : "pending",
       fulfillmentStatus:
         status === "completed" ? "fulfilled" : status === "processing" ? "partial" : "unfulfilled",
@@ -165,14 +165,16 @@ export default async function OrdersPage({ params }: { params: Promise<{ slug: s
   return (
     <div className="container py-10 space-y-8">
       <div className="space-y-1">
-        <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Orders</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Orders
+        </p>
         <h1 className="text-3xl font-bold">Recent orders</h1>
         <p className="text-sm text-muted-foreground">
           Review orders and update statuses before notifying customers.
         </p>
       </div>
 
-      <OrdersTable shopSlug={slug} orders={orders} isMock={isMock} />
+      <OrdersTable shopSlug={slug} orders={orders as OrderEntry[]} isMock={isMock} />
     </div>
   );
 }
