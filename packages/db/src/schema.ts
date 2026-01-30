@@ -28,6 +28,26 @@ export const tenants = pgTable("tenants", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const shopSettings = pgTable(
+  "shop_settings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    bankDetails: text("bank_details"),
+    payoutAccount: varchar("payout_account", { length: 128 }),
+    payoutNotes: text("payout_notes"),
+    orderNotes: text("order_notes"),
+    inventoryNotes: text("inventory_notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    tenantUniqueIdx: uniqueIndex("shop_settings_tenant_id_unique").on(table.tenantId),
+  }),
+);
+
 // Users table stores application users. External auth IDs (e.g. from Clerk)
 // map users to external providers. Email is optional because Clerk can
 // supply it, but it is kept here for convenience.
@@ -221,6 +241,176 @@ export const orderItems = pgTable("order_items", {
     .notNull(),
   qty: integer("qty").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+});
+
+// Payout schedules and ledger entries capture withdrawals, fees, and chargebacks.
+export const payouts = pgTable("payouts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
+  status: varchar("status", { length: 32 }).default("scheduled").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 8 }).default("USD").notNull(),
+  scheduledFor: timestamp("scheduled_for").notNull(),
+  paidAt: timestamp("paid_at"),
+  method: varchar("method", { length: 64 }),
+  reference: varchar("reference", { length: 128 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const payoutLedger = pgTable("payout_ledger", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
+  payoutId: uuid("payout_id").references(() => payouts.id),
+  type: varchar("type", { length: 32 }).notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: varchar("currency", { length: 8 }).default("USD").notNull(),
+  occurredAt: timestamp("occurred_at").defaultNow().notNull(),
+  referenceType: varchar("reference_type", { length: 64 }),
+  referenceId: uuid("reference_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Returns and refunds track RMA flow and restock decisions.
+export const returns = pgTable("returns", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
+  orderId: uuid("order_id").references(() => orders.id),
+  status: varchar("status", { length: 32 }).default("requested").notNull(),
+  reason: text("reason"),
+  rmaNumber: varchar("rma_number", { length: 64 }),
+  refundAmount: numeric("refund_amount", { precision: 12, scale: 2 }),
+  refundCurrency: varchar("refund_currency", { length: 8 }).default("USD"),
+  restockStatus: varchar("restock_status", { length: 32 }).default("pending").notNull(),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  approvedAt: timestamp("approved_at"),
+  receivedAt: timestamp("received_at"),
+  refundedAt: timestamp("refunded_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const returnItems = pgTable("return_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
+  returnId: uuid("return_id")
+    .references(() => returns.id)
+    .notNull(),
+  orderItemId: uuid("order_item_id").references(() => orderItems.id),
+  variantId: uuid("variant_id").references(() => variants.id),
+  qty: integer("qty").notNull(),
+  restockQty: integer("restock_qty").default(0).notNull(),
+  condition: varchar("condition", { length: 32 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Shipping profiles and fulfillment rules define rates and routing.
+export const shippingProfiles = pgTable("shipping_profiles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  carrier: varchar("carrier", { length: 64 }),
+  serviceLevel: varchar("service_level", { length: 64 }),
+  rateType: varchar("rate_type", { length: 32 }).default("flat").notNull(),
+  flatRate: numeric("flat_rate", { precision: 12, scale: 2 }),
+  currency: varchar("currency", { length: 8 }).default("USD"),
+  minOrderValue: numeric("min_order_value", { precision: 12, scale: 2 }),
+  maxOrderValue: numeric("max_order_value", { precision: 12, scale: 2 }),
+  minWeight: numeric("min_weight", { precision: 12, scale: 2 }),
+  maxWeight: numeric("max_weight", { precision: 12, scale: 2 }),
+  estimatedMinDays: integer("estimated_min_days"),
+  estimatedMaxDays: integer("estimated_max_days"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const fulfillmentRules = pgTable("fulfillment_rules", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
+  shippingProfileId: uuid("shipping_profile_id").references(() => shippingProfiles.id),
+  priority: integer("priority").default(0).notNull(),
+  destinationCountry: varchar("destination_country", { length: 2 }),
+  minOrderValue: numeric("min_order_value", { precision: 12, scale: 2 }),
+  maxOrderValue: numeric("max_order_value", { precision: 12, scale: 2 }),
+  handlingDays: integer("handling_days"),
+  active: boolean("active").default(true).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Customer management includes segments and outbound messages.
+export const customers = pgTable("customers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
+  email: varchar("email", { length: 256 }),
+  name: varchar("name", { length: 256 }),
+  phone: varchar("phone", { length: 32 }),
+  status: varchar("status", { length: 32 }).default("active").notNull(),
+  orderCount: integer("order_count").default(0).notNull(),
+  totalSpent: numeric("total_spent", { precision: 12, scale: 2 }).default("0"),
+  currency: varchar("currency", { length: 8 }).default("USD"),
+  lastOrderAt: timestamp("last_order_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const customerSegments = pgTable("customer_segments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
+  name: varchar("name", { length: 128 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const customerSegmentMembers = pgTable(
+  "customer_segment_members",
+  {
+    segmentId: uuid("segment_id")
+      .references(() => customerSegments.id)
+      .notNull(),
+    customerId: uuid("customer_id")
+      .references(() => customers.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.segmentId, table.customerId] }),
+  }),
+);
+
+export const customerMessages = pgTable("customer_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tenantId: uuid("tenant_id")
+    .references(() => tenants.id)
+    .notNull(),
+  customerId: uuid("customer_id")
+    .references(() => customers.id)
+    .notNull(),
+  channel: varchar("channel", { length: 16 }).notNull(),
+  subject: varchar("subject", { length: 256 }),
+  body: text("body"),
+  status: varchar("status", { length: 32 }).default("draft").notNull(),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Auctions table defines auctions tied to a variant. Only one unit is sold
