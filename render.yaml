@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: emakret-api
+    env: docker
+    dockerfilePath: ./Dockerfile.api
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DOMAIN
+        sync: false
+      - key: NEXT_PUBLIC_DOMAIN
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_JWT_PUBLIC_KEY
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+
+  - type: web
+    name: emakret-web
+    env: docker
+    dockerfilePath: ./Dockerfile.web
+    autoDeploy: true
+    envVars:
+      - key: BACKEND_URL
+        fromService:
+          type: web
+          name: emakret-api
+          property: url
+      - key: NEXT_PUBLIC_DOMAIN
+        sync: false
+      - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_JWT_PUBLIC_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DOMAIN
+        sync: false
