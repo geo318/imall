@@ -20,8 +20,6 @@ export function ProductAvailabilitySlot({ product, selectedVariantId, productIde
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
   const auction = selectedVariant?.auction ?? null;
   const availableQty = selectedVariant?.availableQty;
-  const stockTotal = availableQty === undefined ? 50 : Math.max(availableQty, 50);
-  const stockSold = availableQty === undefined ? 0 : stockTotal - availableQty;
   const stockStatus = getStockStatus(availableQty);
 
   // Refetch for fresh stock data on demand
@@ -88,10 +86,7 @@ export function ProductAvailabilitySlot({ product, selectedVariantId, productIde
   };
 
   const renderAvailabilityContent = () => {
-    if (stockStatus === "sold") {
-      return <Badge className="bg-red-100 text-red-800 border-red-200 text-sm">Sold Out</Badge>;
-    }
-    if (stockStatus === "out_of_stock") {
+    if (stockStatus === "sold" || stockStatus === "out_of_stock") {
       return <Badge className="bg-red-100 text-red-800 border-red-200 text-sm">Out of Stock</Badge>;
     }
     if (availableQty !== undefined) {
@@ -107,23 +102,6 @@ export function ProductAvailabilitySlot({ product, selectedVariantId, productIde
             >
               {availableQty} left
             </span>
-          </div>
-
-          <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
-            <div
-              className={cn(
-                "h-full rounded-full transition-all",
-                stockStatus === "low" ? "bg-warning" : "bg-green-500",
-              )}
-              style={{
-                width: `${(availableQty / stockTotal) * 100}%`,
-              }}
-            />
-          </div>
-
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{stockSold} sold</span>
-            <span>{stockTotal} total</span>
           </div>
 
           {stockStatus === "low" && (

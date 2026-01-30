@@ -58,6 +58,8 @@ export default function LazyImage({
           <Image
             src={imageUrl}
             alt={alt ?? ""}
+            width={width ?? 1}
+            height={height ?? 1}
             unoptimized
             onLoad={() => setIsLoaded(true)}
             onError={() => setHasError(true)}
