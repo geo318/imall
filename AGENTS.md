@@ -13,6 +13,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Added Render-aware build/start routing via `scripts/render.mjs` and updated root scripts to build/start only the matching service (web vs api) based on `RENDER_SERVICE_NAME`.
 - Render start now optionally runs `db:push` before boot when `RUN_MIGRATIONS` is enabled (intended for the API service).
 - Added `Dockerfile.api`, `Dockerfile.web`, and a root `.dockerignore` for Render Docker deployments.
+- Dockerfiles now pin Bun 1.3.0 to match the repo `packageManager` and avoid frozen lockfile drift.
 - Admin API proxy now prefers `BACKEND_URL` (server-side) before falling back to `NEXT_PUBLIC_BACKEND_URL`.
 - Added `render.yaml` to define Render Docker services for API and web.
 - Render blueprint now uses `hostport` for `BACKEND_URL`, and server-side env handling prepends `http://` when a scheme is missing.
