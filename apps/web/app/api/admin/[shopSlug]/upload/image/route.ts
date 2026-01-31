@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { resolveBackendBase } from "../../../_utils/backend";
 import { getAdminToken } from "@/app/api/admin/utils";
+import { resolveBackendBase } from "../../../../_utils/backend";
 
 const API_BASE = resolveBackendBase();
 

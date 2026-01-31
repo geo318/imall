@@ -17,6 +17,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Dockerfiles now pin Bun 1.3.0 to match the repo `packageManager` and avoid frozen lockfile drift.
 - Dockerfiles now copy both app package manifests so Bun workspace install matches the lockfile.
 - Dockerfile.web now includes `packages/db/package.json` to keep Bun workspace resolution local.
+- Fixed relative import path for `resolveBackendBase` in the admin image upload API route.
 - Admin API proxy now prefers `BACKEND_URL` (server-side) before falling back to `NEXT_PUBLIC_BACKEND_URL`.
 - Added `render.yaml` to define Render Docker services for API and web.
 - Render blueprint now uses `hostport` for `BACKEND_URL`, and server-side env handling prepends `http://` when a scheme is missing.
