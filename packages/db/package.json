@@ -9,8 +9,7 @@
     "./schema": "./dist/schema.js"
   },
   "scripts": {
-    "build": "tsc -b",
-    "prepare": "bun run build"
+    "build": "tsc -b"
   },
   "dependencies": {
     "@repo/shared": "*",

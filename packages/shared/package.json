@@ -11,8 +11,7 @@
     "./slug": "./dist/slug.js"
   },
   "scripts": {
-    "build": "tsc -b",
-    "prepare": "bun run build"
+    "build": "tsc -b"
   },
   "dependencies": {
     "@t3-oss/env-core": "^0.13.10",
