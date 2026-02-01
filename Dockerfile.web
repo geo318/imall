@@ -18,7 +18,8 @@ ENV DOMAIN=https://placeholder.example.com
 ENV DATABASE_URL=postgresql://localhost:5432/placeholder
 ENV CLERK_SECRET_KEY=sk_build_placeholder
 ENV NEXT_PUBLIC_DOMAIN=https://placeholder.example.com
-ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_build_placeholder
+# Empty so ClerkProvider gets "" and doesn't validate; real key set at runtime
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 # Next.js "Collecting page data" workers may not inherit ENV; shared env skips validation when NEXT_PHASE=phase-production-build
 RUN bun run build:web
 

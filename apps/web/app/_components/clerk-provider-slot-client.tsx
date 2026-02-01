@@ -32,6 +32,8 @@ function ClerkReadyDetector({ onReady }: { onReady: () => void }) {
   return null;
 }
 
+const BUILD_PLACEHOLDER_KEY = "pk_build_placeholder";
+
 export function ClerkProviderSlotClient({
   children,
   publishableKey,
@@ -41,12 +43,14 @@ export function ClerkProviderSlotClient({
 }) {
   const [clerkReady, setClerkReady] = useState(false);
 
-  // Always render ClerkProvider to avoid "useUser outside ClerkProvider" errors
-  // ClerkProvider handles empty keys gracefully during SSR
-  // The key will be available after mount
-  if (!publishableKey) {
-    // During SSR when key isn't available yet, still render ClerkProvider with empty key
-    // This prevents "useUser outside ClerkProvider" errors
+  // During Next.js build or when key is Docker placeholder, use "" so we still render ClerkProvider
+  // (useUser etc. require it) but Clerk doesn't receive an invalid key
+  const isBuildPlaceholder =
+    publishableKey === BUILD_PLACEHOLDER_KEY ||
+    (typeof process !== "undefined" && process.env?.NEXT_PHASE === "phase-production-build");
+  const effectiveKey = isBuildPlaceholder ? "" : publishableKey;
+
+  if (!effectiveKey) {
     return (
       <ClerkProvider publishableKey="">
         <ClerkReadyContext.Provider value={false}>{children}</ClerkReadyContext.Provider>
@@ -55,7 +59,7 @@ export function ClerkProviderSlotClient({
   }
 
   return (
-    <ClerkProvider publishableKey={publishableKey}>
+    <ClerkProvider publishableKey={effectiveKey}>
       <ClerkReadyDetector onReady={() => setClerkReady(true)} />
       <ClerkReadyContext.Provider value={clerkReady}>{children}</ClerkReadyContext.Provider>
     </ClerkProvider>

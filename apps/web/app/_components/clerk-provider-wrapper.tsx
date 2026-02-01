@@ -10,8 +10,9 @@ export function ClerkProviderWrapper({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     // Only read env after mount to avoid "uncached data" errors during build
-    // NEXT_PUBLIC_ vars are injected by Next.js and available in the browser
-    setPublishableKey(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "");
+    // Ignore Docker build placeholder so we never pass it to Clerk
+    const raw = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
+    setPublishableKey(raw === "pk_build_placeholder" ? "" : raw);
   }, []);
 
   // During SSR/build, render without ClerkProvider to avoid errors
