@@ -57,15 +57,19 @@ const runtimeEnv: RuntimeEnv = {
   SKIP_ENV_VALIDATION: process.env.SKIP_ENV_VALIDATION,
 };
 
-export function buildEnv(runtimeEnv: RuntimeEnv) {
+export function buildEnv(input: RuntimeEnv) {
+  const skipValidation =
+    Boolean(input.SKIP_ENV_VALIDATION) ||
+    input.NODE_ENV === "test" ||
+    process.env.NEXT_PHASE === "phase-production-build";
   return createEnv({
     server: serverSchema,
     client: clientSchema,
-    runtimeEnv,
     isServer: !globalThis.window,
     clientPrefix: "NEXT_PUBLIC_",
-    skipValidation: Boolean(runtimeEnv.SKIP_ENV_VALIDATION) || runtimeEnv.NODE_ENV === "test",
     emptyStringAsUndefined: true,
+    skipValidation,
+    runtimeEnv: input,
   });
 }
 
