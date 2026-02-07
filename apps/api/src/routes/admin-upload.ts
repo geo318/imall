@@ -1,8 +1,18 @@
-import { assets, db } from "@repo/db";
+import { assets, db, tenants } from "@repo/db";
+import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
-import { authPlugin, getTenantIdBySlug } from "../context";
+import { authPlugin, getTenantIdBySlug, isSuperadminRequest } from "../context";
 import { getStorage } from "../storage";
 import { ensureAuth, requireAuth, verifyTenantAccess } from "../utils/auth";
+
+async function isSellingEnabled(tenantId: string) {
+  const [tenant] = await db
+    .select({ canSell: tenants.canSell })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  return Boolean(tenant?.canSell);
+}
 
 export const adminUploadRoutes = new Elysia({
   prefix: "/admin/:shopSlug/upload",
@@ -10,20 +20,28 @@ export const adminUploadRoutes = new Elysia({
   .use(authPlugin)
   .post("/image", async ({ params, auth, request, set }) => {
     try {
-      // Use centralized auth utilities
-      const effectiveAuth = await ensureAuth(auth, request);
-      requireAuth(effectiveAuth);
-
       const { shopSlug } = params as { shopSlug: string };
       const tenantId = await getTenantIdBySlug(shopSlug);
 
-      // Verify tenant access
-      const hasAccess = effectiveAuth?.userId
-        ? await verifyTenantAccess(effectiveAuth.userId, tenantId)
-        : false;
-      if (!hasAccess) {
-        set.status = 403;
-        return { error: "Forbidden: You don't have access to this shop" };
+      const superadmin = isSuperadminRequest(request);
+      if (!superadmin) {
+        // Use centralized auth utilities
+        const effectiveAuth = await ensureAuth(auth, request);
+        requireAuth(effectiveAuth);
+
+        // Verify tenant access
+        const hasAccess = effectiveAuth?.userId
+          ? await verifyTenantAccess(effectiveAuth.userId, tenantId)
+          : false;
+        if (!hasAccess) {
+          set.status = 403;
+          return { error: "Forbidden: You don't have access to this shop" };
+        }
+
+        if (!(await isSellingEnabled(tenantId))) {
+          set.status = 403;
+          return { error: "Selling is disabled for this shop" };
+        }
       }
 
       const storage = getStorage();

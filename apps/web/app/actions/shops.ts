@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { env } from "@repo/shared";
 import { cacheLife, cacheTag } from "next/cache";
+import { redirect } from "@/i18n/navigation.server";
 import { CACHE_TAGS } from "@/lib/constants";
 
 /**
@@ -82,6 +83,11 @@ export type Shop = {
   name: string;
 };
 
+export type MyShop = Shop & {
+  canSell?: boolean;
+  role?: string | null;
+};
+
 /**
  * Get list of shops
  * Cached for PPR - public data, no auth required
@@ -102,4 +108,50 @@ export async function getShops(limit = 50): Promise<Shop[]> {
   }
 
   return response.json();
+}
+
+/**
+ * Get shops for current authenticated user
+ */
+export async function getMyShops(): Promise<MyShop[]> {
+  const response = await backendRequest("/shops/mine");
+  if (!response.ok) {
+    throw new Error("Failed to load your shops");
+  }
+  return response.json();
+}
+
+/**
+ * Register a new shop for the current user
+ */
+export async function registerShop(
+  _prevState: { error?: string } | undefined,
+  formData: FormData,
+) {
+  const name = String(formData.get("name") || "").trim();
+
+  if (!name) {
+    return { error: "Shop name is required" };
+  }
+
+  try {
+    const response = await backendRequest("/shops/register", {
+      method: "POST",
+      body: { name },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { error: errorData?.error ?? "Failed to register shop" };
+    }
+
+    const data = (await response.json()) as { slug?: string };
+    if (!data?.slug) {
+      return { error: "Failed to register shop" };
+    }
+
+    return redirect(`/admin/${data.slug}`);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Failed to register shop" };
+  }
 }

@@ -93,11 +93,34 @@ export function requireAdmin(ctx: AuthContext) {
   }
 }
 
+export function isSuperadminRequest(request: Request) {
+  const email = request.headers.get("x-superadmin-email");
+  const password = request.headers.get("x-superadmin-password");
+  return Boolean(email && password && email === env.SUPERADMIN_EMAIL && password === env.SUPERADMIN_PASSWORD);
+}
+
 export const adminGuard = new Elysia({ name: "admin-guard" })
   .use(authPlugin)
   .onBeforeHandle(({ auth }) => {
     requireAdmin(auth);
   });
+
+export const adminOrSuperadminGuard = new Elysia({ name: "admin-superadmin-guard" })
+  .use(authPlugin)
+  .onBeforeHandle(({ auth, request }) => {
+    if (isSuperadminRequest(request)) {
+      return;
+    }
+    requireAdmin(auth);
+  });
+
+export const superadminGuard = new Elysia({ name: "superadmin-guard" }).onBeforeHandle(
+  ({ request }) => {
+    if (!isSuperadminRequest(request)) {
+      throw new Response("Forbidden", { status: 403 });
+    }
+  },
+);
 
 /* ---------- Validation schemas ---------- */
 export const bidPayloadSchema = z.object({

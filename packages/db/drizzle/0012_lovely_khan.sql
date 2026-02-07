@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ALTER COLUMN "can_sell" SET DEFAULT false;

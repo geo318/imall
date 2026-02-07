@@ -8,13 +8,14 @@ import {
   inventorySnapshot,
   productStats,
   products,
+  tenants,
   variants,
 } from "@repo/db";
 import { INVENTORY_REASONS, slugify } from "@repo/shared";
-import { and, eq, ilike, inArray, isNotNull, isNull, not, or, sum, type SQL } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNotNull, isNull, not, or, type SQL, sum } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { authPlugin, getTenantIdBySlug } from "../context";
+import { authPlugin, getTenantIdBySlug, isSuperadminRequest } from "../context";
 import { getStorage } from "../storage";
 import { ensureAuth, requireAuth, verifyTenantAccess } from "../utils/auth";
 
@@ -26,98 +27,97 @@ const optionalNumberString = z.preprocess(
     const trimmed = value.trim();
     return trimmed === "" ? undefined : trimmed;
   },
-  z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid number").optional(),
-);
-
-const optionalIntegerString = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value === "number") return value.toString();
-    if (typeof value !== "string") return value;
-    const trimmed = value.trim();
-    return trimmed === "" ? undefined : trimmed;
-  },
-  z.string().regex(/^\d+$/, "Invalid stock quantity").optional(),
-);
-
-const optionalDateTimeString = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value !== "string") return value;
-    const trimmed = value.trim();
-    return trimmed === "" ? undefined : trimmed;
-  },
-  z.string().optional(),
-);
-
-const productSchema = z.object({
-  title: z.string().min(1).max(256),
-  description: z.string().optional(),
-  category: z.string().min(1, "Category is required"),
-  slug: z.preprocess((value) => {
-    if (typeof value === "string" && value.trim() === "") {
-      return undefined;
-    }
-    return value;
-  }, z.string().trim().max(128, "Slug must be less than 128 characters").optional()),
-  draft: z.boolean().optional().default(false),
-  isAuction: z.boolean().default(false),
-  variants: z.array(
-    z.object({
-      sku: z.string().optional(),
-      price: optionalNumberString,
-      currency: z.string().default("USD"),
-      isAuction: z.boolean().optional(),
-      stock: optionalIntegerString,
-      auctionStartBid: optionalNumberString,
-      auctionMinIncrement: optionalNumberString,
-      auctionBuyNow: optionalNumberString,
-      auctionStartsAt: optionalDateTimeString,
-      auctionEndsAt: optionalDateTimeString,
-    }),
-  ),
-  images: z
-    .array(
-      z
-        .object({
-          id: z.string().optional(),
-          url: z.string().optional(),
-          file: z.instanceof(File).optional(),
-          isPrimary: z.boolean().optional(),
-        })
-        .refine((data) => data.url || data.file, {
-          message: "Either url or file must be provided",
-        }),
-    )
+  z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Invalid number")
     .optional(),
-}).superRefine((data, ctx) => {
-  if (!data.isAuction) {
-    const missingPrice = data.variants.some(
-      (variant) => !variant.price || Number(variant.price) <= 0,
-    );
-    if (missingPrice) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["variants"],
-        message: "All variants must have a valid price greater than 0",
-      });
+);
+
+const optionalIntegerString = z.preprocess((value) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "number") return value.toString();
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}, z.string().regex(/^\d+$/, "Invalid stock quantity").optional());
+
+const optionalDateTimeString = z.preprocess((value) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}, z.string().optional());
+
+const productSchema = z
+  .object({
+    title: z.string().min(1).max(256),
+    description: z.string().optional(),
+    category: z.string().min(1, "Category is required"),
+    slug: z.preprocess((value) => {
+      if (typeof value === "string" && value.trim() === "") {
+        return undefined;
+      }
+      return value;
+    }, z.string().trim().max(128, "Slug must be less than 128 characters").optional()),
+    draft: z.boolean().optional().default(false),
+    isAuction: z.boolean().default(false),
+    variants: z.array(
+      z.object({
+        sku: z.string().optional(),
+        price: optionalNumberString,
+        currency: z.string().default("USD"),
+        isAuction: z.boolean().optional(),
+        stock: optionalIntegerString,
+        auctionStartBid: optionalNumberString,
+        auctionMinIncrement: optionalNumberString,
+        auctionBuyNow: optionalNumberString,
+        auctionStartsAt: optionalDateTimeString,
+        auctionEndsAt: optionalDateTimeString,
+      }),
+    ),
+    images: z
+      .array(
+        z
+          .object({
+            id: z.string().optional(),
+            url: z.string().optional(),
+            file: z.instanceof(File).optional(),
+            isPrimary: z.boolean().optional(),
+          })
+          .refine((data) => data.url || data.file, {
+            message: "Either url or file must be provided",
+          }),
+      )
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.isAuction) {
+      const missingPrice = data.variants.some(
+        (variant) => !variant.price || Number(variant.price) <= 0,
+      );
+      if (missingPrice) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["variants"],
+          message: "All variants must have a valid price greater than 0",
+        });
+      }
+    } else {
+      const hasValidAuction = data.variants.some(
+        (variant) =>
+          Boolean(variant.auctionStartBid) &&
+          Boolean(variant.auctionEndsAt) &&
+          new Date(variant.auctionEndsAt as string) > new Date(),
+      );
+      if (!hasValidAuction) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["variants"],
+          message: "Auction variants require a start bid and a future end time",
+        });
+      }
     }
-  } else {
-    const hasValidAuction = data.variants.some(
-      (variant) =>
-        Boolean(variant.auctionStartBid) &&
-        Boolean(variant.auctionEndsAt) &&
-        new Date(variant.auctionEndsAt as string) > new Date(),
-    );
-    if (!hasValidAuction) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["variants"],
-        message: "Auction variants require a start bid and a future end time",
-      });
-    }
-  }
-});
+  });
 
 type VariantInput = z.infer<typeof productSchema>["variants"][number];
 
@@ -149,11 +149,7 @@ function resolveVariantPrice(variant: VariantInput, isAuction: boolean) {
     return variant.price;
   }
   if (isAuction) {
-    return (
-      variant.auctionStartBid ||
-      variant.auctionBuyNow ||
-      "0"
-    );
+    return variant.auctionStartBid || variant.auctionBuyNow || "0";
   }
   return "0";
 }
@@ -179,31 +175,42 @@ const adminProductsQuerySchema = z.object({
   order: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
+async function isSellingEnabled(tenantId: string) {
+  const [tenant] = await db
+    .select({ canSell: tenants.canSell })
+    .from(tenants)
+    .where(eq(tenants.id, tenantId))
+    .limit(1);
+  return Boolean(tenant?.canSell);
+}
+
 export const adminProductsRoutes = new Elysia({
   prefix: "/admin/:shopSlug/products",
 })
   .use(authPlugin)
   .get("/", async ({ params, query, auth, request }) => {
     try {
-      // Ensure authentication (uses authPlugin or manual verification fallback)
-      const effectiveAuth = await ensureAuth(auth, request);
-      requireAuth(effectiveAuth);
-
       // Get tenant ID and verify user has access
       const { shopSlug } = params as { shopSlug: string };
       const tenantId = await getTenantIdBySlug(shopSlug);
-      if (!effectiveAuth?.userId) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
+      const superadmin = isSuperadminRequest(request);
+      if (!superadmin) {
+        // Ensure authentication (uses authPlugin or manual verification fallback)
+        const effectiveAuth = await ensureAuth(auth, request);
+        requireAuth(effectiveAuth);
+        if (!effectiveAuth?.userId) {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
 
-      if (!hasAccess) {
-        return Response.json(
-          { error: "Forbidden: You don't have access to this shop" },
-          {
-            status: 403,
-          },
-        );
+        if (!hasAccess) {
+          return Response.json(
+            { error: "Forbidden: You don't have access to this shop" },
+            {
+              status: 403,
+            },
+          );
+        }
       }
 
       const { status, search, sort, order } = adminProductsQuerySchema.parse(query);
@@ -323,8 +330,7 @@ export const adminProductsRoutes = new Elysia({
         const priceValues = productVariants
           .map((variant) => Number(variant.price))
           .filter((value) => Number.isFinite(value));
-        const priceMinValue =
-          priceValues.length > 0 ? Math.min(...priceValues) : null;
+        const priceMinValue = priceValues.length > 0 ? Math.min(...priceValues) : null;
         const currency =
           productVariants.find((variant) => Number(variant.price) === priceMinValue)?.currency ||
           productVariants[0]?.currency ||
@@ -443,28 +449,30 @@ export const adminProductsRoutes = new Elysia({
   })
   .get("/:productId", async ({ params, auth, request }) => {
     try {
-      // Ensure authentication
-      const effectiveAuth = await ensureAuth(auth, request);
-      requireAuth(effectiveAuth);
-
       // Get tenant ID and verify user has access
       const { shopSlug, productId } = params as {
         shopSlug: string;
         productId: string;
       };
       const tenantId = await getTenantIdBySlug(shopSlug);
-      if (!effectiveAuth?.userId) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
+      const superadmin = isSuperadminRequest(request);
+      if (!superadmin) {
+        // Ensure authentication
+        const effectiveAuth = await ensureAuth(auth, request);
+        requireAuth(effectiveAuth);
+        if (!effectiveAuth?.userId) {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
 
-      if (!hasAccess) {
-        return Response.json(
-          { error: "Forbidden: You don't have access to this shop" },
-          {
-            status: 403,
-          },
-        );
+        if (!hasAccess) {
+          return Response.json(
+            { error: "Forbidden: You don't have access to this shop" },
+            {
+              status: 403,
+            },
+          );
+        }
       }
 
       const [product] = await db
@@ -576,25 +584,36 @@ export const adminProductsRoutes = new Elysia({
   })
   .post("/", async ({ params, body, auth, request }) => {
     try {
-      // Ensure authentication
-      const effectiveAuth = await ensureAuth(auth, request);
-      requireAuth(effectiveAuth);
-
       // Get tenant ID and verify user has access
       const { shopSlug } = params as { shopSlug: string };
       const tenantId = await getTenantIdBySlug(shopSlug);
-      if (!effectiveAuth?.userId) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
+      const superadmin = isSuperadminRequest(request);
+      if (!superadmin) {
+        // Ensure authentication
+        const effectiveAuth = await ensureAuth(auth, request);
+        requireAuth(effectiveAuth);
+        if (!effectiveAuth?.userId) {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
 
-      if (!hasAccess) {
-        return Response.json(
-          { error: "Forbidden: You don't have access to this shop" },
-          {
-            status: 403,
-          },
-        );
+        if (!hasAccess) {
+          return Response.json(
+            { error: "Forbidden: You don't have access to this shop" },
+            {
+              status: 403,
+            },
+          );
+        }
+
+        if (!(await isSellingEnabled(tenantId))) {
+          return Response.json(
+            { error: "Selling is disabled for this shop" },
+            {
+              status: 403,
+            },
+          );
+        }
       }
       const validated = productSchema.parse(body);
       const storage = getStorage();
@@ -749,28 +768,39 @@ export const adminProductsRoutes = new Elysia({
   })
   .put("/:productId", async ({ params, body, auth, request }) => {
     try {
-      // Ensure authentication
-      const effectiveAuth = await ensureAuth(auth, request);
-      requireAuth(effectiveAuth);
-
       // Get tenant ID and verify user has access
       const { shopSlug, productId } = params as {
         shopSlug: string;
         productId: string;
       };
       const tenantId = await getTenantIdBySlug(shopSlug);
-      if (!effectiveAuth?.userId) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
+      const superadmin = isSuperadminRequest(request);
+      if (!superadmin) {
+        // Ensure authentication
+        const effectiveAuth = await ensureAuth(auth, request);
+        requireAuth(effectiveAuth);
+        if (!effectiveAuth?.userId) {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
 
-      if (!hasAccess) {
-        return Response.json(
-          { error: "Forbidden: You don't have access to this shop" },
-          {
-            status: 403,
-          },
-        );
+        if (!hasAccess) {
+          return Response.json(
+            { error: "Forbidden: You don't have access to this shop" },
+            {
+              status: 403,
+            },
+          );
+        }
+
+        if (!(await isSellingEnabled(tenantId))) {
+          return Response.json(
+            { error: "Selling is disabled for this shop" },
+            {
+              status: 403,
+            },
+          );
+        }
       }
       const validated = productSchema.parse(body);
       const storage = getStorage();
@@ -977,28 +1007,39 @@ export const adminProductsRoutes = new Elysia({
   })
   .delete("/:productId", async ({ params, auth, request }) => {
     try {
-      // Ensure authentication
-      const effectiveAuth = await ensureAuth(auth, request);
-      requireAuth(effectiveAuth);
-
       // Get tenant ID and verify user has access
       const { shopSlug, productId } = params as {
         shopSlug: string;
         productId: string;
       };
       const tenantId = await getTenantIdBySlug(shopSlug);
-      if (!effectiveAuth?.userId) {
-        return Response.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
+      const superadmin = isSuperadminRequest(request);
+      if (!superadmin) {
+        // Ensure authentication
+        const effectiveAuth = await ensureAuth(auth, request);
+        requireAuth(effectiveAuth);
+        if (!effectiveAuth?.userId) {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
 
-      if (!hasAccess) {
-        return Response.json(
-          { error: "Forbidden: You don't have access to this shop" },
-          {
-            status: 403,
-          },
-        );
+        if (!hasAccess) {
+          return Response.json(
+            { error: "Forbidden: You don't have access to this shop" },
+            {
+              status: 403,
+            },
+          );
+        }
+
+        if (!(await isSellingEnabled(tenantId))) {
+          return Response.json(
+            { error: "Selling is disabled for this shop" },
+            {
+              status: 403,
+            },
+          );
+        }
       }
 
       // Soft delete: set deletedAt timestamp instead of actually deleting

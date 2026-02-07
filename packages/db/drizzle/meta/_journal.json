@@ -78,6 +78,20 @@
       "when": 1769373268453,
       "tag": "0010_magenta_solo",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1770211670471,
+      "tag": "0011_tenant_selling",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1770227272291,
+      "tag": "0012_lovely_khan",
+      "breakpoints": true
     }
   ]
 }

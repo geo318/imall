@@ -61,6 +61,18 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Updated shared env test import to include explicit `.js` extension for NodeNext module resolution.
 - Server-side shop fetch now returns an empty list instead of throwing when the API is unreachable (avoids build failures without the API).
 - Server-side product fetchers now return empty results on connection failures to allow Next builds without the API running.
+- Added `next-intl` dependency to the web app; Clerk Elements sign-in/up now respect locale-prefixed paths and OAuth redirects.
+- Sell page is forced dynamic (`noStore`) and middleware now resolves auth for public routes so authenticated users aren’t mis-redirected.
+- Product explorer empty-state and result-count copy now comes from translations (en/ka/ru).
+- Replaced Next middleware usage with `apps/web/proxy.ts` for auth + locale handling; removed `apps/web/middleware.ts`.
+- Added `SUPERADMIN_*` env entries to `.env` and `.env.example`.
+- Fixed Drizzle meta snapshot chain: `0011_snapshot.json` now points to `0010` and has a unique snapshot id.
+- Switched server components/pages from `useTranslations` to `getTranslations` to avoid React/Next 16 streaming errors.
+- Dropped `next-intl` and moved to Next.js App Router i18n pattern: custom locale config, dictionary loader, and client/server translation helpers.
+- `apps/web/proxy.ts` now enforces locale prefixes, sets `NEXT_LOCALE` cookie, and injects `x-locale` header for server-side locale resolution.
+- Awaited async `cookies()`/`headers()` usage for Next 16 and updated superadmin admin pages to await superadmin cookie headers; client-only pages now import locale `Link` from `navigation.client`.
+- Simplified superadmin env to email/password only; removed session secret/API key and switched superadmin auth headers to use email/password.
+- Added `SUPERADMIN_EMAIL` and `SUPERADMIN_PASSWORD` to Render env vars and Docker web build placeholders.
 
 ## Known gaps / follow-ups
 

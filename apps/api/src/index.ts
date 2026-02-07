@@ -10,6 +10,7 @@ import { imageRoutes } from "./routes/images";
 import { inventoryRoutes } from "./routes/inventory";
 import { allProductsRoutes, productsRoutes } from "./routes/products";
 import { shopsRoutes } from "./routes/shops";
+import { superadminRoutes } from "./routes/superadmin";
 
 // Verify cartRoutes is loaded
 if (cartRoutes) {
@@ -20,7 +21,8 @@ if (cartRoutes) {
 
 const corsHeaders = (origin: string | null) => {
   const headers: Record<string, string> = {
-    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Access-Control-Allow-Headers":
+      "Content-Type, Authorization, X-Superadmin-Email, X-Superadmin-Password",
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
@@ -64,6 +66,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(adminProductsRoutes)
   .use(adminShopRoutes)
   .use(adminUploadRoutes)
+  .use(superadminRoutes)
   .onStart(() => {
     console.log("[API] Routes registered:");
     console.log("[API]   - /api/shops");

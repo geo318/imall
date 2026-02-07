@@ -22,6 +22,8 @@ ENV DOMAIN=https://placeholder.example.com
 ENV DATABASE_URL=postgresql://localhost:5432/placeholder
 ENV CLERK_SECRET_KEY=sk_build_placeholder
 ENV NEXT_PUBLIC_DOMAIN=https://placeholder.example.com
+ENV SUPERADMIN_EMAIL=build@example.com
+ENV SUPERADMIN_PASSWORD=build-placeholder
 RUN bun run build:web
 
 FROM oven/bun:1.3.0 AS runtime

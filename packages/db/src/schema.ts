@@ -24,6 +24,7 @@ export const tenants = pgTable("tenants", {
   id: uuid("id").defaultRandom().primaryKey(),
   shopSlug: varchar("shop_slug", { length: 128 }).notNull().unique(),
   name: varchar("name", { length: 256 }).notNull(),
+  canSell: boolean("can_sell").default(false).notNull(),
   settings: text("settings_json"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

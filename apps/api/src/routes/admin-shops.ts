@@ -17,10 +17,11 @@ import {
   tenants,
   variants,
 } from "@repo/db";
-import { and, eq, desc, inArray, sql, sum } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql, sum } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { adminGuard, getTenantIdBySlug } from "../context";
+import { adminOrSuperadminGuard, getTenantIdBySlug } from "../context";
+import { slugify } from "@repo/shared";
 
 const settingsSchema = z.object({
   name: z.string().min(1).optional(),
@@ -30,6 +31,43 @@ const settingsSchema = z.object({
   orderNotes: z.string().optional(),
   inventoryNotes: z.string().optional(),
 });
+
+function extractSlugSuffix(slug: string | null | undefined) {
+  if (!slug) return null;
+  const suffix = slug.split("-").at(-1);
+  if (!suffix) return null;
+  return /^[a-z0-9]{6,8}$/i.test(suffix) ? suffix : null;
+}
+
+async function slugTakenByOtherTenant(slug: string, tenantId: string) {
+  const [existing] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(and(eq(tenants.shopSlug, slug), ne(tenants.id, tenantId)))
+    .limit(1);
+  return Boolean(existing?.id);
+}
+
+async function generateShopSlug(name: string, tenantId: string, currentSlug?: string | null) {
+  const base = slugify(name) || "shop";
+  const preservedSuffix = extractSlugSuffix(currentSlug ?? undefined);
+  if (preservedSuffix) {
+    const candidate = `${base}-${preservedSuffix}`;
+    if (!(await slugTakenByOtherTenant(candidate, tenantId))) {
+      return candidate;
+    }
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const suffix = crypto.randomUUID().replace(/-/g, "").slice(0, 6);
+    const candidate = `${base}-${suffix}`;
+    if (!(await slugTakenByOtherTenant(candidate, tenantId))) {
+      return candidate;
+    }
+  }
+
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 10);
+}
 
 const orderStatusSchema = z.object({
   status: z.enum(["pending", "processing", "completed", "cancelled"]),
@@ -220,12 +258,17 @@ async function getOrCreateShopSettings(tenantId: string) {
 }
 
 export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
-  .use(adminGuard)
+  .use(adminOrSuperadminGuard)
   .get("/settings", async ({ params }) => {
     const { shopSlug } = params as { shopSlug: string };
     const tenantId = await getTenantIdBySlug(shopSlug);
     const [tenant] = await db
-      .select({ id: tenants.id, name: tenants.name, settings: tenants.settings })
+      .select({
+        id: tenants.id,
+        name: tenants.name,
+        settings: tenants.settings,
+        canSell: tenants.canSell,
+      })
       .from(tenants)
       .where(eq(tenants.id, tenantId))
       .limit(1);
@@ -239,6 +282,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       id: tenant.id,
       slug: shopSlug,
       name: tenant.name,
+      canSell: tenant.canSell,
       bankDetails: settings?.bankDetails ?? null,
       payoutAccount: settings?.payoutAccount ?? null,
       payoutNotes: settings?.payoutNotes ?? null,
@@ -255,9 +299,20 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
 
     await db.transaction(async (tx) => {
       if (payload.name) {
+        const [existingTenant] = await tx
+          .select({ name: tenants.name, slug: tenants.shopSlug })
+          .from(tenants)
+          .where(eq(tenants.id, tenantId))
+          .limit(1);
+
+        const needsSlugUpdate = existingTenant?.name !== payload.name;
+        const nextSlug = needsSlugUpdate
+          ? await generateShopSlug(payload.name, tenantId, existingTenant?.slug)
+          : existingTenant?.slug;
+
         await tx
           .update(tenants)
-          .set({ name: payload.name })
+          .set({ name: payload.name, shopSlug: nextSlug ?? existingTenant?.slug ?? "" })
           .where(eq(tenants.id, tenantId));
       }
 
@@ -289,6 +344,8 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
     const refreshed = await db
       .select({
         name: tenants.name,
+        slug: tenants.shopSlug,
+        canSell: tenants.canSell,
         bankDetails: shopSettings.bankDetails,
         payoutAccount: shopSettings.payoutAccount,
         payoutNotes: shopSettings.payoutNotes,
@@ -302,6 +359,8 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
 
     return {
       name: refreshed[0]?.name ?? "",
+      slug: refreshed[0]?.slug ?? shopSlug,
+      canSell: refreshed[0]?.canSell ?? false,
       bankDetails: refreshed[0]?.bankDetails ?? null,
       payoutAccount: refreshed[0]?.payoutAccount ?? null,
       payoutNotes: refreshed[0]?.payoutNotes ?? null,

@@ -47,7 +47,23 @@ export const productsRoutes = new Elysia({
 })
   .get("/", async ({ params, query, set }) => {
     try {
-      const tenantId = await getTenantIdBySlug(params.shopSlug);
+      const [tenant] = await db
+        .select({ id: tenants.id, canSell: tenants.canSell })
+        .from(tenants)
+        .where(eq(tenants.shopSlug, params.shopSlug))
+        .limit(1);
+
+      if (!tenant) {
+        set.status = 404;
+        return { error: "Shop not found" };
+      }
+
+      if (!tenant.canSell) {
+        set.status = 403;
+        return { error: "Shop not approved for selling" };
+      }
+
+      const tenantId = tenant.id;
       const { limit, offset, q, minPrice, maxPrice, sort } = shopProductsQuerySchema.parse(query);
 
       const qLike = q ? `%${q}%` : undefined;
@@ -187,14 +203,6 @@ export const productsRoutes = new Elysia({
         console.error("[Products Route] Error name:", err.name);
         console.error("[Products Route] Error message:", err.message);
         console.error("[Products Route] Error stack:", err.stack);
-        // Check if it's a tenant not found error
-        if (err.name === "TenantNotFound" || err.message.includes("Tenant not found")) {
-          set.status = 404;
-          return {
-            error: "Shop not found",
-            message: "The requested shop does not exist",
-          };
-        }
       }
       set.status = 500;
       return {
@@ -205,7 +213,23 @@ export const productsRoutes = new Elysia({
   })
   .get("/:productSlug", async ({ params, set }) => {
     try {
-      const tenantId = await getTenantIdBySlug(params.shopSlug);
+      const [tenant] = await db
+        .select({ id: tenants.id, canSell: tenants.canSell })
+        .from(tenants)
+        .where(eq(tenants.shopSlug, params.shopSlug))
+        .limit(1);
+
+      if (!tenant) {
+        set.status = 404;
+        return "Product not found";
+      }
+
+      if (!tenant.canSell) {
+        set.status = 403;
+        return "Shop not approved for selling";
+      }
+
+      const tenantId = tenant.id;
 
       // Fetch product and variants separately for proper typing - exclude soft-deleted products
       const [product] = await db
@@ -385,7 +409,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           })
           .from(products)
           .innerJoin(tenants, eq(products.tenantId, tenants.id))
-          .where(sql`${products.deletedAt} IS NULL`) // Exclude soft-deleted products
+          .where(and(sql`${products.deletedAt} IS NULL`, eq(tenants.canSell, true)))
           .orderBy(sql`random()`)
           .limit(limit);
         console.log("[All Products Route] Query succeeded, got", rows.length, "rows");
@@ -576,7 +600,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         .from(products)
         .innerJoin(tenants, eq(products.tenantId, tenants.id))
         .innerJoin(variants, eq(variants.productId, products.id))
-        .where(and(...whereClauses))
+        .where(and(...whereClauses, eq(tenants.canSell, true)))
         .groupBy(products.id, tenants.shopSlug, tenants.name);
 
       // HAVING for min/max price
@@ -722,6 +746,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           draft: products.draft,
           tenantSlug: tenants.shopSlug,
           tenantName: tenants.name,
+          canSell: tenants.canSell,
         })
         .from(products)
         .innerJoin(tenants, eq(products.tenantId, tenants.id))
@@ -738,6 +763,11 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
 
       // If product is deleted or draft and user is not owner, return 404
       if ((product.deletedAt || product.draft) && !isOwner) {
+        set.status = 404;
+        return "Product not found";
+      }
+
+      if (!isOwner && !product.canSell) {
         set.status = 404;
         return "Product not found";
       }

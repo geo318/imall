@@ -1,4 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
+import { env } from "@repo/shared";
+import { getSuperadminSession } from "@/lib/superadmin";
 import { resolveBackendBase } from "../_utils/backend";
 
 const API_BASE = resolveBackendBase();
@@ -53,7 +55,10 @@ interface BackendRequestOptions {
 
 export async function backendRequest(path: string, options: BackendRequestOptions = {}) {
   const token = options.token ?? (await resolveToken());
-  if (!token) {
+  const session = await getSuperadminSession();
+  const hasSuperadmin = Boolean(session);
+
+  if (!token && !hasSuperadmin) {
     throw new Error("Unauthorized: Authentication required");
   }
 
@@ -70,7 +75,13 @@ export async function backendRequest(path: string, options: BackendRequestOption
   }
 
   if (!headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+  }
+  if (hasSuperadmin && !headers.has("X-Superadmin-Email")) {
+    headers.set("X-Superadmin-Email", env.SUPERADMIN_EMAIL);
+    headers.set("X-Superadmin-Password", env.SUPERADMIN_PASSWORD);
   }
 
   const response = await fetch(`${API_BASE}${resolveApiPath(path)}`, {

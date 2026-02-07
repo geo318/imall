@@ -12,6 +12,8 @@ const serverSchema = {
   PAYMENT_WEBHOOK_SECRET: z.string().optional(),
   SEED_SHOP_SLUG: z.string().default("demo-shop"),
   SEED_SHOP_NAME: z.string().default("Demo Shop"),
+  SUPERADMIN_EMAIL: z.string().email(),
+  SUPERADMIN_PASSWORD: z.string().min(1),
   BACKEND_URL: z.preprocess(
     (value) => {
       if (typeof value === "string" && value.length > 0 && !/^https?:\/\//i.test(value)) {
@@ -45,6 +47,8 @@ const runtimeEnv: RuntimeEnv = {
   PAYMENT_WEBHOOK_SECRET: process.env.PAYMENT_WEBHOOK_SECRET,
   SEED_SHOP_SLUG: process.env.SEED_SHOP_SLUG,
   SEED_SHOP_NAME: process.env.SEED_SHOP_NAME,
+  SUPERADMIN_EMAIL: process.env.SUPERADMIN_EMAIL,
+  SUPERADMIN_PASSWORD: process.env.SUPERADMIN_PASSWORD,
   BACKEND_URL: process.env.BACKEND_URL,
   NEXT_PUBLIC_DOMAIN: process.env.NEXT_PUBLIC_DOMAIN,
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,

@@ -421,6 +421,7 @@ async function upsertTenant(shopSeed: ShopSeed) {
       id: crypto.randomUUID(),
       shopSlug: shopSeed.slug,
       name: shopSeed.name,
+      canSell: true,
     })
     .onConflictDoNothing()
     .returning({ id: tenants.id });

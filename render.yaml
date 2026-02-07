@@ -19,6 +19,10 @@ services:
         sync: false
       - key: BACKEND_URL
         sync: false
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
+        sync: false
 
   - type: web
     name: emakret-web
@@ -42,4 +46,8 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: DOMAIN
+        sync: false
+      - key: SUPERADMIN_EMAIL
+        sync: false
+      - key: SUPERADMIN_PASSWORD
         sync: false
