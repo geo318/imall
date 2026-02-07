@@ -1,26 +1,30 @@
+"use client";
+
 import { Instagram, ShoppingBag, Twitter, Youtube } from "lucide-react";
-import Link from "next/link";
 import { Suspense } from "react";
+import { Link } from "@/i18n/navigation.client";
+import { useTranslations } from "@/i18n/provider";
 import { Copyright } from "./copyright";
 
 export function Footer() {
+  const t = useTranslations();
   const footerLinks = {
     product: [
-      { label: "Products", href: "/products" },
-      { label: "Vendors", href: "/vendors" },
-      { label: "Auctions", href: "/products?type=auction" },
-      { label: "New arrivals", href: "/products?sort=newest" },
+      { label: t("footer.links.products"), href: "/products" },
+      { label: t("footer.links.vendors"), href: "/vendors" },
+      { label: t("footer.links.auctions"), href: "/products?type=auction" },
+      { label: t("footer.links.newArrivals"), href: "/products?sort=newest" },
     ],
     company: [
-      { label: "About", href: "/about" },
-      { label: "FAQ", href: "/faq" },
-      { label: "Contact", href: "/about" },
-      { label: "Careers", href: "/about" },
+      { label: t("footer.links.about"), href: "/about" },
+      { label: t("footer.links.faq"), href: "/faq" },
+      { label: t("footer.links.contact"), href: "/about" },
+      { label: t("footer.links.careers"), href: "/about" },
     ],
     legal: [
-      { label: "Privacy", href: "/faq" },
-      { label: "Terms", href: "/faq" },
-      { label: "Cookies", href: "/faq" },
+      { label: t("footer.links.privacy"), href: "/faq" },
+      { label: t("footer.links.terms"), href: "/faq" },
+      { label: t("footer.links.cookies"), href: "/faq" },
     ],
   } as const;
 
@@ -38,10 +42,7 @@ export function Footer() {
                 Market<span className="text-emerald-600">Hub</span>
               </span>
             </Link>
-            <p className="text-sm text-muted-foreground max-w-xs">
-              The trusted multi-vendor marketplace for unique products. Buy, sell, and auction with
-              confidence.
-            </p>
+            <p className="text-sm text-muted-foreground max-w-xs">{t("footer.tagline")}</p>
             <div className="flex gap-3">
               <Link
                 href="#"
@@ -69,7 +70,7 @@ export function Footer() {
 
           {/* Product Links */}
           <div>
-            <h4 className="font-semibold mb-4">Product</h4>
+            <h4 className="font-semibold mb-4">{t("footer.headings.product")}</h4>
             <ul className="space-y-2">
               {footerLinks.product.map((item) => (
                 <li key={item.label}>
@@ -86,7 +87,7 @@ export function Footer() {
 
           {/* Company Links */}
           <div>
-            <h4 className="font-semibold mb-4">Company</h4>
+            <h4 className="font-semibold mb-4">{t("footer.headings.company")}</h4>
             <ul className="space-y-2">
               {footerLinks.company.map((item) => (
                 <li key={item.label}>
@@ -103,7 +104,7 @@ export function Footer() {
 
           {/* Legal Links */}
           <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
+            <h4 className="font-semibold mb-4">{t("footer.headings.legal")}</h4>
             <ul className="space-y-2">
               {footerLinks.legal.map((item) => (
                 <li key={item.label}>
@@ -129,7 +130,7 @@ export function Footer() {
           >
             <Copyright />
           </Suspense>
-          <p className="text-sm text-muted-foreground">Made with care for vendors worldwide.</p>
+          <p className="text-sm text-muted-foreground">{t("footer.madeWithCare")}</p>
         </div>
       </div>
     </footer>

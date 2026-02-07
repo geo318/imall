@@ -1,18 +1,21 @@
 import Image from "next/image";
-import Link from "next/link";
+import { getTranslations } from "@/i18n/server";
+import { getCurrentLocale } from "@/i18n/navigation.server";
+import { Link } from "@/i18n/navigation.server";
 import { homeVendorsMock } from "@/MOCKS/homeVendors.mock";
 
-export function VendorSpotlight() {
+export async function VendorSpotlight() {
+  const t = await getTranslations(getCurrentLocale());
   return (
     <section className="py-14 sm:py-16 lg:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 text-center">
           <h2 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
-            Top <span className="text-gradient">Vendors</span>
+            {t.rich("vendorSpotlight.title", {
+              highlight: (chunks) => <span className="text-gradient">{chunks}</span>,
+            })}
           </h2>
-          <p className="mt-2 text-slate-600">
-            Meet the passionate creators behind our best products
-          </p>
+          <p className="mt-2 text-slate-600">{t("vendorSpotlight.subtitle")}</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -41,7 +44,9 @@ export function VendorSpotlight() {
               <p className="text-sm text-slate-600">{vendor.specialty}</p>
               <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                 <span>{vendor.rating} ★</span>
-                <span className="text-slate-500">{vendor.sales} sales</span>
+                <span className="text-slate-500">
+                  {t("vendorSpotlight.sales", { count: vendor.sales })}
+                </span>
               </div>
             </Link>
           ))}

@@ -5,7 +5,7 @@ import { Button } from "@repo/ui/button";
 import { Dropdown, DropdownItem } from "@repo/ui/dropdown";
 import { useQuery } from "@tanstack/react-query";
 import { Heart } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation.client";
 import LazyImage from "@/components/shared/lazy-image";
 import { getProductIdentifier } from "@/lib/api/products";
 

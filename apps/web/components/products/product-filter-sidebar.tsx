@@ -6,6 +6,7 @@ import { Label } from "@repo/ui/label";
 import { RangeSlider } from "@repo/ui/range-slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { useTranslations } from "@/i18n/provider";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { productCategoriesMock } from "@/MOCKS/productsPage.mock";
@@ -44,6 +45,7 @@ export function ProductFilterSidebar({
   showListingType = true,
   priceMax = 500,
 }: Props) {
+  const t = useTranslations();
   const [expandedSections, setExpandedSections] = useState({
     price: true,
     categories: true,
@@ -73,7 +75,7 @@ export function ProductFilterSidebar({
 
   // Map frontend sort keys to display labels
   const sortOptions = [
-    { value: "newest", label: "Newest First" },
+    { value: "newest", label: t("products.filtersNewest") },
     // { value: "oldest", label: "Oldest First" },
     // { value: "price-asc", label: "Price: Low to High" },
     // { value: "price-desc", label: "Price: High to Low" },
@@ -89,7 +91,7 @@ export function ProductFilterSidebar({
           className="w-full justify-start text-muted-foreground"
         >
           <X className="h-4 w-4 mr-2" />
-          Clear all filters
+          {t("products.filtersClear")}
         </Button>
       )}
 
@@ -100,7 +102,7 @@ export function ProductFilterSidebar({
           onClick={() => toggleSection("price")}
           className="flex items-center justify-between w-full text-sm font-semibold"
         >
-          Price Range
+          {t("products.filtersPrice")}
           {expandedSections.price ? (
             <ChevronUp className="h-4 w-4" />
           ) : (
@@ -134,7 +136,7 @@ export function ProductFilterSidebar({
             onClick={() => toggleSection("categories")}
             className="flex items-center justify-between w-full text-sm font-semibold"
           >
-            Categories
+          {t("products.filtersCategories")}
             {expandedSections.categories ? (
               <ChevronUp className="h-4 w-4" />
             ) : (
@@ -171,7 +173,7 @@ export function ProductFilterSidebar({
             onClick={() => toggleSection("listingType")}
             className="flex items-center justify-between w-full text-sm font-semibold"
           >
-            Listing Type
+          {t("products.filtersListingType")}
             {expandedSections.listingType ? (
               <ChevronUp className="h-4 w-4" />
             ) : (
@@ -187,7 +189,7 @@ export function ProductFilterSidebar({
                   onCheckedChange={() => onListingTypeChange("all")}
                 />
                 <Label htmlFor="type-all" className="text-sm font-normal cursor-pointer">
-                  All Listings
+                  {t("products.filtersAllListings")}
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
@@ -197,7 +199,7 @@ export function ProductFilterSidebar({
                   onCheckedChange={() => onListingTypeChange("buy-now")}
                 />
                 <Label htmlFor="type-buy-now" className="text-sm font-normal cursor-pointer">
-                  Buy Now
+                  {t("products.filtersBuyNow")}
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
@@ -207,7 +209,7 @@ export function ProductFilterSidebar({
                   onCheckedChange={() => onListingTypeChange("auction")}
                 />
                 <Label htmlFor="type-auction" className="text-sm font-normal cursor-pointer">
-                  Auctions
+                  {t("products.filtersAuctions")}
                 </Label>
               </div>
             </div>
@@ -222,7 +224,7 @@ export function ProductFilterSidebar({
           onClick={() => toggleSection("sorting")}
           className="flex items-center justify-between w-full text-sm font-semibold"
         >
-          Sort By
+          {t("products.filtersSortBy")}
           {expandedSections.sorting ? (
             <ChevronUp className="h-4 w-4" />
           ) : (
@@ -233,7 +235,7 @@ export function ProductFilterSidebar({
           <div className="pt-2">
             <Select value={sortBy} onValueChange={(value) => onSortByChange(value as SortKey)}>
               <SelectTrigger className="w-full text-left">
-                <SelectValue placeholder="Sort by..." />
+                <SelectValue placeholder={t("products.filtersSortPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {sortOptions.map((option) => (

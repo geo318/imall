@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname } from "@/i18n/navigation.client";
+import { locales } from "@/i18n/config";
 import { Suspense } from "react";
 import { Footer } from "@/components/footer/footer";
 import { HeaderClient } from "@/components/header-client";
@@ -11,7 +12,13 @@ import { HeaderClient } from "@/components/header-client";
  */
 export function LayoutWrapper({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
-  const isAuthPage = pathname?.startsWith("/sign-in") || pathname?.startsWith("/sign-up") || false;
+  const localePattern = new RegExp(`^/(${locales.join("|")})(?=/|$)`);
+  const normalizedPath = pathname ? pathname.replace(localePattern, "") : "";
+  const isAuthPage =
+    normalizedPath.startsWith("/sign-in") ||
+    normalizedPath.startsWith("/sign-up") ||
+    normalizedPath.startsWith("/superadmin") ||
+    false;
 
   if (isAuthPage) {
     return <>{children}</>;

@@ -2,7 +2,8 @@
 
 import { Badge } from "@repo/ui/badge";
 import { Gavel } from "lucide-react";
-import Link from "next/link";
+import { useTranslations } from "@/i18n/provider";
+import { Link } from "@/i18n/navigation.client";
 import LazyImage from "@/components/shared/lazy-image";
 import { AuctionTimer } from "./auction-timer";
 
@@ -33,6 +34,7 @@ export function ProductCard({
   href,
   tag,
 }: MarketingProduct) {
+  const t = useTranslations();
   return (
     <Link href={href ?? "/products"} className="group block" prefetch>
       <div className="card-hover relative overflow-hidden rounded-2xl bg-card border border-border/50">
@@ -48,13 +50,13 @@ export function ProductCard({
             />
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground">
-              No image
+              {t("productCard.noImage")}
             </div>
           )}
           {(isAuction || tag) && (
             <Badge className="absolute top-3 left-3 bg-amber-200 text-amber-950 gap-1 z-10">
               <Gavel className="h-3 w-3" />
-              {tag ?? "Auction"}
+              {tag ?? t("productCard.auction")}
             </Badge>
           )}
         </div>
@@ -67,18 +69,20 @@ export function ProductCard({
           {isAuction ? (
             <div className="space-y-1">
               <div className="flex items-baseline justify-between">
-                <span className="text-xs text-muted-foreground">Current bid</span>
+                <span className="text-xs text-muted-foreground">{t("productCard.currentBid")}</span>
                 <span className="font-bold text-emerald-700">
                   {currentBid !== undefined && currentBid !== null
                     ? `$${currentBid.toFixed(2)}`
-                    : "View"}
+                    : t("productCard.view")}
                 </span>
               </div>
               {endsAt && <AuctionTimer endsAt={endsAt} />}
             </div>
           ) : (
             <p className="font-bold text-lg">
-              {price !== undefined && price !== null ? `$${price.toFixed(2)}` : "View product"}
+              {price !== undefined && price !== null
+                ? `$${price.toFixed(2)}`
+                : t("productCard.viewProduct")}
               {currency ? (
                 <span className="ml-1 text-sm text-muted-foreground">{currency}</span>
               ) : null}

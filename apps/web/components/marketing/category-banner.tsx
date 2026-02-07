@@ -1,22 +1,25 @@
 import { Button } from "@repo/ui/button";
 import Image from "next/image";
-import Link from "next/link";
+import { getTranslations } from "@/i18n/server";
+import { getCurrentLocale } from "@/i18n/navigation.server";
+import { Link } from "@/i18n/navigation.server";
 import { homeCategoriesMock } from "@/MOCKS/homeCategories.mock";
 
-export function CategoryBanner() {
+export async function CategoryBanner() {
+  const t = await getTranslations(getCurrentLocale());
   return (
     <section className="bg-emerald-50/60 py-14">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 flex items-end justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
-              Browse by category
+              {t("categoryBanner.title")}
             </h2>
-            <p className="text-sm text-slate-600">Find exactly what you&apos;re looking for</p>
+            <p className="text-sm text-slate-600">{t("categoryBanner.subtitle")}</p>
           </div>
           <Button variant="ghost" className="hidden text-emerald-700 sm:inline-flex">
             <Link href="/products" prefetch>
-              View all
+              {t("categoryBanner.cta")}
             </Link>
           </Button>
         </div>

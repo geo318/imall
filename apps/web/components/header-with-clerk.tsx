@@ -1,7 +1,7 @@
 "use client";
 
 import { useClerk, useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation.client";
 import { Header } from "./header";
 
 export function HeaderWithClerk() {

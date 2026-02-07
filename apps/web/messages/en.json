@@ -1,0 +1,187 @@
+{
+  "nav": {
+    "products": "Products",
+    "faq": "FAQ",
+    "searchPlaceholder": "Search products…",
+    "admin": "Admin",
+    "createShop": "Create shop",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "startSelling": "Start selling"
+  },
+  "home": {
+    "hero": {
+      "badge": "Multi-vendor marketplace",
+      "title": "Shop from <highlight>Thousands</highlight> of Trusted Vendors",
+      "description": "Discover unique products, bid on exclusive auctions, and connect directly with sellers. Your next favorite find is just a click away.",
+      "ctaShop": "Start shopping",
+      "ctaVendor": "Become a vendor",
+      "stats": {
+        "products": "Products",
+        "vendors": "Vendors",
+        "buyers": "Happy buyers"
+      }
+    },
+    "why": {
+      "tag": "Why MarketHub",
+      "title": "Built for marketplaces that need trust, speed, and flexibility.",
+      "description": "Multi-tenant shops, auctions when you need them, and a shared admin space that keeps everything running smoothly."
+    },
+    "valueProps": [
+      {
+        "title": "Trusted vendors",
+        "body": "Curated sellers with verified profiles and clear fulfillment policies."
+      },
+      {
+        "title": "Auctions + cart",
+        "body": "Bid on exclusive drops or check out instantly with a standard cart."
+      },
+      {
+        "title": "Built for scale",
+        "body": "Multi-tenant routing, shared auth, and a unified admin workspace."
+      }
+    ],
+    "forVendors": {
+      "title": "For vendors",
+      "features": [
+        "List products or run auctions with minimal setup.",
+        "Manage inventory, payouts, and orders from one workspace.",
+        "Built-in buyer messaging and trust signals coming soon."
+      ],
+      "openAdmin": "Open admin"
+    }
+  },
+  "categoryBanner": {
+    "title": "Browse by category",
+    "subtitle": "Find exactly what you're looking for",
+    "cta": "View all"
+  },
+  "vendorSpotlight": {
+    "title": "Top <highlight>Vendors</highlight>",
+    "subtitle": "Meet the passionate creators behind our best products",
+    "sales": "{count} sales"
+  },
+  "footer": {
+    "tagline": "The trusted multi-vendor marketplace for unique products. Buy, sell, and auction with confidence.",
+    "headings": {
+      "product": "Product",
+      "company": "Company",
+      "legal": "Legal"
+    },
+    "links": {
+      "products": "Products",
+      "vendors": "Vendors",
+      "auctions": "Auctions",
+      "newArrivals": "New arrivals",
+      "about": "About",
+      "faq": "FAQ",
+      "contact": "Contact",
+      "careers": "Careers",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "cookies": "Cookies"
+    },
+    "madeWithCare": "Made with care for vendors worldwide."
+  },
+  "productCard": {
+    "noImage": "No image",
+    "auction": "Auction",
+    "currentBid": "Current bid",
+    "view": "View",
+    "viewProduct": "View product"
+  },
+  "about": {
+    "eyebrow": "About",
+    "title": "MarketHub is a modern multi-vendor stack.",
+    "description": "We're building a commerce base that supports auctions, standard carts, and vendor onboarding without heavy engineering lift. Use it as a demo today; extend it into a full marketplace tomorrow.",
+    "ctaDemo": "Explore the demo shop",
+    "ctaAdmin": "Open admin workspace",
+    "focus": {
+      "title": "What we're focusing on next",
+      "items": [
+        "Clerk roles for admins/staff and shopper identity mapping.",
+        "Payment provider interface (keepz.me live, credo/bog/tbc next).",
+        "Shipping integrations after manual flow stabilizes.",
+        "More UI polish via the shared @repo/ui kit."
+      ]
+    },
+    "pillars": [
+      {
+        "title": "Multi-tenant by default",
+        "body": "Spin up new shops with isolated catalog, orders, and branding in minutes."
+      },
+      {
+        "title": "Flexible catalog models",
+        "body": "Support fixed-price products alongside auction-driven listings."
+      },
+      {
+        "title": "Shared admin workspace",
+        "body": "Merchants manage operations from a single, unified dashboard."
+      }
+    ]
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Questions, answered.",
+    "lead": "A quick primer on how MarketHub works for buyers and vendors. Need more?",
+    "leadLink": "Read about the roadmap",
+    "entries": [
+      {
+        "q": "How do vendors join?",
+        "a": "Vendors apply with a shop name and wait for approval before selling goes live."
+      },
+      {
+        "q": "Can I mix auctions and standard listings?",
+        "a": "Yes. Each product can be set as auction or fixed-price depending on your strategy."
+      },
+      {
+        "q": "What does the shared admin cover?",
+        "a": "Inventory, orders, payouts, returns, and customer notes are all centralized."
+      },
+      {
+        "q": "Do buyers need accounts?",
+        "a": "Accounts are optional but recommended for favorites, faster checkout, and messaging."
+      }
+    ]
+  },
+  "vendors": {
+    "title": "Our Vendors",
+    "subtitle": "Discover trusted sellers from around the world"
+  },
+  "vendorsSearch": {
+    "searchPlaceholder": "Search vendors by name or specialty...",
+    "verifiedOnly": "Verified only",
+    "showing": "Showing {count, plural, =0 {0 vendors} one {# vendor} other {# vendors}}",
+    "noResultsTitle": "No vendors found",
+    "noResultsBody": "Try adjusting your search or filters",
+    "clearFilters": "Clear filters"
+  },
+  "products": {
+    "title": "Browse <highlight>Products</highlight>",
+    "subtitle": "Explore our curated collection from verified vendors.",
+    "searchPlaceholder": "Search products...",
+    "filters": "Filters",
+    "filtersClear": "Clear all filters",
+    "filtersPrice": "Price range",
+    "filtersCategories": "Categories",
+    "filtersListingType": "Listing type",
+    "filtersAllListings": "All listings",
+    "filtersBuyNow": "Buy now",
+    "filtersAuctions": "Auctions",
+    "filtersSortBy": "Sort by",
+    "filtersSortPlaceholder": "Sort by...",
+    "filtersNewest": "Newest first",
+    "showingCount": "Showing {count} products",
+    "emptyBody": "No products found matching your criteria."
+  },
+  "sell": {
+    "eyebrow": "Start selling",
+    "title": "Create your shop profile",
+    "description": "Tell us your shop name. We'll generate a unique shop URL and review your application before enabling sales.",
+    "nameLabel": "Shop name",
+    "namePlaceholder": "Your shop name",
+    "notice": "A unique shop URL will be assigned automatically. Selling will stay disabled until approved.",
+    "create": "Create shop",
+    "creating": "Creating shop..."
+  }
+}

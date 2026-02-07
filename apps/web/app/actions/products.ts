@@ -247,7 +247,6 @@ export async function searchProducts(params: ProductSearchParams): Promise<Produ
   cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
   cacheTag(CACHE_TAGS.PRODUCTS);
 
-  // Public endpoint - no auth token needed
   const response = await backendRequest("/products/search", {
     params: {
       limit: params.limit,

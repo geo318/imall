@@ -2,15 +2,16 @@
 
 import { Button } from "@repo/ui/button";
 import { motion } from "motion/react";
-import Link from "next/link";
-
-const stats = [
-  { label: "Products", value: "10K+" },
-  { label: "Vendors", value: "500+" },
-  { label: "Happy Buyers", value: "50K+" },
-];
+import { useTranslations } from "@/i18n/provider";
+import { Link } from "@/i18n/navigation.client";
 
 export function HeroSection() {
+  const t = useTranslations();
+  const stats = [
+    { label: t("home.hero.stats.products"), value: "10K+" },
+    { label: t("home.hero.stats.vendors"), value: "500+" },
+    { label: t("home.hero.stats.buyers"), value: "50K+" },
+  ];
   return (
     <section className="relative overflow-hidden bg-gradient-hero">
       <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 md:py-20 lg:px-8 lg:py-24">
@@ -27,7 +28,7 @@ export function HeroSection() {
             className="mb-6 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 shadow-sm shadow-emerald-100"
           >
             <span aria-hidden>✨</span>
-            <span>Multi-vendor marketplace</span>
+            <span>{t("home.hero.badge")}</span>
           </motion.div>
 
           <motion.h1
@@ -41,7 +42,9 @@ export function HeroSection() {
             }}
             className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl"
           >
-            Shop from <span className="text-gradient">Thousands</span> of Trusted Vendors
+            {t.rich("home.hero.title", {
+              highlight: (chunks) => <span className="text-gradient">{chunks}</span>,
+            })}
           </motion.h1>
 
           <motion.p
@@ -55,8 +58,7 @@ export function HeroSection() {
             }}
             className="mt-4 text-lg text-slate-600 sm:text-xl"
           >
-            Discover unique products, bid on exclusive auctions, and connect directly with sellers.
-            Your next favorite find is just a click away.
+            {t("home.hero.description")}
           </motion.p>
 
           <motion.div
@@ -80,7 +82,7 @@ export function HeroSection() {
                 className="bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700"
               >
                 <Link href="/products" prefetch>
-                  Start Shopping
+                  {t("home.hero.ctaShop")}
                 </Link>
               </Button>
             </motion.div>
@@ -95,7 +97,7 @@ export function HeroSection() {
                 className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
               >
                 <Link href="/vendors" prefetch>
-                  Become a Vendor
+                  {t("home.hero.ctaVendor")}
                 </Link>
               </Button>
             </motion.div>

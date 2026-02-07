@@ -1,39 +1,69 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { defaultLocale, locales, type Locale } from "@/i18n/config";
 import { isReservedRoute } from "@/lib/utils";
 
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/:slug",
-  "/favicon.ico",
-]);
+function stripLocale(pathname: string) {
+  const localePattern = new RegExp(`^/(${locales.join("|")})(?=/|$)`);
+  return pathname.replace(localePattern, "");
+}
+
+function getLocaleFromPath(pathname: string): Locale | null {
+  const segment = pathname.split("/").filter(Boolean)[0];
+  if (segment && locales.includes(segment as Locale)) {
+    return segment as Locale;
+  }
+  return null;
+}
 
 export default clerkMiddleware(async (auth, req) => {
   const pathname = req.nextUrl.pathname;
 
-  // Skip reserved route check for API routes (revalidate, etc.)
   if (pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
 
-  // Reserved routes should be handled by their specific routes, not the catchall [slug]
-  // Let them through to be handled by Next.js routing
-  const slug = pathname.split("/").find(Boolean);
-  if (slug && isReservedRoute(slug)) {
-    // Let Next.js handle reserved routes (like /cart, /checkout, etc.)
-    return NextResponse.next();
+  const detectedLocale = getLocaleFromPath(pathname);
+  if (!detectedLocale) {
+    const url = req.nextUrl.clone();
+    url.pathname = `/${defaultLocale}${pathname}`;
+    return NextResponse.redirect(url);
   }
 
-  if (isPublicRoute(req)) return NextResponse.next();
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-locale", detectedLocale);
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+  response.cookies.set("NEXT_LOCALE", detectedLocale, { path: "/" });
 
   const authResult = await auth();
+  const normalizedPath = stripLocale(pathname);
+
+  const slug = normalizedPath.split("/").find(Boolean);
+  if (slug && isReservedRoute(slug)) {
+    return response;
+  }
+
+  const segments = normalizedPath.split("/").filter(Boolean);
+  const isPublicRoute =
+    normalizedPath === "/" ||
+    normalizedPath.startsWith("/sign-in") ||
+    normalizedPath.startsWith("/sign-up") ||
+    normalizedPath.startsWith("/sell") ||
+    normalizedPath.startsWith("/superadmin") ||
+    normalizedPath === "/favicon.ico" ||
+    segments.length === 1;
+
+  if (isPublicRoute) return response;
+
   if (!authResult.userId) {
     return authResult.redirectToSignIn();
   }
 
-  return NextResponse.next();
+  return response;
 });
 
 export const config = {

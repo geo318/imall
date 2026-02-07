@@ -5,30 +5,35 @@ import { Dropdown, DropdownItem, DropdownSeparator } from "@repo/ui/dropdown";
 import { Input } from "@repo/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { LogOut, Menu, Search, Settings, ShoppingBag, User, X } from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { getCart } from "@/actions/carts";
 import { MarketHubLogo } from "@/assets";
+import { locales } from "@/i18n/config";
+import { Link, usePathname, useRouter, useSearchParams } from "@/i18n/navigation.client";
+import { useTranslations } from "@/i18n/provider";
 import type { CartItem } from "@/lib/api/cart";
 import { cn } from "@/lib/utils";
 import { HeaderFavorites } from "./header-favorites";
 
-const navLinks = [
-  { href: "/products", label: "Products" },
-  { href: "/faq", label: "FAQ" },
-];
-
 type HeaderProps = {
   isSignedIn?: boolean;
   signOut?: () => void | Promise<void>;
+  primaryShopSlug?: string | null;
 };
 
-export function Header({ isSignedIn = false, signOut }: HeaderProps) {
+export function Header({ isSignedIn = false, signOut, primaryShopSlug }: HeaderProps) {
+  const t = useTranslations();
+  const navLinks = [
+    { href: "/products", label: t("nav.products") },
+    { href: "/faq", label: t("nav.faq") },
+  ];
   const pathname = usePathname();
+  const localePattern = new RegExp(`^/(${locales.join("|")})(?=/|$)`);
+  const normalizedPath = pathname.replace(localePattern, "");
   const router = useRouter();
   const searchParams = useSearchParams();
   const qParam = searchParams.get("search") ?? searchParams.get("q") ?? "";
+  const adminHref = primaryShopSlug ? `/admin/${primaryShopSlug}` : "/sell";
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [q, setQ] = useState(qParam);
@@ -73,7 +78,7 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
             <MarketHubLogo width={18} height={18} className="text-white" />
           </div>
           <span className="text-xl font-bold tracking-tight hidden sm:inline">
-            Market<span className="text-emerald-600">Hub</span>
+            <span className="text-emerald-600 font-extrabold tracking-wide text-xl">i</span>Mall
           </span>
         </Link>
 
@@ -85,7 +90,7 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
               href={link.href}
               className={cn(
                 "px-4 py-2 text-sm font-medium rounded-full transition-colors",
-                pathname === link.href
+                normalizedPath === link.href
                   ? "bg-slate-100 text-slate-900"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-50",
               )}
@@ -110,7 +115,7 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search products…"
+                placeholder={t("nav.searchPlaceholder")}
                 className="h-9 pl-10 pr-4 w-full bg-white border-slate-200 rounded-lg"
               />
               {q && (
@@ -150,9 +155,9 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
             >
               <div className="py-1">
                 <DropdownItem asChild>
-                  <Link href="/admin/demo-shop" className="flex items-center gap-2">
+                  <Link href={adminHref} className="flex items-center gap-2">
                     <Settings className="h-4 w-4" />
-                    Admin
+                    {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
                   </Link>
                 </DropdownItem>
                 <DropdownSeparator />
@@ -163,7 +168,7 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
                   className="text-red-600 hover:bg-red-50"
                 >
                   <LogOut className="h-4 w-4" />
-                  Sign Out
+                  {t("nav.signOut")}
                 </DropdownItem>
               </div>
             </Dropdown>
@@ -178,8 +183,8 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
             size="sm"
             className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 rounded-lg"
           >
-            <Link href="/sign-in" prefetch>
-              Start Selling
+            <Link href="/sell" prefetch>
+              {t("nav.startSelling")}
             </Link>
           </Button>
         </div>
@@ -199,7 +204,7 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
               <Input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search products…"
+                placeholder={t("nav.searchPlaceholder")}
                 className="h-9 pl-10 pr-4 w-full"
               />
               {q && (
@@ -251,10 +256,10 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
             <div className="pt-4 border-t border-border flex flex-col space-y-2">
               {isSignedIn ? (
                 <>
-                  <Link href="/admin/demo-shop" className="w-full">
+                  <Link href={adminHref} className="w-full">
                     <Button variant="outline" className="w-full">
                       <Settings className="h-4 w-4 mr-2" />
-                      Admin
+                      {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
                     </Button>
                   </Link>
                   <Button
@@ -265,13 +270,13 @@ export function Header({ isSignedIn = false, signOut }: HeaderProps) {
                     }}
                   >
                     <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
+                    {t("nav.signOut")}
                   </Button>
                 </>
               ) : (
                 <Link href="/sign-in" className="w-full">
                   <Button className="w-full bg-emerald-600 text-white hover:bg-emerald-700">
-                    Sign In
+                    {t("nav.signIn")}
                   </Button>
                 </Link>
               )}

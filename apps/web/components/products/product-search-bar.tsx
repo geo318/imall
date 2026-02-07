@@ -2,7 +2,7 @@
 
 import { Input } from "@repo/ui/input";
 import { Search, X } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "@/i18n/navigation.client";
 import { useEffect, useState } from "react";
 
 type Props = {
