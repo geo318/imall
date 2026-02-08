@@ -5,7 +5,7 @@ import {
   authPlugin,
   bidPayloadSchema,
   getAvailableStock,
-  getTenantIdBySlug,
+  getTenantBySlug,
   INVENTORY_REASONS,
   listQuerySchema,
   type WsContext,
@@ -58,7 +58,12 @@ export const auctionsRoutes = new Elysia({
   .get("/", async ({ params, query, set }) => {
     try {
       const { shopSlug } = params as { shopSlug: string };
-      const tenantId = await getTenantIdBySlug(shopSlug);
+      const tenant = await getTenantBySlug(shopSlug);
+      if (!tenant.canAuction) {
+        set.status = 403;
+        return "Auctions are disabled for this shop";
+      }
+      const tenantId = tenant.id;
       const { limit } = listQuerySchema.parse(query);
       const result = await db
         .select({
@@ -82,8 +87,13 @@ export const auctionsRoutes = new Elysia({
     }
   })
   .get("/:auctionId", async ({ params, set }) => {
-    const { auctionId } = params as { shopSlug: string; auctionId: string };
+    const { shopSlug, auctionId } = params as { shopSlug: string; auctionId: string };
     try {
+      const tenant = await getTenantBySlug(shopSlug);
+      if (!tenant.canAuction) {
+        set.status = 403;
+        return "Auctions are disabled for this shop";
+      }
       const result = await db
         .select({
           id: auctions.id,
@@ -109,7 +119,11 @@ export const auctionsRoutes = new Elysia({
     }
   })
   .get("/:auctionId/bids", async ({ params }) => {
-    const { auctionId } = params as { shopSlug: string; auctionId: string };
+    const { shopSlug, auctionId } = params as { shopSlug: string; auctionId: string };
+    const tenant = await getTenantBySlug(shopSlug);
+    if (!tenant.canAuction) {
+      throw new Response("Auctions are disabled for this shop", { status: 403 });
+    }
     const results = await db
       .select({
         id: bids.id,
@@ -126,6 +140,10 @@ export const auctionsRoutes = new Elysia({
       shopSlug: string;
       auctionId: string;
     };
+    const tenant = await getTenantBySlug(shopSlug);
+    if (!tenant.canAuction) {
+      return new Response("Auctions are disabled for this shop", { status: 403 });
+    }
 
     // Validate payload
     let payload: ReturnType<typeof bidPayloadSchema.parse>;
@@ -172,7 +190,7 @@ export const auctionsRoutes = new Elysia({
     // Get or create user from Clerk userId (externalAuthId)
     const externalAuthId = effectiveAuth.userId;
 
-    const tenantId = await getTenantIdBySlug(shopSlug);
+    const tenantId = tenant.id;
 
     try {
       const {
@@ -348,7 +366,11 @@ export const auctionsRoutes = new Elysia({
       shopSlug: string;
       auctionId: string;
     };
-    const tenantId = await getTenantIdBySlug(shopSlug);
+    const tenant = await getTenantBySlug(shopSlug);
+    if (!tenant.canAuction) {
+      throw new Response("Auctions are disabled for this shop", { status: 403 });
+    }
+    const tenantId = tenant.id;
     try {
       const order = await db.transaction(async (tx) => {
         const [auction] = await tx

@@ -172,6 +172,24 @@ export async function getTenantIdBySlug(slug: string): Promise<string> {
   return tenant.id;
 }
 
+export async function getTenantBySlug(slug: string): Promise<{
+  id: string;
+  canSell: boolean;
+  canAuction: boolean;
+}> {
+  const [tenant] = await db
+    .select({ id: tenants.id, canSell: tenants.canSell, canAuction: tenants.canAuction })
+    .from(tenants)
+    .where(eq(tenants.shopSlug, slug))
+    .limit(1);
+  if (!tenant) {
+    const error = new Error("Tenant not found");
+    error.name = "TenantNotFound";
+    throw error;
+  }
+  return tenant;
+}
+
 export async function getAvailableStock(tenantId: string, variantId: string) {
   const [row] = await db
     .select({ onHand: sum(inventoryLedger.delta) })

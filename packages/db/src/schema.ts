@@ -25,9 +25,45 @@ export const tenants = pgTable("tenants", {
   shopSlug: varchar("shop_slug", { length: 128 }).notNull().unique(),
   name: varchar("name", { length: 256 }).notNull(),
   canSell: boolean("can_sell").default(false).notNull(),
+  canAuction: boolean("can_auction").default(false).notNull(),
   settings: text("settings_json"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Categories are global across tenants and support a multi-level tree.
+export const categories = pgTable(
+  "categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slug: varchar("slug", { length: 160 }).notNull().unique(),
+    name: varchar("name", { length: 256 }).notNull(),
+    description: text("description"),
+    isActive: boolean("is_active").default(true).notNull(),
+    deletedAt: timestamp("deleted_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    slugIdx: uniqueIndex("categories_slug_unique").on(table.slug),
+  }),
+);
+
+// Category relations express parent-child links (many-to-many, depth via traversal).
+export const categoryRelations = pgTable(
+  "category_relations",
+  {
+    parentId: uuid("parent_id")
+      .references(() => categories.id)
+      .notNull(),
+    childId: uuid("child_id")
+      .references(() => categories.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.parentId, table.childId] }),
+  }),
+);
 
 export const shopSettings = pgTable(
   "shop_settings",

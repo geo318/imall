@@ -73,6 +73,8 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Awaited async `cookies()`/`headers()` usage for Next 16 and updated superadmin admin pages to await superadmin cookie headers; client-only pages now import locale `Link` from `navigation.client`.
 - Simplified superadmin env to email/password only; removed session secret/API key and switched superadmin auth headers to use email/password.
 - Added `SUPERADMIN_EMAIL` and `SUPERADMIN_PASSWORD` to Render env vars and Docker web build placeholders.
+- Added header/footer language switcher that rewrites the locale prefix while preserving path and query.
+- Added global category tree schema (categories + relations), seed data, and superadmin UI/actions to manage categories; added per-shop auction toggle (`canAuction`) in superadmin.
 
 ## Known gaps / follow-ups
 

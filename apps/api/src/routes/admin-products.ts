@@ -175,13 +175,16 @@ const adminProductsQuerySchema = z.object({
   order: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
-async function isSellingEnabled(tenantId: string) {
+async function getTenantCapabilities(tenantId: string) {
   const [tenant] = await db
-    .select({ canSell: tenants.canSell })
+    .select({ canSell: tenants.canSell, canAuction: tenants.canAuction })
     .from(tenants)
     .where(eq(tenants.id, tenantId))
     .limit(1);
-  return Boolean(tenant?.canSell);
+  return {
+    canSell: Boolean(tenant?.canSell),
+    canAuction: Boolean(tenant?.canAuction),
+  };
 }
 
 export const adminProductsRoutes = new Elysia({
@@ -606,16 +609,26 @@ export const adminProductsRoutes = new Elysia({
           );
         }
 
-        if (!(await isSellingEnabled(tenantId))) {
-          return Response.json(
-            { error: "Selling is disabled for this shop" },
-            {
-              status: 403,
-            },
-          );
-        }
       }
+      const capabilities = await getTenantCapabilities(tenantId);
+      if (!capabilities.canSell) {
+        return Response.json(
+          { error: "Selling is disabled for this shop" },
+          {
+            status: 403,
+          },
+        );
+      }
+
       const validated = productSchema.parse(body);
+      if (validated.isAuction && !capabilities.canAuction) {
+        return Response.json(
+          { error: "Auctions are disabled for this shop" },
+          {
+            status: 403,
+          },
+        );
+      }
       const storage = getStorage();
 
       const slug = determineSlug({
@@ -793,16 +806,26 @@ export const adminProductsRoutes = new Elysia({
           );
         }
 
-        if (!(await isSellingEnabled(tenantId))) {
-          return Response.json(
-            { error: "Selling is disabled for this shop" },
-            {
-              status: 403,
-            },
-          );
-        }
       }
+      const capabilities = await getTenantCapabilities(tenantId);
+      if (!capabilities.canSell) {
+        return Response.json(
+          { error: "Selling is disabled for this shop" },
+          {
+            status: 403,
+          },
+        );
+      }
+
       const validated = productSchema.parse(body);
+      if (validated.isAuction && !capabilities.canAuction) {
+        return Response.json(
+          { error: "Auctions are disabled for this shop" },
+          {
+            status: 403,
+          },
+        );
+      }
       const storage = getStorage();
 
       return await db.transaction(async (tx) => {
@@ -1032,14 +1055,15 @@ export const adminProductsRoutes = new Elysia({
           );
         }
 
-        if (!(await isSellingEnabled(tenantId))) {
-          return Response.json(
-            { error: "Selling is disabled for this shop" },
-            {
-              status: 403,
-            },
-          );
-        }
+      }
+      const capabilities = await getTenantCapabilities(tenantId);
+      if (!capabilities.canSell) {
+        return Response.json(
+          { error: "Selling is disabled for this shop" },
+          {
+            status: 403,
+          },
+        );
       }
 
       // Soft delete: set deletedAt timestamp instead of actually deleting
