@@ -6,7 +6,8 @@ import { Link } from "@/i18n/navigation.server";
 import { homeCategoriesMock } from "@/MOCKS/homeCategories.mock";
 
 export async function CategoryBanner() {
-  const t = await getTranslations(getCurrentLocale());
+  const locale = await getCurrentLocale();
+  const t = await getTranslations(locale);
   return (
     <section className="bg-emerald-50/60 py-14">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">

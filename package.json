@@ -18,7 +18,7 @@
     "dev": "turbo run dev",
     "dev:web": "turbo run dev --filter=web",
     "dev:api": "turbo run dev --filter=api",
-    "dev:all": "turbo run dev --filter=api --filter=web --parallel",
+    "dev:all": "turbo run build --filter=@repo/db && turbo run dev --filter=api --filter=web --parallel",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:push": "drizzle-kit push --config drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config drizzle.config.ts",

@@ -5,7 +5,8 @@ import { Link } from "@/i18n/navigation.server";
 import { homeVendorsMock } from "@/MOCKS/homeVendors.mock";
 
 export async function VendorSpotlight() {
-  const t = await getTranslations(getCurrentLocale());
+  const locale = await getCurrentLocale();
+  const t = await getTranslations(locale);
   return (
     <section className="py-14 sm:py-16 lg:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">

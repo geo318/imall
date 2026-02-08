@@ -1,7 +1,9 @@
+"use client";
+
 import { Badge } from "@repo/ui/badge";
 import { CheckCircle, Star } from "lucide-react";
 import Image from "next/image";
-import { Link } from "@/i18n/navigation.server";
+import { Link } from "@/i18n/navigation.client";
 import type { Shop } from "@/lib/server/shops";
 
 type Props = {

@@ -53,11 +53,13 @@ export async function ensureAuth(
  * @returns AuthContext with userId (never null)
  * @throws Response with 401 status if not authenticated
  */
-export function requireAuth(auth: AuthContext | null): AuthContext {
+export type AuthenticatedContext = AuthContext & { userId: string };
+
+export function requireAuth(auth: AuthContext | null): AuthenticatedContext {
   if (!auth?.userId) {
     throw new Response("Unauthorized", { status: 401 });
   }
-  return auth;
+  return auth as AuthenticatedContext;
 }
 
 /**
