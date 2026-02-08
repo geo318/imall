@@ -23,6 +23,8 @@ services:
         sync: false
       - key: SUPERADMIN_PASSWORD
         sync: false
+      - key: SEED_CATEGORIES
+        sync: false
 
   - type: web
     name: emakret-web

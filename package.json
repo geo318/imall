@@ -26,6 +26,7 @@
     "db:studio:docker": "docker compose up --build -d db && bun run db:push && bun run db:studio",
     "dev:with-db": "docker compose up --build -d db && bun run db:push && bun run dev:all",
     "seed:with-db": "docker compose up --build -d db && bun run db:push && bun run seed",
+    "seed:categories": "bun scripts/seed-categories.ts",
     "lint": "turbo run lint",
     "lint:biome": "biome check .",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",

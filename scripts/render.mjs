@@ -22,12 +22,20 @@ const shouldRunMigrations = () => {
   return flag === "1" || flag === "true" || flag === "yes";
 };
 
+const shouldSeedCategories = () => {
+  const flag = (process.env.SEED_CATEGORIES || "").toLowerCase();
+  return flag === "1" || flag === "true" || flag === "yes";
+};
+
 const bunRun = (script) => ["bun", "run", script];
 
 if (task === "build") {
   if (isApi && !isWeb) {
     run(bunRun("build:packages"));
     run(bunRun("build:api"));
+    if (shouldSeedCategories()) {
+      run(bunRun("seed:categories"));
+    }
   } else if (isWeb && !isApi) {
     run(bunRun("build:packages"));
     run(bunRun("build:web"));
