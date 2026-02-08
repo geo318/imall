@@ -1,5 +1,5 @@
 import { categoryRelations, categories, db, tenants } from "@repo/db";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { slugify } from "@repo/shared";
@@ -29,6 +29,28 @@ const categoryUpdateSchema = z.object({
   isActive: z.boolean().optional(),
   parentId: z.string().uuid().nullable().optional(),
 });
+
+async function attachHasChildren(
+  list: Array<{
+    id: string;
+    slug: string;
+    name: string;
+    description: string | null;
+    isActive: boolean;
+    deletedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>,
+) {
+  if (list.length === 0) return [];
+  const ids = list.map((item) => item.id);
+  const childRows = await db
+    .select({ parentId: categoryRelations.parentId })
+    .from(categoryRelations)
+    .where(inArray(categoryRelations.parentId, ids));
+  const parentSet = new Set(childRows.map((row) => row.parentId));
+  return list.map((item) => ({ ...item, hasChildren: parentSet.has(item.id) }));
+}
 
 export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
   .use(superadminGuard)
@@ -107,6 +129,70 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       .from(categoryRelations);
 
     return { categories: list, relations };
+  })
+  .get("/categories/roots", async () => {
+    const childIds = db.select({ childId: categoryRelations.childId }).from(categoryRelations);
+    const roots = await db
+      .select({
+        id: categories.id,
+        slug: categories.slug,
+        name: categories.name,
+        description: categories.description,
+        isActive: categories.isActive,
+        deletedAt: categories.deletedAt,
+        createdAt: categories.createdAt,
+        updatedAt: categories.updatedAt,
+      })
+      .from(categories)
+      .where(and(isNull(categories.deletedAt), notInArray(categories.id, childIds)));
+
+    const withChildren = await attachHasChildren(roots);
+    return withChildren.map((category) => ({ ...category, parentId: null }));
+  })
+  .get("/categories/:categoryId/children", async ({ params }) => {
+    const { categoryId } = params as { categoryId: string };
+    if (!categoryId || categoryId === "undefined") {
+      return new Response("Missing category id", { status: 400 });
+    }
+    let parentId = categoryId;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(categoryId)) {
+      const [parent] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(eq(categories.slug, categoryId))
+        .limit(1);
+      if (!parent) {
+        return new Response("Category not found", { status: 404 });
+      }
+      parentId = parent.id;
+    }
+    const children = await db
+      .select({
+        id: categories.id,
+        slug: categories.slug,
+        name: categories.name,
+        description: categories.description,
+        isActive: categories.isActive,
+        deletedAt: categories.deletedAt,
+        createdAt: categories.createdAt,
+        updatedAt: categories.updatedAt,
+      })
+      .from(categories)
+      .innerJoin(categoryRelations, eq(categoryRelations.childId, categories.id))
+      .where(and(eq(categoryRelations.parentId, parentId), isNull(categories.deletedAt)));
+
+    const withChildren = await attachHasChildren(children);
+    return withChildren.map((category) => ({ ...category, parentId }));
+  })
+  .get("/categories/list", async () => {
+    return db
+      .select({
+        id: categories.id,
+        name: categories.name,
+      })
+      .from(categories)
+      .where(isNull(categories.deletedAt))
+      .orderBy(desc(categories.createdAt));
   })
   .post("/categories", async ({ body }) => {
     const payload = categoryCreateSchema.parse(body);

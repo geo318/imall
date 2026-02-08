@@ -160,12 +160,28 @@ export type SuperadminCategoryRelation = {
   childId: string;
 };
 
+export type SuperadminCategoryNode = SuperadminCategory & {
+  parentId: string | null;
+  hasChildren: boolean;
+};
+
 export async function listSuperadminCategories(): Promise<{
   categories: SuperadminCategory[];
   relations: SuperadminCategoryRelation[];
 }> {
   const response = await superadminRequest("/superadmin/categories");
   if (!response.ok) {
+    throw new Error("Failed to load categories");
+  }
+  return response.json();
+}
+
+export async function listSuperadminCategoryRoots(): Promise<SuperadminCategoryNode[]> {
+  const response = await superadminRequest("/superadmin/categories/roots");
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Unauthorized");
+    }
     throw new Error("Failed to load categories");
   }
   return response.json();

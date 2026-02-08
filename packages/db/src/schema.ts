@@ -43,9 +43,7 @@ export const categories = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => ({
-    slugIdx: uniqueIndex("categories_slug_unique").on(table.slug),
-  }),
+  (table) => ({})
 );
 
 // Category relations express parent-child links (many-to-many, depth via traversal).

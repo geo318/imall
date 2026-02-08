@@ -11,7 +11,16 @@ CREATE TABLE IF NOT EXISTS "categories" (
   "updated_at" timestamp DEFAULT now() NOT NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS "categories_slug_unique" ON "categories" ("slug");
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'categories_slug_unique'
+  ) THEN
+    ALTER TABLE "categories"
+      ADD CONSTRAINT "categories_slug_unique" UNIQUE ("slug");
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "category_relations" (
   "parent_id" uuid NOT NULL,
