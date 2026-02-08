@@ -75,6 +75,8 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Added `SUPERADMIN_EMAIL` and `SUPERADMIN_PASSWORD` to Render env vars and Docker web build placeholders.
 - Added header/footer language switcher that rewrites the locale prefix while preserving path and query.
 - Added global category tree schema (categories + relations), seed data, and superadmin UI/actions to manage categories; added per-shop auction toggle (`canAuction`) in superadmin.
+- `dev:all` now rebuilds `@repo/db` first to keep generated exports in sync during local dev.
+- Superadmin category tree now loads roots first and fetches child categories on expand via API routes.
 
 ## Known gaps / follow-ups
 
