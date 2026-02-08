@@ -14,6 +14,7 @@ import { useTranslations } from "@/i18n/provider";
 import type { CartItem } from "@/lib/api/cart";
 import { cn } from "@/lib/utils";
 import { HeaderFavorites } from "./header-favorites";
+import { LanguageSwitcher } from "./language-switcher";
 
 type HeaderProps = {
   isSignedIn?: boolean;
@@ -133,6 +134,7 @@ export function Header({ isSignedIn = false, signOut, primaryShopSlug }: HeaderP
 
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-2 flex-shrink-0 ml-auto">
+          <LanguageSwitcher />
           <HeaderFavorites />
           <Button variant="ghost" size="sm" className="rounded-full relative">
             <Link href="/cart">
@@ -219,6 +221,7 @@ export function Header({ isSignedIn = false, signOut, primaryShopSlug }: HeaderP
             </div>
           </form>
           <HeaderFavorites />
+          <LanguageSwitcher className="ml-1" />
           <Button variant="ghost" size="sm" className="rounded-full relative">
             <Link href="/cart">
               <ShoppingBag className="h-5 w-5" />

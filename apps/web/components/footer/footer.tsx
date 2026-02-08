@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { Link } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import { Copyright } from "./copyright";
+import { LanguageSwitcher } from "../language-switcher";
 
 export function Footer() {
   const t = useTranslations();
@@ -130,6 +131,7 @@ export function Footer() {
           >
             <Copyright />
           </Suspense>
+          <LanguageSwitcher />
           <p className="text-sm text-muted-foreground">{t("footer.madeWithCare")}</p>
         </div>
       </div>
