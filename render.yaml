@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: emakret-api
+    name: imall-api
     env: docker
     region: frankfurt
     dockerfilePath: ./Dockerfile.api
@@ -28,7 +28,7 @@ services:
         sync: false
 
   - type: web
-    name: emakret-web
+    name: imall
     env: docker
     region: frankfurt
     dockerfilePath: ./Dockerfile.web
