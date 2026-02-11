@@ -2,6 +2,7 @@ services:
   - type: web
     name: emakret-api
     env: docker
+    region: frankfurt
     dockerfilePath: ./Dockerfile.api
     autoDeploy: true
     envVars:
@@ -29,6 +30,7 @@ services:
   - type: web
     name: emakret-web
     env: docker
+    region: frankfurt
     dockerfilePath: ./Dockerfile.web
     autoDeploy: true
     envVars:
