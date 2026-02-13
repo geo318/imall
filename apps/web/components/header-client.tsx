@@ -6,7 +6,7 @@ import { useRouter } from "@/i18n/navigation.client";
 import { Header } from "./header";
 
 export function HeaderClient() {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser();
   const { signOut } = useClerk();
   const router = useRouter();
 
@@ -25,6 +25,12 @@ export function HeaderClient() {
   });
 
   const primaryShopSlug = Array.isArray(shops) ? shops[0]?.slug : undefined;
+  const userDisplayName =
+    user?.username ??
+    user?.firstName ??
+    user?.fullName ??
+    user?.primaryEmailAddress?.emailAddress?.split("@")[0] ??
+    null;
 
   const handleSignOut = async () => {
     await signOut();
@@ -36,6 +42,7 @@ export function HeaderClient() {
       isSignedIn={isSignedIn}
       signOut={handleSignOut}
       primaryShopSlug={primaryShopSlug ?? null}
+      userDisplayName={userDisplayName}
     />
   );
 }

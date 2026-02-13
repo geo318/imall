@@ -10,6 +10,7 @@ import { useClerkReady } from "@/app/_components/clerk-provider-slot-client";
 import { defaultLocale } from "@/i18n/config";
 import { Link } from "@/i18n/navigation.client";
 import { useLocale } from "@/i18n/provider";
+import { FacebookIcon } from "./facebook-icon";
 import { GoogleIcon } from "./google-icon";
 import { SignInSkeleton } from "./sign-in-skeleton";
 
@@ -20,7 +21,7 @@ function SignInForm() {
   const localePrefix = locale === defaultLocale ? "" : `/${locale}`;
   const signInPath = `${localePrefix}/sign-in`;
 
-  const handleOAuth = async (provider: "google") => {
+  const handleOAuth = async (provider: "google" | "facebook") => {
     if (!clerk?.client) return;
     await clerk.client.signIn.authenticateWithRedirect({
       strategy: `oauth_${provider}`,
@@ -43,6 +44,15 @@ function SignInForm() {
             >
               <GoogleIcon className="w-5 h-5 mr-2" />
               Google
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOAuth("facebook")}
+              className="w-full h-11 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition-colors"
+            >
+              <FacebookIcon className="w-5 h-5 mr-2" />
+              Facebook
             </Button>
           </div>
 

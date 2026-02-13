@@ -20,9 +20,15 @@ type HeaderProps = {
   isSignedIn?: boolean;
   signOut?: () => void | Promise<void>;
   primaryShopSlug?: string | null;
+  userDisplayName?: string | null;
 };
 
-export function Header({ isSignedIn = false, signOut, primaryShopSlug }: HeaderProps) {
+export function Header({
+  isSignedIn = false,
+  signOut,
+  primaryShopSlug,
+  userDisplayName,
+}: HeaderProps) {
   const t = useTranslations();
   const navLinks = [
     { href: "/products", label: t("nav.products") },
@@ -147,48 +153,48 @@ export function Header({ isSignedIn = false, signOut, primaryShopSlug }: HeaderP
             </Link>
           </Button>
           {isSignedIn ? (
-            <Dropdown
-              trigger={
-                <div className="inline-flex items-center justify-center rounded-full p-2 text-sm font-medium transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
-                  <User className="h-5 w-5" />
+            <>
+              <span className="text-sm text-slate-600">
+                {userDisplayName ? `Hi, ${userDisplayName}` : "Hi"}
+              </span>
+              <Dropdown
+                trigger={
+                  <div className="inline-flex items-center justify-center rounded-full p-2 text-sm font-medium transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
+                    <User className="h-5 w-5" />
+                  </div>
+                }
+                align="right"
+              >
+                <div className="py-1">
+                  <DropdownItem asChild>
+                    <Link href={adminHref} className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
+                    </Link>
+                  </DropdownItem>
+                  <DropdownSeparator />
+                  <DropdownItem
+                    onClick={() => {
+                      signOut?.();
+                    }}
+                    className="text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {t("nav.signOut")}
+                  </DropdownItem>
                 </div>
-              }
-              align="right"
-            >
-              <div className="py-1">
-                <DropdownItem asChild>
-                  <Link href={adminHref} className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
-                  </Link>
-                </DropdownItem>
-                <DropdownSeparator />
-                <DropdownItem
-                  onClick={() => {
-                    signOut?.();
-                  }}
-                  className="text-red-600 hover:bg-red-50"
-                >
-                  <LogOut className="h-4 w-4" />
-                  {t("nav.signOut")}
-                </DropdownItem>
-              </div>
-            </Dropdown>
+              </Dropdown>
+            </>
           ) : (
-            <Button variant="ghost" size="sm" className="rounded-full">
-              <Link href="/sign-in" prefetch>
-                <User className="h-5 w-5" />
-              </Link>
-            </Button>
-          )}
-          <Button
-            size="sm"
-            className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 rounded-lg"
-          >
-            <Link href="/sell" prefetch>
-              {t("nav.startSelling")}
+            <Link href="/sign-in" prefetch>
+              <Button
+                size="sm"
+                className="bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 rounded-lg"
+              >
+                {t("nav.signIn")}
+              </Button>
             </Link>
-          </Button>
+          )}
         </div>
 
         {/* Mobile Actions */}

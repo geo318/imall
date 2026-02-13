@@ -36,6 +36,8 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Added `/api/products` (randomized) so marketing/product grids can pull products across tenants without relying on env defaults; `/api/shops` exists for listing tenants. API product detail now attaches auctions per variant; CORS is handled via a manual preflight handler in `apps/api/src/index.ts`.
 - Implemented Clerk Elements-based authentication with Google and Facebook OAuth support. Created reusable SVG icon components (`GoogleIcon`, `FacebookIcon`) in `app/(auth)/_components/`. OAuth buttons trigger redirect-based authentication flow.
 - Sign-in/sign-up OAuth buttons now only use Clerk's `oauth_google` strategy (removed plain `google` fallback) to avoid invalid OAuth redirects missing `client_id`.
+- Login page now shows both Google and Facebook OAuth buttons and uses Clerk `oauth_google` / `oauth_facebook` strategies.
+- Header UX updated: removed desktop "Start selling" CTA, show "Sign in" button for guests, and show `Hi, {username}` before the account icon for signed-in users.
 - Fixed ClerkProvider integration: Created `ClerkContextProvider` with `ClerkReadyContext` to ensure Clerk Elements only render after Clerk is fully initialized. Wrapped in Suspense boundary in layout to prevent navigation blocking.
 - Separated `MarketingNav` into client wrapper (`MarketingNavClient`) that uses Clerk hooks, wrapped in Suspense in `app/page.tsx` to prevent blocking. Fixed `Copyright` component to use `"use cache"` directive for static year rendering.
 - Fixed auth page layout: Left branding panel and right form panel now both scroll independently (`overflow-y-auto`) instead of left panel being sticky.
