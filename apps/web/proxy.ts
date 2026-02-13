@@ -1,6 +1,6 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { defaultLocale, locales, type Locale } from "@/i18n/config";
+import { defaultLocale, type Locale, locales } from "@/i18n/config";
 import { isReservedRoute } from "@/lib/utils";
 
 function stripLocale(pathname: string) {
@@ -40,7 +40,7 @@ export default clerkMiddleware(async (auth, req) => {
   response.cookies.set("NEXT_LOCALE", detectedLocale, { path: "/" });
 
   const authResult = await auth();
-  const normalizedPath = stripLocale(pathname);
+  const normalizedPath = stripLocale(pathname) || "/";
 
   const slug = normalizedPath.split("/").find(Boolean);
   if (slug && isReservedRoute(slug)) {

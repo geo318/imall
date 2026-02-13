@@ -5,11 +5,11 @@ import * as SignIn from "@clerk/elements/sign-in";
 import { useClerk } from "@clerk/nextjs";
 import { Button } from "@repo/ui/button";
 import { Eye, EyeOff } from "lucide-react";
-import { Link } from "@/i18n/navigation.client";
-import { useLocale } from "@/i18n/provider";
 import { useEffect, useState } from "react";
 import { useClerkReady } from "@/app/_components/clerk-provider-slot-client";
 import { defaultLocale } from "@/i18n/config";
+import { Link } from "@/i18n/navigation.client";
+import { useLocale } from "@/i18n/provider";
 import { GoogleIcon } from "./google-icon";
 import { SignInSkeleton } from "./sign-in-skeleton";
 
@@ -22,31 +22,11 @@ function SignInForm() {
 
   const handleOAuth = async (provider: "google") => {
     if (!clerk?.client) return;
-
-    // Try oauth_ prefix first (most common)
-    const strategies = [`oauth_${provider}`, provider] as const;
-
-    for (const strategy of strategies) {
-      try {
-        await clerk.client.signIn.authenticateWithRedirect({
-          // @ts-expect-error - Strategy name may vary based on Clerk configuration
-          strategy: strategy as "oauth_google" | "oauth_facebook" | "google" | "facebook",
-          redirectUrl: `${globalThis.location.origin}${localePrefix}/`,
-          redirectUrlComplete: `${globalThis.location.origin}${localePrefix}/`,
-        });
-        return; // Success, exit
-      } catch (error: unknown) {
-        // If it's not a strategy name error, re-throw
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        if (!errorMessage.includes("does not match one of the allowed values")) {
-          throw error;
-        }
-      }
-    }
-
-    console.error(
-      `OAuth authentication failed for ${provider}. Make sure it's enabled in Clerk Dashboard.`,
-    );
+    await clerk.client.signIn.authenticateWithRedirect({
+      strategy: `oauth_${provider}`,
+      redirectUrl: `${globalThis.location.origin}${localePrefix}/`,
+      redirectUrlComplete: `${globalThis.location.origin}${localePrefix}/`,
+    });
   };
 
   return (
