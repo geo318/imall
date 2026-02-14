@@ -38,6 +38,24 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Sign-in/sign-up OAuth buttons now only use Clerk's `oauth_google` strategy (removed plain `google` fallback) to avoid invalid OAuth redirects missing `client_id`.
 - Login page now shows both Google and Facebook OAuth buttons and uses Clerk `oauth_google` / `oauth_facebook` strategies.
 - Header UX updated: removed desktop "Start selling" CTA, show "Sign in" button for guests, and show `Hi, {username}` before the account icon for signed-in users.
+- OAuth redirect flow now uses a dedicated locale-aware callback route (`/[locale]/sso-callback`) via `AuthenticateWithRedirectCallback` to avoid locale-redirect interference with session completion.
+- Proxy middleware treats `/sso-callback` as a public route so OAuth completion isn't blocked by auth redirects.
+- Added tabbed legal hub page at `/[locale]/legal` backed by locale markdown files in `apps/web/content/legal/{en,ka,ru}`, with footer legal links pointing to tab query params.
+- Replaced legal placeholder markdown with full EN/KA/RU policy content (overview, return/cancellation, terms, privacy, translated terms, contact) and set deterministic section order in `apps/web/lib/legal.ts`.
+- Updated public branding surface to use iMall logo/wordmark in footer and auth pages, refreshed sticky header with glass/backdrop styling, and redesigned FAQ page as a hero + accordion with updated EN/KA/RU copy.
+- Refined iMall monogram SVG icon, tuned header transparency/backdrop saturation, and restyled legal page (hero + glass tabs + polished markdown panel) to match the updated public design language.
+- Imported the exact `shop-spark` iMall logo image into `apps/web/public/imall-logo.png`, switched `MarketHubLogo` to render that asset, aligned header transparency classes to `shop-spark`, and updated legal hero/tabs styling to match the same visual system.
+- Legal tabs now follow `shop-spark` Legal page styling more closely: compact segmented tab rail, icon/title header per section, and animated content area with structured prose typography.
+- Legal content was aligned closer to `shop-spark` body copy: concise Privacy/Terms/Refund sections in EN and a new Cookies policy tab/content (EN/KA/RU), with legal section ordering updated to `privacy -> terms -> cookies -> refund` first.
+- About page now mirrors `shop-spark` structure (hero, stats, mission, values, CTA) with iMall-focused copy in EN/KA/RU and localized messaging that reflects the marketplace + auction concept.
+- Header now uses a `shop-spark`-style categories mega menu (`apps/web/components/mega-menu.tsx`) with desktop hover panel + mobile accordion, removed Products/FAQ links from header, moved categories trigger right after logo, and wired category query (`?category=`) into products explorer state.
+- Fixed iMall logo asset serving in Next by switching logo source to `/imall-logo.jpg` (the imported file bytes are JPEG; using `.png` extension caused `next/image` "isn't a valid image" errors and broken header icon).
+- Proxy middleware now bypasses static assets (`/public` files with extensions) and matcher excludes `.*\\..*`; this prevents locale redirects from rewriting image URLs like `/imall-logo.jpg` to `/{locale}/...` and breaking `next/image`.
+- Converted `apps/web/public/imall-logo.png` to a real PNG file, pointed `MarketHubLogo` back to `/imall-logo.png`, and set locale layout metadata icons (`icon/shortcut/apple`) to use the same PNG as favicon.
+- Replaced `apps/web/app/favicon.ico` (default Vercel icon) with an iMall-based ICO that embeds a 256x256 PNG image.
+- Removed `apps/web/app/favicon.ico` (was failing Next image decoding) and switched to `apps/web/app/icon.png` using the iMall logo so App Router serves the custom site icon without ICO decode issues.
+- Finalized app icon setup per Next App Router file-convention guidance: restored `apps/web/app/favicon.ico` using the RGBA favicon from `shop-spark/public/favicon.ico` (keeps transparency), removed `apps/web/app/icon.png`, and dropped explicit `metadata.icons` overrides so Next uses `app/favicon.ico`.
+- Replaced app icons with a generated transparent circle-`i` brand mark: `apps/web/app/icon.png` (512 RGBA) and `apps/web/app/favicon.ico` (256 RGBA PNG-in-ICO), keeping App Router file conventions and transparency intact.
 - Fixed ClerkProvider integration: Created `ClerkContextProvider` with `ClerkReadyContext` to ensure Clerk Elements only render after Clerk is fully initialized. Wrapped in Suspense boundary in layout to prevent navigation blocking.
 - Separated `MarketingNav` into client wrapper (`MarketingNavClient`) that uses Clerk hooks, wrapped in Suspense in `app/page.tsx` to prevent blocking. Fixed `Copyright` component to use `"use cache"` directive for static year rendering.
 - Fixed auth page layout: Left branding panel and right form panel now both scroll independently (`overflow-y-auto`) instead of left panel being sticky.
