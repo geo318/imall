@@ -1,6 +1,6 @@
 import { Heart, Shield, Zap } from "lucide-react";
-import { Link } from "@/i18n/navigation.server";
 import { MarketHubLogo } from "@/assets";
+import { Link } from "@/i18n/navigation.server";
 import { SignInSlot } from "../../_components/sign-in-slot";
 
 const features = [
@@ -32,7 +32,9 @@ export default function SignInPage() {
             <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
               <MarketHubLogo className="w-6 h-6 text-white" />
             </div>
-            <span className="text-2xl font-bold text-white">Marketplace</span>
+            <span className="text-2xl font-bold tracking-tight text-white">
+              <span className="font-extrabold text-emerald-100">i</span>Mall
+            </span>
           </Link>
 
           {/* Main Content */}
@@ -70,7 +72,7 @@ export default function SignInPage() {
           </div>
 
           {/* Footer */}
-          <p className="text-white/60 text-sm">© 2024 Marketplace. All rights reserved.</p>
+          <p className="text-white/60 text-sm">© 2024 iMall. All rights reserved.</p>
         </div>
       </div>
 
@@ -82,7 +84,9 @@ export default function SignInPage() {
             <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center">
               <MarketHubLogo className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-foreground">Marketplace</span>
+            <span className="text-xl font-bold tracking-tight text-foreground">
+              <span className="font-extrabold text-emerald-600">i</span>Mall
+            </span>
           </Link>
         </div>
 
@@ -102,7 +106,7 @@ export default function SignInPage() {
         {/* Footer */}
         <div className="p-6 border-t border-border lg:hidden flex-shrink-0">
           <p className="text-center text-sm text-muted-foreground">
-            © 2024 Marketplace. All rights reserved.
+            © 2024 iMall. All rights reserved.
           </p>
         </div>
       </div>

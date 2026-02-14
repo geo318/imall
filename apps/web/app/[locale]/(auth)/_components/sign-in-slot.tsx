@@ -7,7 +7,6 @@ import { Button } from "@repo/ui/button";
 import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useClerkReady } from "@/app/_components/clerk-provider-slot-client";
-import { defaultLocale } from "@/i18n/config";
 import { Link } from "@/i18n/navigation.client";
 import { useLocale } from "@/i18n/provider";
 import { FacebookIcon } from "./facebook-icon";
@@ -18,15 +17,17 @@ function SignInForm() {
   const [showPassword, setShowPassword] = useState(false);
   const clerk = useClerk();
   const locale = useLocale();
-  const localePrefix = locale === defaultLocale ? "" : `/${locale}`;
+  const localePrefix = `/${locale}`;
   const signInPath = `${localePrefix}/sign-in`;
+  const oauthCallbackPath = `${localePrefix}/sso-callback`;
+  const oauthCompletePath = `${localePrefix}/`;
 
   const handleOAuth = async (provider: "google" | "facebook") => {
     if (!clerk?.client) return;
     await clerk.client.signIn.authenticateWithRedirect({
       strategy: `oauth_${provider}`,
-      redirectUrl: `${globalThis.location.origin}${localePrefix}/`,
-      redirectUrlComplete: `${globalThis.location.origin}${localePrefix}/`,
+      redirectUrl: `${globalThis.location.origin}${oauthCallbackPath}`,
+      redirectUrlComplete: `${globalThis.location.origin}${oauthCompletePath}`,
     });
   };
 

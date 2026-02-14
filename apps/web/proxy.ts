@@ -23,6 +23,12 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next();
   }
 
+  // Skip locale/auth middleware for public static assets (e.g. /imall-logo.jpg)
+  // so Next can serve files from /public directly.
+  if (/\.[^/]+$/.test(pathname)) {
+    return NextResponse.next();
+  }
+
   const detectedLocale = getLocaleFromPath(pathname);
   if (!detectedLocale) {
     const url = req.nextUrl.clone();
@@ -52,6 +58,7 @@ export default clerkMiddleware(async (auth, req) => {
     normalizedPath === "/" ||
     normalizedPath.startsWith("/sign-in") ||
     normalizedPath.startsWith("/sign-up") ||
+    normalizedPath.startsWith("/sso-callback") ||
     normalizedPath.startsWith("/sell") ||
     normalizedPath.startsWith("/superadmin") ||
     normalizedPath === "/favicon.ico" ||
@@ -68,7 +75,7 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|_next/data|_next/webpack-hmr|__nextjs_original-stack-frame|favicon.ico).*)",
+    "/((?!_next/static|_next/image|_next/data|_next/webpack-hmr|__nextjs_original-stack-frame|favicon.ico|.*\\..*).*)",
     "/",
   ],
 };
