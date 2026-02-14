@@ -79,6 +79,7 @@
       "careers": "Careers",
       "privacy": "Privacy",
       "terms": "Terms",
+      "returns": "Returns",
       "cookies": "Cookies"
     },
     "madeWithCare": "Made with care for vendors worldwide."
@@ -91,58 +92,101 @@
     "viewProduct": "View product"
   },
   "about": {
-    "eyebrow": "About",
-    "title": "MarketHub is a modern multi-vendor stack.",
-    "description": "We're building a commerce base that supports auctions, standard carts, and vendor onboarding without heavy engineering lift. Use it as a demo today; extend it into a full marketplace tomorrow.",
-    "ctaDemo": "Explore the demo shop",
-    "ctaAdmin": "Open admin workspace",
-    "focus": {
-      "title": "What we're focusing on next",
+    "hero": {
+      "title": "We're Building the Future of <highlight>Marketplace Commerce</highlight>",
+      "description": "iMall connects trusted vendors with buyers and brings fixed-price shopping and real-time auctions into one reliable platform.",
+      "ctaExplore": "Explore products"
+    },
+    "stats": [
+      {
+        "value": "500+",
+        "label": "Verified Vendors"
+      },
+      {
+        "value": "10K+",
+        "label": "Products Listed"
+      },
+      {
+        "value": "50K+",
+        "label": "Happy Customers"
+      },
+      {
+        "value": "98%",
+        "label": "Satisfaction Rate"
+      }
+    ],
+    "mission": {
+      "title": "Our <highlight>Mission</highlight>",
+      "body1": "We make multi-vendor commerce accessible by giving businesses practical tools for listings, auctions, orders, and onboarding without heavy setup.",
+      "body2": "As a marketplace intermediary, iMall focuses on trust, clear policies, and transparent vendor-buyer transactions.",
+      "imageAlt": "Team collaboration"
+    },
+    "values": {
+      "title": "Our <highlight>Values</highlight>",
+      "subtitle": "The principles that guide how we build iMall",
       "items": [
-        "Clerk roles for admins/staff and shopper identity mapping.",
-        "Payment provider interface (keepz.me live, credo/bog/tbc next).",
-        "Shipping integrations after manual flow stabilizes.",
-        "More UI polish via the shared @repo/ui kit."
+        {
+          "title": "Trust & Safety",
+          "body": "We protect transactions with clear rules, moderation, and secure platform practices."
+        },
+        {
+          "title": "Community First",
+          "body": "We build for buyers and vendors together, with practical workflows for both sides."
+        },
+        {
+          "title": "Product Innovation",
+          "body": "From auctions to standard checkout, we ship features that solve real commerce needs."
+        },
+        {
+          "title": "Respect for Craft",
+          "body": "We value quality products and the people behind them, from small shops to growing brands."
+        }
       ]
     },
-    "pillars": [
-      {
-        "title": "Multi-tenant by default",
-        "body": "Spin up new shops with isolated catalog, orders, and branding in minutes."
-      },
-      {
-        "title": "Flexible catalog models",
-        "body": "Support fixed-price products alongside auction-driven listings."
-      },
-      {
-        "title": "Shared admin workspace",
-        "body": "Merchants manage operations from a single, unified dashboard."
-      }
-    ]
+    "cta": {
+      "title": "Ready to Start Selling?",
+      "description": "Create your shop, complete onboarding, and grow with iMall's shared admin tools.",
+      "primary": "Become a vendor",
+      "secondary": "Learn more"
+    }
   },
   "faq": {
     "eyebrow": "FAQ",
-    "title": "Questions, answered.",
-    "lead": "A quick primer on how MarketHub works for buyers and vendors. Need more?",
-    "leadLink": "Read about the roadmap",
+    "title": "Frequently Asked Questions",
+    "lead": "Everything you need to know about accounts, orders, auctions, and legal policies on iMall.",
+    "leadLink": "Review legal policies",
     "entries": [
       {
-        "q": "How do vendors join?",
-        "a": "Vendors apply with a shop name and wait for approval before selling goes live."
+        "q": "Do I buy products from iMall directly?",
+        "a": "Usually no. iMall is a marketplace where third-party vendors sell products. Your purchase agreement is with the vendor unless a product is marked as sold by iMall."
       },
       {
-        "q": "Can I mix auctions and standard listings?",
-        "a": "Yes. Each product can be set as auction or fixed-price depending on your strategy."
+        "q": "How do returns work?",
+        "a": "Returns follow each vendor's policy. Most sellers offer up to 30 days. For EU deliveries, the 14-day cooling-off right applies where required by law."
       },
       {
-        "q": "What does the shared admin cover?",
-        "a": "Inventory, orders, payouts, returns, and customer notes are all centralized."
+        "q": "Can I cancel an order after payment?",
+        "a": "If the order has not shipped, contact the vendor immediately via iMall messages. Once shipped, cancellation may be handled as a return request."
       },
       {
-        "q": "Do buyers need accounts?",
-        "a": "Accounts are optional but recommended for favorites, faster checkout, and messaging."
+        "q": "Are auctions available for every product?",
+        "a": "No. Auctions are enabled per seller and product category. Bids must meet the minimum increment shown on the product page."
+      },
+      {
+        "q": "Do I need an account to buy?",
+        "a": "Guest browsing is available, but signing in gives you favorites, faster checkout, order history, and easier support."
+      },
+      {
+        "q": "Who should I contact for disputes or data requests?",
+        "a": "Start with the vendor for order-specific issues. For privacy or platform-level requests, email contact@imall.ge."
       }
     ]
+  },
+  "legal": {
+    "eyebrow": "Legal",
+    "title": "Legal and Compliance",
+    "description": "Review privacy, terms, consent, and cookie policies in one place.",
+    "emptySections": "Legal sections are not available yet."
   },
   "vendors": {
     "title": "Our Vendors",

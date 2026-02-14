@@ -1,11 +1,12 @@
 "use client";
 
-import { Instagram, ShoppingBag, Twitter, Youtube } from "lucide-react";
+import { Instagram, Twitter, Youtube } from "lucide-react";
 import { Suspense } from "react";
+import { MarketHubLogo } from "@/assets";
 import { Link } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
-import { Copyright } from "./copyright";
 import { LanguageSwitcher } from "../language-switcher";
+import { Copyright } from "./copyright";
 
 export function Footer() {
   const t = useTranslations();
@@ -23,9 +24,12 @@ export function Footer() {
       { label: t("footer.links.careers"), href: "/about" },
     ],
     legal: [
-      { label: t("footer.links.privacy"), href: "/faq" },
-      { label: t("footer.links.terms"), href: "/faq" },
-      { label: t("footer.links.cookies"), href: "/faq" },
+      { label: t("footer.links.privacy"), href: "/legal?section=privacy-policy" },
+      { label: t("footer.links.terms"), href: "/legal?section=terms-of-service" },
+      {
+        label: t("footer.links.returns"),
+        href: "/legal?section=return-and-cancellation-policy",
+      },
     ],
   } as const;
 
@@ -35,13 +39,9 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="space-y-4">
-            <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600">
-                <ShoppingBag className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-bold tracking-tight">
-                Market<span className="text-emerald-600">Hub</span>
-              </span>
+            <Link href="/" className="flex items-center gap-1">
+              <MarketHubLogo width={32} height={32} className="h-8 w-8" />
+              <span className="font-bold text-xl -ml-1">Mall</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">{t("footer.tagline")}</p>
             <div className="flex gap-3">
@@ -124,9 +124,7 @@ export function Footer() {
         <div className="mt-12 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4">
           <Suspense
             fallback={
-              <p className="text-sm text-muted-foreground">
-                © 2024 MarketHub. All rights reserved.
-              </p>
+              <p className="text-sm text-muted-foreground">© 2024 iMall. All rights reserved.</p>
             }
           >
             <Copyright />

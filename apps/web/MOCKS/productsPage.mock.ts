@@ -2,24 +2,44 @@ import type { MarketingProduct } from "@/components/marketing/product-card";
 
 export const productCategoriesMock = [
   {
-    name: "Home & Living",
-    blurb: "Handmade decor, kitchenware, and storage.",
+    name: "Art & Collectibles",
+    blurb: "Original works, rare finds, and curated collectibles.",
     color: "from-emerald-100 to-white",
   },
   {
     name: "Fashion",
-    blurb: "Limited apparel drops, bags, and accessories.",
+    blurb: "Apparel, accessories, and vintage pieces.",
     color: "from-amber-100 to-white",
   },
   {
-    name: "Art & Prints",
-    blurb: "Auctions for originals and signed editions.",
+    name: "Home & Living",
+    blurb: "Furniture, decor, and everyday essentials.",
     color: "from-sky-100 to-white",
   },
   {
-    name: "Tech & Gadgets",
-    blurb: "Thoughtful devices and desk upgrades.",
+    name: "Electronics",
+    blurb: "Devices, audio, cameras, and smart tech.",
     color: "from-indigo-100 to-white",
+  },
+  {
+    name: "Jewelry",
+    blurb: "Fine, handmade, and statement jewelry.",
+    color: "from-rose-100 to-white",
+  },
+  {
+    name: "Sports & Outdoors",
+    blurb: "Gear for active, outdoor, and fitness lifestyles.",
+    color: "from-cyan-100 to-white",
+  },
+  {
+    name: "Books & Media",
+    blurb: "Books, vinyl, and collectible media.",
+    color: "from-violet-100 to-white",
+  },
+  {
+    name: "Handmade Crafts",
+    blurb: "Artisan goods from independent makers.",
+    color: "from-orange-100 to-white",
   },
 ];
 

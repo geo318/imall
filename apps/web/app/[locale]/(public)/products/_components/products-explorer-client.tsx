@@ -29,11 +29,14 @@ export function ProductsExplorerClient() {
   const t = useTranslations();
   const searchParams = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const categoryParam = searchParams.get("category") || "";
 
   // State - sync with URL params
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(
+    categoryParam ? [categoryParam] : [],
+  );
   const [listingType, setListingType] = useState<ListingType>("all");
   const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -45,6 +48,16 @@ export function ProductsExplorerClient() {
       setSearchQuery(urlSearch);
     }
   }, [searchParams, searchQuery]);
+
+  useEffect(() => {
+    setSelectedCategories((prev) => {
+      if (categoryParam) {
+        if (prev.length === 1 && prev[0] === categoryParam) return prev;
+        return [categoryParam];
+      }
+      return prev.length === 0 ? prev : [];
+    });
+  }, [categoryParam]);
 
   // Map frontend sort keys to backend sort values
   const sortMap: Record<SortKey, "newest" | "oldest" | "priceAsc" | "priceDesc" | "random"> = {
