@@ -5,6 +5,7 @@ import { adminShopRoutes } from "./routes/admin-shops";
 import { adminUploadRoutes } from "./routes/admin-upload";
 import { auctionsRoutes, startAuctionCloser } from "./routes/auctions";
 import { cartRoutes } from "./routes/carts";
+import { categoriesRoutes } from "./routes/categories";
 import { favoritesRoutes } from "./routes/favorites";
 import { imageRoutes } from "./routes/images";
 import { inventoryRoutes } from "./routes/inventory";
@@ -58,6 +59,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(cartRoutes) // Single cart (can hold items from multiple shops) - register early to avoid conflicts
   .use(imageRoutes) // Image serving - register early to avoid conflicts
   .use(shopsRoutes)
+  .use(categoriesRoutes)
   .use(allProductsRoutes)
   .use(productsRoutes)
   .use(inventoryRoutes)
@@ -70,6 +72,7 @@ const app = new Elysia({ prefix: "/api" })
   .onStart(() => {
     console.log("[API] Routes registered:");
     console.log("[API]   - /api/shops");
+    console.log("[API]   - /api/categories/tree");
     console.log("[API]   - /api/products");
     console.log("[API]   - /api/carts");
     console.log("[API]   - /api/inventory");

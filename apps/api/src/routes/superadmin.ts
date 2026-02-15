@@ -1,8 +1,8 @@
-import { categoryRelations, categories, db, tenants } from "@repo/db";
+import { categories, categoryRelations, db, tenants } from "@repo/db";
+import { slugify } from "@repo/shared";
 import { and, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { slugify } from "@repo/shared";
 import { superadminGuard } from "../context";
 
 const shopUpdateSchema = z
@@ -16,7 +16,12 @@ const shopUpdateSchema = z
 
 const categoryCreateSchema = z.object({
   name: z.string().min(1),
+  categoryKey: z.string().optional(),
   slug: z.string().optional(),
+  icon: z.string().optional(),
+  nameEn: z.string().optional(),
+  nameKa: z.string().optional(),
+  nameRu: z.string().optional(),
   description: z.string().optional(),
   isActive: z.boolean().optional(),
   parentId: z.string().uuid().optional(),
@@ -24,7 +29,12 @@ const categoryCreateSchema = z.object({
 
 const categoryUpdateSchema = z.object({
   name: z.string().min(1).optional(),
+  categoryKey: z.string().optional(),
   slug: z.string().optional(),
+  icon: z.string().optional(),
+  nameEn: z.string().optional(),
+  nameKa: z.string().optional(),
+  nameRu: z.string().optional(),
   description: z.string().optional(),
   isActive: z.boolean().optional(),
   parentId: z.string().uuid().nullable().optional(),
@@ -34,7 +44,12 @@ async function attachHasChildren(
   list: Array<{
     id: string;
     slug: string;
+    categoryKey: string;
     name: string;
+    nameEn: string | null;
+    nameKa: string | null;
+    nameRu: string | null;
+    icon: string;
     description: string | null;
     isActive: boolean;
     deletedAt: Date | null;
@@ -79,10 +94,7 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       updates.canAuction = payload.canAuction;
     }
 
-    await db
-      .update(tenants)
-      .set(updates)
-      .where(eq(tenants.shopSlug, shopSlug));
+    await db.update(tenants).set(updates).where(eq(tenants.shopSlug, shopSlug));
 
     const [updated] = await db
       .select({
@@ -108,7 +120,12 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       .select({
         id: categories.id,
         slug: categories.slug,
+        categoryKey: categories.categoryKey,
         name: categories.name,
+        nameEn: categories.nameEn,
+        nameKa: categories.nameKa,
+        nameRu: categories.nameRu,
+        icon: categories.icon,
         description: categories.description,
         isActive: categories.isActive,
         deletedAt: categories.deletedAt,
@@ -136,7 +153,12 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       .select({
         id: categories.id,
         slug: categories.slug,
+        categoryKey: categories.categoryKey,
         name: categories.name,
+        nameEn: categories.nameEn,
+        nameKa: categories.nameKa,
+        nameRu: categories.nameRu,
+        icon: categories.icon,
         description: categories.description,
         isActive: categories.isActive,
         deletedAt: categories.deletedAt,
@@ -170,7 +192,12 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       .select({
         id: categories.id,
         slug: categories.slug,
+        categoryKey: categories.categoryKey,
         name: categories.name,
+        nameEn: categories.nameEn,
+        nameKa: categories.nameKa,
+        nameRu: categories.nameRu,
+        icon: categories.icon,
         description: categories.description,
         isActive: categories.isActive,
         deletedAt: categories.deletedAt,
@@ -188,7 +215,12 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
     return db
       .select({
         id: categories.id,
+        categoryKey: categories.categoryKey,
         name: categories.name,
+        nameEn: categories.nameEn,
+        nameKa: categories.nameKa,
+        nameRu: categories.nameRu,
+        icon: categories.icon,
       })
       .from(categories)
       .where(isNull(categories.deletedAt))
@@ -196,12 +228,22 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
   })
   .post("/categories", async ({ body }) => {
     const payload = categoryCreateSchema.parse(body);
-    const slug = payload.slug ? slugify(payload.slug) : slugify(payload.name);
+    const categoryKey = payload.categoryKey
+      ? slugify(payload.categoryKey)
+      : payload.slug
+        ? slugify(payload.slug)
+        : slugify(payload.name);
+    const slug = payload.slug ? slugify(payload.slug) : categoryKey;
 
     const [created] = await db
       .insert(categories)
       .values({
+        categoryKey,
         name: payload.name,
+        nameEn: payload.nameEn || payload.name,
+        nameKa: payload.nameKa,
+        nameRu: payload.nameRu,
+        icon: payload.icon || "📦",
         slug,
         description: payload.description,
         isActive: payload.isActive ?? true,
@@ -209,7 +251,12 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       .returning({
         id: categories.id,
         slug: categories.slug,
+        categoryKey: categories.categoryKey,
         name: categories.name,
+        nameEn: categories.nameEn,
+        nameKa: categories.nameKa,
+        nameRu: categories.nameRu,
+        icon: categories.icon,
         description: categories.description,
         isActive: categories.isActive,
         deletedAt: categories.deletedAt,
@@ -238,7 +285,12 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       updatedAt: new Date(),
     };
     if (payload.name !== undefined) updates.name = payload.name;
+    if (payload.categoryKey !== undefined) updates.categoryKey = slugify(payload.categoryKey);
     if (payload.slug !== undefined) updates.slug = slugify(payload.slug);
+    if (payload.icon !== undefined) updates.icon = payload.icon || "📦";
+    if (payload.nameEn !== undefined) updates.nameEn = payload.nameEn || null;
+    if (payload.nameKa !== undefined) updates.nameKa = payload.nameKa || null;
+    if (payload.nameRu !== undefined) updates.nameRu = payload.nameRu || null;
     if (payload.description !== undefined) updates.description = payload.description;
     if (payload.isActive !== undefined) updates.isActive = payload.isActive;
 
@@ -260,7 +312,12 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       .select({
         id: categories.id,
         slug: categories.slug,
+        categoryKey: categories.categoryKey,
         name: categories.name,
+        nameEn: categories.nameEn,
+        nameKa: categories.nameKa,
+        nameRu: categories.nameRu,
+        icon: categories.icon,
         description: categories.description,
         isActive: categories.isActive,
         deletedAt: categories.deletedAt,
@@ -286,7 +343,12 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       .returning({
         id: categories.id,
         slug: categories.slug,
+        categoryKey: categories.categoryKey,
         name: categories.name,
+        nameEn: categories.nameEn,
+        nameKa: categories.nameKa,
+        nameRu: categories.nameRu,
+        icon: categories.icon,
         description: categories.description,
         isActive: categories.isActive,
         deletedAt: categories.deletedAt,

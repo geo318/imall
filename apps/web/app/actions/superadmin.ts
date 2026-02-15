@@ -147,7 +147,12 @@ export async function updateShopAuction(formData: FormData): Promise<void> {
 export type SuperadminCategory = {
   id: string;
   slug: string;
+  categoryKey: string;
   name: string;
+  nameEn: string | null;
+  nameKa: string | null;
+  nameRu: string | null;
+  icon: string;
   description: string | null;
   isActive: boolean;
   deletedAt: string | null;
@@ -189,7 +194,12 @@ export async function listSuperadminCategoryRoots(): Promise<SuperadminCategoryN
 
 export async function createSuperadminCategory(formData: FormData): Promise<void> {
   const name = String(formData.get("name") || "").trim();
+  const categoryKey = String(formData.get("categoryKey") || "").trim();
   const slug = String(formData.get("slug") || "").trim();
+  const icon = String(formData.get("icon") || "").trim();
+  const nameEn = String(formData.get("nameEn") || "").trim();
+  const nameKa = String(formData.get("nameKa") || "").trim();
+  const nameRu = String(formData.get("nameRu") || "").trim();
   const description = String(formData.get("description") || "").trim();
   const parentId = String(formData.get("parentId") || "").trim();
   const isActive = String(formData.get("isActive") || "").trim() === "true";
@@ -202,7 +212,12 @@ export async function createSuperadminCategory(formData: FormData): Promise<void
     method: "POST",
     body: JSON.stringify({
       name,
+      categoryKey: categoryKey || undefined,
       slug: slug || undefined,
+      icon: icon || undefined,
+      nameEn: nameEn || undefined,
+      nameKa: nameKa || undefined,
+      nameRu: nameRu || undefined,
       description: description || undefined,
       isActive,
       parentId: parentId || undefined,
@@ -220,7 +235,12 @@ export async function createSuperadminCategory(formData: FormData): Promise<void
 export async function updateSuperadminCategory(formData: FormData): Promise<void> {
   const id = String(formData.get("id") || "").trim();
   const name = String(formData.get("name") || "").trim();
+  const categoryKey = String(formData.get("categoryKey") || "").trim();
   const slug = String(formData.get("slug") || "").trim();
+  const icon = String(formData.get("icon") || "").trim();
+  const nameEn = String(formData.get("nameEn") || "").trim();
+  const nameKa = String(formData.get("nameKa") || "").trim();
+  const nameRu = String(formData.get("nameRu") || "").trim();
   const description = String(formData.get("description") || "").trim();
   const parentId = String(formData.get("parentId") || "").trim();
   const isActive = String(formData.get("isActive") || "").trim() === "true";
@@ -233,7 +253,12 @@ export async function updateSuperadminCategory(formData: FormData): Promise<void
     method: "PATCH",
     body: JSON.stringify({
       name: name || undefined,
+      categoryKey: categoryKey || undefined,
       slug: slug || undefined,
+      icon: icon || undefined,
+      nameEn: nameEn || undefined,
+      nameKa: nameKa || undefined,
+      nameRu: nameRu || undefined,
       description: description || undefined,
       parentId: parentId ? parentId : null,
       isActive,

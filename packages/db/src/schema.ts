@@ -36,14 +36,21 @@ export const categories = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     slug: varchar("slug", { length: 160 }).notNull().unique(),
+    categoryKey: varchar("category_key", { length: 160 }).notNull(),
     name: varchar("name", { length: 256 }).notNull(),
+    nameEn: varchar("name_en", { length: 256 }),
+    nameKa: varchar("name_ka", { length: 256 }),
+    nameRu: varchar("name_ru", { length: 256 }),
+    icon: varchar("icon", { length: 32 }).default("📦").notNull(),
     description: text("description"),
     isActive: boolean("is_active").default(true).notNull(),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => ({})
+  (table) => ({
+    categoryKeyIdx: uniqueIndex("categories_category_key_unique").on(table.categoryKey),
+  }),
 );
 
 // Category relations express parent-child links (many-to-many, depth via traversal).

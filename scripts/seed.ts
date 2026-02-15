@@ -1,10 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { db } from "@repo/db";
 import {
   auctions,
-  categoryRelations,
-  categories,
   cartItems,
   carts,
+  categories,
+  categoryRelations,
   inventoryLedger,
   products,
   tenants,
@@ -12,7 +13,6 @@ import {
 } from "@repo/db/schema";
 import { INVENTORY_REASONS, slugify } from "@repo/shared";
 import { and, eq, sum } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
 
 type AuctionSeed = {
   startingBid: string;
@@ -430,12 +430,7 @@ const categorySeeds = [
   },
   {
     name: "Fashion",
-    children: [
-      { name: "Women" },
-      { name: "Men" },
-      { name: "Watches" },
-      { name: "Jewelry" },
-    ],
+    children: [{ name: "Women" }, { name: "Men" }, { name: "Watches" }, { name: "Jewelry" }],
   },
   {
     name: "Collectibles & Art",
@@ -680,7 +675,10 @@ async function seedCategories() {
 
   const categoryRows: Array<{
     id: string;
+    categoryKey: string;
+    icon: string;
     name: string;
+    nameEn: string;
     slug: string;
     description?: string;
     isActive: boolean;
@@ -691,7 +689,10 @@ async function seedCategories() {
     const parentId = randomUUID();
     categoryRows.push({
       id: parentId,
+      categoryKey: slugify(parent.name),
+      icon: "📦",
       name: parent.name,
+      nameEn: parent.name,
       slug: slugify(parent.name),
       isActive: true,
     });
@@ -700,7 +701,10 @@ async function seedCategories() {
       const childId = randomUUID();
       categoryRows.push({
         id: childId,
+        categoryKey: slugify(`${parent.name}-${child.name}`),
+        icon: "📦",
         name: child.name,
+        nameEn: child.name,
         slug: slugify(child.name),
         isActive: true,
       });

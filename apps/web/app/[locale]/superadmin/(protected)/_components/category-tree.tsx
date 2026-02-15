@@ -1,15 +1,20 @@
 "use client";
 
-import { type ReactElement, useCallback, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@repo/ui/button";
+import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { type ReactElement, useCallback, useMemo, useState } from "react";
 
 type CategoryAction = (formData: FormData) => void | Promise<void>;
 
 export type SuperadminCategoryNode = {
   id: string;
   slug: string;
+  categoryKey: string;
   name: string;
+  nameEn: string | null;
+  nameKa: string | null;
+  nameRu: string | null;
+  icon: string;
   description: string | null;
   isActive: boolean;
   deletedAt: string | null;
@@ -19,7 +24,15 @@ export type SuperadminCategoryNode = {
   hasChildren: boolean;
 };
 
-type CategoryOption = { id: string; name: string };
+type CategoryOption = {
+  id: string;
+  name: string;
+  categoryKey: string;
+  icon: string;
+  nameEn: string | null;
+  nameKa: string | null;
+  nameRu: string | null;
+};
 
 type Props = {
   roots: SuperadminCategoryNode[];
@@ -28,12 +41,7 @@ type Props = {
   deleteAction: CategoryAction;
 };
 
-export function SuperadminCategoryTree({
-  roots,
-  createAction,
-  updateAction,
-  deleteAction,
-}: Props) {
+export function SuperadminCategoryTree({ roots, createAction, updateAction, deleteAction }: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [childrenById, setChildrenById] = useState<Record<string, SuperadminCategoryNode[]>>({});
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
@@ -111,6 +119,7 @@ export function SuperadminCategoryTree({
       (options ?? []).map((category) => ({
         id: category.id,
         name: category.name,
+        icon: category.icon,
       })),
     [options],
   );
@@ -150,16 +159,18 @@ export function SuperadminCategoryTree({
                 ) : (
                   <span className="inline-flex h-6 w-6" />
                 )}
+                <span className="text-base">{node.icon || "📦"}</span>
                 {node.name}
               </div>
             </td>
-            <td className="px-4 py-3 text-slate-600">{node.slug}</td>
+            <td className="px-4 py-3 text-slate-600">
+              <div className="font-medium text-slate-700">{node.slug}</div>
+              <div className="text-xs text-slate-500">{node.categoryKey}</div>
+            </td>
             <td className="px-4 py-3">
               <span
                 className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
-                  node.isActive
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "bg-slate-100 text-slate-600"
+                  node.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
                 }`}
               >
                 {node.isActive ? "Active" : "Disabled"}
@@ -169,16 +180,46 @@ export function SuperadminCategoryTree({
               <form action={updateAction} className="flex flex-wrap gap-2 items-center">
                 <input type="hidden" name="id" value={node.id} />
                 <input
+                  name="icon"
+                  defaultValue={node.icon || "📦"}
+                  className="h-8 w-14 rounded-md border border-slate-200 px-2 text-xs"
+                  placeholder="📦"
+                />
+                <input
                   name="name"
                   defaultValue={node.name}
                   className="h-8 rounded-md border border-slate-200 px-2 text-xs"
                   placeholder="Name"
                 />
                 <input
+                  name="categoryKey"
+                  defaultValue={node.categoryKey}
+                  className="h-8 rounded-md border border-slate-200 px-2 text-xs"
+                  placeholder="Key"
+                />
+                <input
                   name="slug"
                   defaultValue={node.slug}
                   className="h-8 rounded-md border border-slate-200 px-2 text-xs"
                   placeholder="Slug"
+                />
+                <input
+                  name="nameEn"
+                  defaultValue={node.nameEn ?? ""}
+                  className="h-8 rounded-md border border-slate-200 px-2 text-xs"
+                  placeholder="EN"
+                />
+                <input
+                  name="nameKa"
+                  defaultValue={node.nameKa ?? ""}
+                  className="h-8 rounded-md border border-slate-200 px-2 text-xs"
+                  placeholder="KA"
+                />
+                <input
+                  name="nameRu"
+                  defaultValue={node.nameRu ?? ""}
+                  className="h-8 rounded-md border border-slate-200 px-2 text-xs"
+                  placeholder="RU"
                 />
                 <select
                   name="parentId"
@@ -227,7 +268,16 @@ export function SuperadminCategoryTree({
 
       return rows;
     },
-    [childrenById, deleteAction, expanded, handleToggle, loadingIds, optionRows, updateAction, loadOptions],
+    [
+      childrenById,
+      deleteAction,
+      expanded,
+      handleToggle,
+      loadingIds,
+      optionRows,
+      updateAction,
+      loadOptions,
+    ],
   );
 
   return (
@@ -242,8 +292,23 @@ export function SuperadminCategoryTree({
       <div className="px-6 py-4 border-b border-slate-100">
         <form action={createAction} className="flex flex-wrap gap-2 items-end">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-600">Name</label>
+            <label htmlFor="create-category-icon" className="text-xs text-slate-600">
+              Icon
+            </label>
             <input
+              id="create-category-icon"
+              name="icon"
+              className="h-9 w-16 rounded-md border border-slate-200 px-3 text-sm"
+              placeholder="📦"
+              defaultValue="📦"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="create-category-name" className="text-xs text-slate-600">
+              Name
+            </label>
+            <input
+              id="create-category-name"
               name="name"
               className="h-9 rounded-md border border-slate-200 px-3 text-sm"
               placeholder="Category name"
@@ -251,16 +316,66 @@ export function SuperadminCategoryTree({
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-600">Slug</label>
+            <label htmlFor="create-category-key" className="text-xs text-slate-600">
+              Key
+            </label>
             <input
+              id="create-category-key"
+              name="categoryKey"
+              className="h-9 rounded-md border border-slate-200 px-3 text-sm"
+              placeholder="electronics"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="create-category-slug" className="text-xs text-slate-600">
+              Slug
+            </label>
+            <input
+              id="create-category-slug"
               name="slug"
               className="h-9 rounded-md border border-slate-200 px-3 text-sm"
               placeholder="optional"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-600">Parent</label>
+            <label htmlFor="create-category-name-en" className="text-xs text-slate-600">
+              Name (EN)
+            </label>
+            <input
+              id="create-category-name-en"
+              name="nameEn"
+              className="h-9 rounded-md border border-slate-200 px-3 text-sm"
+              placeholder="English label"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="create-category-name-ka" className="text-xs text-slate-600">
+              Name (KA)
+            </label>
+            <input
+              id="create-category-name-ka"
+              name="nameKa"
+              className="h-9 rounded-md border border-slate-200 px-3 text-sm"
+              placeholder="ქართული თარგმანი"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="create-category-name-ru" className="text-xs text-slate-600">
+              Name (RU)
+            </label>
+            <input
+              id="create-category-name-ru"
+              name="nameRu"
+              className="h-9 rounded-md border border-slate-200 px-3 text-sm"
+              placeholder="Русский перевод"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="create-category-parent" className="text-xs text-slate-600">
+              Parent
+            </label>
             <select
+              id="create-category-parent"
               name="parentId"
               className="h-9 rounded-md border border-slate-200 px-3 text-sm"
               defaultValue=""
