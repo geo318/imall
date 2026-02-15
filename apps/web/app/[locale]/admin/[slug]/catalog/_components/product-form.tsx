@@ -12,12 +12,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { useLocale } from "@/i18n/provider";
+import { fetchCategoryTree, flattenCategoryOptions } from "@/lib/api/categories";
 import { getImage } from "@/lib/utils/images";
 import { ImageGalleryUpload } from "./image-gallery-upload";
 import { MarkdownEditor } from "./markdown-editor";
 import {
   type ImageItem,
-  MOCK_CATEGORIES,
   type ProductFormData,
   productFormSchema,
   type VariantFormData,
@@ -60,6 +61,7 @@ const toDateTimeLocal = (value?: string | null) => {
 
 export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props) {
   const queryClient = useQueryClient();
+  const locale = useLocale();
   const [images, setImages] = useState<ImageItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -107,14 +109,24 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     enabled: !!productId,
   });
 
+  const { data: categoryTree = [] } = useQuery({
+    queryKey: ["categories-tree", locale],
+    queryFn: () => fetchCategoryTree(locale),
+    staleTime: 60_000,
+    retry: false,
+  });
+
   const categoryOptions = useMemo(() => {
-    const options = [...MOCK_CATEGORIES] as string[];
+    const options = flattenCategoryOptions(categoryTree).map((category) => ({
+      value: category.fallbackName,
+      label: category.label,
+    }));
     const currentCategory = productData?.category;
-    if (currentCategory && !options.includes(currentCategory as (typeof MOCK_CATEGORIES)[number])) {
-      options.push(currentCategory);
+    if (currentCategory && !options.some((category) => category.value === currentCategory)) {
+      options.push({ value: currentCategory, label: currentCategory });
     }
     return options;
-  }, [productData?.category]);
+  }, [categoryTree, productData?.category]);
 
   useEffect(() => {
     if (!productId && !isSlugDirty) {
@@ -484,11 +496,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
               control={control}
               name="category"
               render={({ field }) => (
-                <Select
-                  value={field.value}
-                  onValueChange={(value) => field.onChange(value)}
-                  defaultValue="sasd"
-                >
+                <Select value={field.value} onValueChange={(value) => field.onChange(value)}>
                   <SelectTrigger
                     id="category"
                     className={errors.category ? "border-destructive" : ""}
@@ -497,8 +505,8 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
                   </SelectTrigger>
                   <SelectContent>
                     {categoryOptions.map((cat) => (
-                      <SelectItem key={cat} value={cat}>
-                        {cat}
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

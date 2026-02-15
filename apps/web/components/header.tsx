@@ -19,11 +19,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getCart } from "@/actions/carts";
 import { MarketHubLogo } from "@/assets";
 import { Link, useRouter, useSearchParams } from "@/i18n/navigation.client";
-import { useTranslations } from "@/i18n/provider";
+import { useLocale, useTranslations } from "@/i18n/provider";
 import type { CartItem } from "@/lib/api/cart";
+import { fetchCategoryTree } from "@/lib/api/categories";
 import { HeaderFavorites } from "./header-favorites";
 import { LanguageSwitcher } from "./language-switcher";
-import { MegaMenu, megaCategories } from "./mega-menu";
+import { MegaMenu } from "./mega-menu";
 
 type HeaderProps = {
   isSignedIn?: boolean;
@@ -39,6 +40,7 @@ export function Header({
   userDisplayName,
 }: HeaderProps) {
   const t = useTranslations();
+  const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const qParam = searchParams.get("search") ?? searchParams.get("q") ?? "";
@@ -77,6 +79,13 @@ export function Header({
     retry: false,
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories-tree", locale],
+    queryFn: () => fetchCategoryTree(locale),
+    staleTime: 60_000,
+    retry: false,
+  });
+
   const cartCount = useMemo(() => {
     const items = cartData?.items ?? [];
     return items.reduce((sum: number, item: CartItem) => sum + (item.qty ?? 0), 0);
@@ -111,7 +120,7 @@ export function Header({
               type="button"
             >
               <Menu className="h-4 w-4" />
-              All Categories
+              {t("nav.categories")}
               <ChevronDown
                 className={`h-3.5 w-3.5 transition-transform ${isCategoryOpen ? "rotate-180" : ""}`}
               />
@@ -164,7 +173,7 @@ export function Header({
             {isSignedIn ? (
               <>
                 <span className="text-sm text-slate-600">
-                  {userDisplayName ? `Hi, ${userDisplayName}` : "Hi"}
+                  {userDisplayName ? `${t("nav.greeting")}, ${userDisplayName}` : t("nav.greeting")}
                 </span>
                 <Dropdown
                   trigger={
@@ -249,7 +258,11 @@ export function Header({
         </div>
 
         <div className="hidden md:block">
-          <MegaMenu isOpen={isCategoryOpen} onClose={() => setIsCategoryOpen(false)} />
+          <MegaMenu
+            isOpen={isCategoryOpen}
+            onClose={() => setIsCategoryOpen(false)}
+            categories={categories}
+          />
         </div>
       </div>
 
@@ -258,43 +271,47 @@ export function Header({
         <div className="md:hidden border-t bg-background max-h-[80vh] overflow-y-auto">
           <nav className="container py-4 flex flex-col space-y-1">
             <span className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Categories
+              {t("nav.categories")}
             </span>
-            {megaCategories.map((category) => (
-              <div key={category.name}>
+            {categories.length === 0 ? (
+              <p className="px-2 py-2 text-sm text-muted-foreground">{t("nav.noCategories")}</p>
+            ) : null}
+            {categories.map((category) => (
+              <div key={category.id}>
                 <button
                   onClick={() =>
-                    setExpandedMobileCat(expandedMobileCat === category.name ? null : category.name)
+                    setExpandedMobileCat(expandedMobileCat === category.id ? null : category.id)
                   }
                   className="w-full flex items-center justify-between px-2 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 rounded-md transition-colors"
                   type="button"
                 >
                   <span className="flex items-center gap-3">
-                    <span>{category.icon}</span>
+                    <span>{category.icon || "📦"}</span>
                     {category.name}
                   </span>
                   <ChevronRight
                     className={`h-4 w-4 text-muted-foreground transition-transform ${
-                      expandedMobileCat === category.name ? "rotate-90" : ""
+                      expandedMobileCat === category.id ? "rotate-90" : ""
                     }`}
                   />
                 </button>
-                {expandedMobileCat === category.name && (
+                {expandedMobileCat === category.id && (
                   <div className="pl-10 pb-2 space-y-1">
                     <Link
-                      href={`/products?category=${encodeURIComponent(category.name)}`}
+                      href={`/products?category=${encodeURIComponent(category.key)}`}
                       onClick={() => setIsMenuOpen(false)}
                       className="block py-1.5 text-sm font-medium text-primary"
                     >
-                      All {category.name}
+                      {t("nav.allIn", { category: category.name })}
                     </Link>
-                    {category.subcategories.map((subcategory) => (
+                    {category.children.map((subcategory) => (
                       <Link
-                        key={subcategory.name}
-                        href={`/products?category=${encodeURIComponent(category.name)}&sub=${encodeURIComponent(subcategory.name)}`}
+                        key={subcategory.id}
+                        href={`/products?category=${encodeURIComponent(category.key)}&sub=${encodeURIComponent(subcategory.key)}`}
                         onClick={() => setIsMenuOpen(false)}
                         className="block py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                       >
+                        <span className="mr-2">{subcategory.icon || "📦"}</span>
                         {subcategory.name}
                       </Link>
                     ))}

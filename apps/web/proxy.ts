@@ -23,7 +23,7 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next();
   }
 
-  // Skip locale/auth middleware for public static assets (e.g. /imall-logo.jpg)
+  // Skip locale/auth middleware for public static assets (e.g. /imall-logo.png)
   // so Next can serve files from /public directly.
   if (/\.[^/]+$/.test(pathname)) {
     return NextResponse.next();

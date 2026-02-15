@@ -1,14 +1,20 @@
 "use client";
 
 import { Button } from "@repo/ui/button";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
-import { useSearchParams } from "@/i18n/navigation.client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "@/components/marketing/product-card";
-import { ProductFilterSidebar, type SortKey } from "@/components/products/product-filter-sidebar";
+import {
+  type CategoryFilterOption,
+  ProductFilterSidebar,
+  type SortKey,
+} from "@/components/products/product-filter-sidebar";
 import { ProductSearchBar } from "@/components/products/product-search-bar";
 import { ProductGridSkeleton } from "@/components/skeletons/product-card-skeleton";
+import { useSearchParams } from "@/i18n/navigation.client";
+import { useLocale, useTranslations } from "@/i18n/provider";
+import { fetchCategoryTree, flattenCategoryOptions } from "@/lib/api/categories";
 import { searchShopProducts } from "@/lib/api/products";
 import { mapApiProductToMarketing } from "@/lib/marketing";
 
@@ -17,6 +23,8 @@ type Props = {
 };
 
 export function ShopProducts({ shopSlug }: Props) {
+  const t = useTranslations();
+  const locale = useLocale();
   const searchParams = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -26,6 +34,32 @@ export function ShopProducts({ shopSlug }: Props) {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<SortKey>("newest");
+
+  const { data: categoryTree = [] } = useQuery({
+    queryKey: ["categories-tree", locale],
+    queryFn: () => fetchCategoryTree(locale),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const categoryOptions = useMemo<CategoryFilterOption[]>(
+    () =>
+      flattenCategoryOptions(categoryTree).map((category) => ({
+        value: category.key,
+        label: category.label,
+      })),
+    [categoryTree],
+  );
+
+  const categoryNameToKey = useMemo(() => {
+    const mapping = new Map<string, string>();
+    flattenCategoryOptions(categoryTree).forEach((category) => {
+      mapping.set(category.key.toLowerCase(), category.key);
+      mapping.set(category.label.toLowerCase(), category.key);
+      mapping.set(category.fallbackName.toLowerCase(), category.key);
+    });
+    return mapping;
+  }, [categoryTree]);
 
   // Sync search query with URL params
   useEffect(() => {
@@ -85,28 +119,24 @@ export function ShopProducts({ shopSlug }: Props) {
     return data?.pages.flatMap((page) => page.items) ?? [];
   }, [data]);
 
-  // Filter products (client-side for categories since they're mocked)
+  // Filter products
   const filteredProducts = useMemo(() => {
     // Filter out products with missing required data before mapping
     const validProducts = allProducts.filter((product) => product.id && product.slug);
     let result = validProducts.map((product) => mapApiProductToMarketing(product));
 
-    // Category filter (mock - using product slug to determine category)
+    // Category filter
     if (selectedCategories.length > 0) {
       result = result.filter((product) => {
-        // Mock category assignment based on slug
-        const categoryHash = product.slug
-          .split("")
-          .reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        const categories = ["Electronics", "Clothing", "Home & Garden", "Sports", "Books", "Toys"];
-        const category = categories[categoryHash % categories.length] ?? "";
-
-        return selectedCategories.includes(category);
+        const category = product.category?.trim().toLowerCase();
+        if (!category) return false;
+        const resolvedKey = categoryNameToKey.get(category);
+        return resolvedKey ? selectedCategories.includes(resolvedKey) : false;
       });
     }
 
     return result;
-  }, [allProducts, selectedCategories]);
+  }, [allProducts, categoryNameToKey, selectedCategories]);
 
   const clearAllFilters = () => {
     setSearchQuery("");
@@ -124,7 +154,7 @@ export function ShopProducts({ shopSlug }: Props) {
       {/* Search Bar */}
       <div className="flex flex-col md:flex-row gap-4">
         <ProductSearchBar
-          placeholder={`Search ${shopSlug} products...`}
+          placeholder={t("shopProducts.searchPlaceholder", { shopSlug })}
           basePath={`/${shopSlug}`}
         />
         <Button
@@ -133,7 +163,7 @@ export function ShopProducts({ shopSlug }: Props) {
           onClick={() => setShowMobileFilters(!showMobileFilters)}
         >
           <SlidersHorizontal className="h-5 w-5" />
-          Filters
+          {t("products.filters")}
         </Button>
       </div>
 
@@ -141,6 +171,7 @@ export function ShopProducts({ shopSlug }: Props) {
       {showMobileFilters && (
         <div className="md:hidden p-4 bg-card border rounded-lg">
           <ProductFilterSidebar
+            categories={categoryOptions}
             priceRange={priceRange}
             onPriceRangeChange={setPriceRange}
             selectedCategories={selectedCategories}
@@ -159,6 +190,7 @@ export function ShopProducts({ shopSlug }: Props) {
         {/* Desktop Sidebar */}
         <ProductFilterSidebar
           className="hidden md:block w-64 shrink-0 sticky top-4 h-fit"
+          categories={categoryOptions}
           priceRange={priceRange}
           onPriceRangeChange={setPriceRange}
           selectedCategories={selectedCategories}
@@ -174,14 +206,14 @@ export function ShopProducts({ shopSlug }: Props) {
         {/* Product Grid */}
         <div className="flex-1">
           <p className="text-sm text-muted-foreground mb-6">
-            Showing {filteredProducts.length} products
+            {t("products.showingCount", { count: filteredProducts.length })}
           </p>
 
           {filteredProducts.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-muted-foreground mb-4">No products found matching your criteria</p>
+              <p className="text-muted-foreground mb-4">{t("products.emptyBody")}</p>
               <Button variant="outline" onClick={clearAllFilters}>
-                Clear Filters
+                {t("products.filtersClear")}
               </Button>
             </div>
           ) : (
@@ -196,7 +228,7 @@ export function ShopProducts({ shopSlug }: Props) {
               <div ref={loadMoreRef} className="h-10" />
               {isFetchingNextPage && (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">Loading more products...</p>
+                  <p className="text-muted-foreground">{t("products.loadingMore")}</p>
                 </div>
               )}
             </>

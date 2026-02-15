@@ -2,31 +2,26 @@
 
 import { Button } from "@repo/ui/button";
 import { uuid } from "@tanstack/react-form";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "@/components/marketing/product-card";
 import {
+  type CategoryFilterOption,
   type ListingType,
   ProductFilterSidebar,
   type SortKey,
 } from "@/components/products/product-filter-sidebar";
 import { ProductSearchBar } from "@/components/products/product-search-bar";
 import { useSearchParams } from "@/i18n/navigation.client";
-import { useTranslations } from "@/i18n/provider";
+import { useLocale, useTranslations } from "@/i18n/provider";
+import { fetchCategoryTree, flattenCategoryOptions } from "@/lib/api/categories";
 import { searchProducts } from "@/lib/api/products";
 import { mapApiProductToMarketing } from "@/lib/marketing";
-import { productCategoriesMock } from "@/MOCKS/productsPage.mock";
-
-function mockCategoryForSlug(slug: string) {
-  const categories = productCategoriesMock.map((c) => c.name);
-  let acc = 0;
-  for (let i = 0; i < slug.length; i++) acc = (acc + slug.charCodeAt(i)) % 1_000_000;
-  return categories[acc % categories.length] ?? categories[0] ?? "All";
-}
 
 export function ProductsExplorerClient() {
   const t = useTranslations();
+  const locale = useLocale();
   const searchParams = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const categoryParam = searchParams.get("category") || "";
@@ -41,6 +36,32 @@ export function ProductsExplorerClient() {
   const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
+  const { data: categoryTree = [] } = useQuery({
+    queryKey: ["categories-tree", locale],
+    queryFn: () => fetchCategoryTree(locale),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const categoryOptions = useMemo<CategoryFilterOption[]>(
+    () =>
+      flattenCategoryOptions(categoryTree).map((category) => ({
+        value: category.key,
+        label: category.label,
+      })),
+    [categoryTree],
+  );
+
+  const categoryNameToKey = useMemo(() => {
+    const mapping = new Map<string, string>();
+    flattenCategoryOptions(categoryTree).forEach((category) => {
+      mapping.set(category.key.toLowerCase(), category.key);
+      mapping.set(category.label.toLowerCase(), category.key);
+      mapping.set(category.fallbackName.toLowerCase(), category.key);
+    });
+    return mapping;
+  }, [categoryTree]);
+
   // Sync search query with URL params
   useEffect(() => {
     const urlSearch = searchParams.get("search") || "";
@@ -52,12 +73,13 @@ export function ProductsExplorerClient() {
   useEffect(() => {
     setSelectedCategories((prev) => {
       if (categoryParam) {
-        if (prev.length === 1 && prev[0] === categoryParam) return prev;
-        return [categoryParam];
+        const normalized = categoryNameToKey.get(categoryParam.toLowerCase()) ?? categoryParam;
+        if (prev.length === 1 && prev[0] === normalized) return prev;
+        return [normalized];
       }
       return prev.length === 0 ? prev : [];
     });
-  }, [categoryParam]);
+  }, [categoryNameToKey, categoryParam]);
 
   // Map frontend sort keys to backend sort values
   const sortMap: Record<SortKey, "newest" | "oldest" | "priceAsc" | "priceDesc" | "random"> = {
@@ -124,22 +146,24 @@ export function ProductsExplorerClient() {
     return data?.pages.flatMap((page) => page.items) ?? [];
   }, [data]);
 
-  // Filter and sort products (client-side for categories since they're mocked)
+  // Filter and sort products
   const filteredProducts = useMemo(() => {
     // Filter out products with missing required data before mapping
     const validProducts = allProducts.filter((product) => product.id && product.slug);
     let result = validProducts.map((product) => mapApiProductToMarketing(product));
 
-    // Category filter (mock)
+    // Category filter
     if (selectedCategories.length > 0) {
       result = result.filter((product) => {
-        const category = mockCategoryForSlug(product.slug);
-        return selectedCategories.includes(category);
+        const category = product.category?.trim().toLowerCase();
+        if (!category) return false;
+        const resolvedKey = categoryNameToKey.get(category);
+        return resolvedKey ? selectedCategories.includes(resolvedKey) : false;
       });
     }
 
     return result;
-  }, [allProducts, selectedCategories]);
+  }, [allProducts, categoryNameToKey, selectedCategories]);
 
   const clearAllFilters = () => {
     setSearchQuery("");
@@ -168,6 +192,7 @@ export function ProductsExplorerClient() {
       {showMobileFilters && (
         <div className="md:hidden mb-8 p-4 bg-card border rounded-lg">
           <ProductFilterSidebar
+            categories={categoryOptions}
             priceRange={priceRange}
             onPriceRangeChange={setPriceRange}
             selectedCategories={selectedCategories}
@@ -185,6 +210,7 @@ export function ProductsExplorerClient() {
         {/* Desktop Sidebar */}
         <ProductFilterSidebar
           className="hidden md:block w-64 shrink-0 sticky top-4 h-fit"
+          categories={categoryOptions}
           priceRange={priceRange}
           onPriceRangeChange={setPriceRange}
           selectedCategories={selectedCategories}
@@ -231,7 +257,7 @@ export function ProductsExplorerClient() {
               <div ref={loadMoreRef} className="h-10" />
               {isFetchingNextPage && (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">Loading more products...</p>
+                  <p className="text-muted-foreground">{t("products.loadingMore")}</p>
                 </div>
               )}
             </>

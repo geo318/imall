@@ -33,19 +33,20 @@ async function readSectionFile(locale: Locale, sectionId: string) {
 async function listSectionIds(locale: Locale) {
   const directoryPath = path.join(LEGAL_CONTENT_ROOT, locale);
   const entries = await fs.readdir(directoryPath, { withFileTypes: true });
+  const hiddenSections = new Set(["translated-terms"]);
   const preferredOrder = [
     "privacy-policy",
     "terms-of-service",
     "cookies-policy",
     "return-and-cancellation-policy",
     "platform-overview",
-    "translated-terms",
     "contact-information",
   ];
 
   return entries
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .map((entry) => entry.name.replace(/\.md$/i, ""))
+    .filter((sectionId) => !hiddenSections.has(sectionId))
     .sort((a, b) => {
       const aIndex = preferredOrder.indexOf(a);
       const bIndex = preferredOrder.indexOf(b);

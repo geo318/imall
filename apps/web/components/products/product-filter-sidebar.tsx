@@ -6,16 +6,20 @@ import { Label } from "@repo/ui/label";
 import { RangeSlider } from "@repo/ui/range-slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
-import { useTranslations } from "@/i18n/provider";
 import { useState } from "react";
+import { useTranslations } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
-import { productCategoriesMock } from "@/MOCKS/productsPage.mock";
 
 export type SortKey = "newest" | "oldest" | "price-asc" | "price-desc";
 export type ListingType = "all" | "buy-now" | "auction";
+export type CategoryFilterOption = {
+  value: string;
+  label: string;
+};
 
 type Props = {
   className?: string;
+  categories: CategoryFilterOption[];
   priceRange: [number, number];
   onPriceRangeChange: (range: [number, number]) => void;
   selectedCategories: string[];
@@ -32,6 +36,7 @@ type Props = {
 
 export function ProductFilterSidebar({
   className,
+  categories,
   priceRange,
   onPriceRangeChange,
   selectedCategories,
@@ -57,11 +62,11 @@ export function ProductFilterSidebar({
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const toggleCategory = (category: string) => {
+  const toggleCategory = (categoryValue: string) => {
     onCategoriesChange(
-      selectedCategories.includes(category)
-        ? selectedCategories.filter((c) => c !== category)
-        : [...selectedCategories, category],
+      selectedCategories.includes(categoryValue)
+        ? selectedCategories.filter((c) => c !== categoryValue)
+        : [...selectedCategories, categoryValue],
     );
   };
 
@@ -70,8 +75,6 @@ export function ProductFilterSidebar({
     priceRange[1] < priceMax ||
     selectedCategories.length > 0 ||
     listingType !== "all";
-
-  const categories = productCategoriesMock.map((c) => c.name);
 
   // Map frontend sort keys to display labels
   const sortOptions = [
@@ -136,7 +139,7 @@ export function ProductFilterSidebar({
             onClick={() => toggleSection("categories")}
             className="flex items-center justify-between w-full text-sm font-semibold"
           >
-          {t("products.filtersCategories")}
+            {t("products.filtersCategories")}
             {expandedSections.categories ? (
               <ChevronUp className="h-4 w-4" />
             ) : (
@@ -146,17 +149,17 @@ export function ProductFilterSidebar({
           {expandedSections.categories && (
             <div className="space-y-2 pt-2">
               {categories.map((category) => (
-                <div key={category} className="flex items-center space-x-2">
+                <div key={category.value} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`category-${category}`}
-                    checked={selectedCategories.includes(category)}
-                    onCheckedChange={() => toggleCategory(category)}
+                    id={`category-${category.value}`}
+                    checked={selectedCategories.includes(category.value)}
+                    onCheckedChange={() => toggleCategory(category.value)}
                   />
                   <Label
-                    htmlFor={`category-${category}`}
+                    htmlFor={`category-${category.value}`}
                     className="text-sm font-normal cursor-pointer"
                   >
-                    {category}
+                    {category.label}
                   </Label>
                 </div>
               ))}
@@ -173,7 +176,7 @@ export function ProductFilterSidebar({
             onClick={() => toggleSection("listingType")}
             className="flex items-center justify-between w-full text-sm font-semibold"
           >
-          {t("products.filtersListingType")}
+            {t("products.filtersListingType")}
             {expandedSections.listingType ? (
               <ChevronUp className="h-4 w-4" />
             ) : (

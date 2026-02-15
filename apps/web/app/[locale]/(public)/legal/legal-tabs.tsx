@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@repo/ui/tabs";
 import { BookOpen, Cookie, FileText, Mail, Scale, Shield, Tags } from "lucide-react";
 import { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { useTranslations } from "@/i18n/provider";
 import type { LegalSection } from "@/lib/legal";
 
 type LegalTabsProps = {
@@ -13,6 +14,7 @@ type LegalTabsProps = {
 };
 
 export function LegalTabs({ sections, initialSectionId, emptyLabel }: LegalTabsProps) {
+  const t = useTranslations();
   const sectionIds = useMemo(() => new Set(sections.map((section) => section.id)), [sections]);
   const fallbackSection = sections[0]?.id;
   const activeDefault =
@@ -34,28 +36,27 @@ export function LegalTabs({ sections, initialSectionId, emptyLabel }: LegalTabsP
     return Cookie;
   };
 
-  const subtitleFor = (id: string) => {
-    if (id.includes("privacy")) return "How we collect, use, and protect your data";
-    if (id.includes("terms")) return "Rules and conditions for using our platform";
-    if (id.includes("cookies")) return "How we use cookies and similar technologies";
-    if (id.includes("return")) return "Our commitment to fair returns and refunds";
-    if (id.includes("translated")) return "Reference terms across supported languages";
-    if (id.includes("contact")) return "How to reach us for legal and data-right requests";
-    if (id.includes("platform")) return "How iMall operates as a marketplace intermediary";
-    return "Legal policy details";
+  const copyKeyFor = (id: string) => {
+    if (id.includes("privacy")) return "privacy";
+    if (id.includes("terms")) return "terms";
+    if (id.includes("cookies")) return "cookies";
+    if (id.includes("return")) return "returns";
+    if (id.includes("translated")) return "glossary";
+    if (id.includes("contact")) return "contact";
+    if (id.includes("platform")) return "overview";
+    return "generic";
   };
 
   const labelFor = (id: string, fallback: string) => {
-    if (id.includes("privacy")) return "Privacy";
-    if (id.includes("terms")) return "Terms";
-    if (id.includes("cookies")) return "Cookies";
-    if (id.includes("return")) return "Returns";
-    if (id.includes("translated")) return "Glossary";
-    if (id.includes("contact")) return "Contact";
-    if (id.includes("platform")) return "Overview";
+    const key = copyKeyFor(id);
+    if (key !== "generic") {
+      return t(`legal.tabs.labels.${key}`);
+    }
     const [firstWord] = fallback.trim().split(/\s+/);
     return firstWord || fallback;
   };
+
+  const subtitleFor = (id: string) => t(`legal.tabs.subtitles.${copyKeyFor(id)}`);
 
   return (
     <Tabs value={activeSection} onValueChange={setActiveSection} className="space-y-8">

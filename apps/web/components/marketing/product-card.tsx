@@ -2,15 +2,16 @@
 
 import { Badge } from "@repo/ui/badge";
 import { Gavel } from "lucide-react";
-import { useTranslations } from "@/i18n/provider";
-import { Link } from "@/i18n/navigation.client";
 import LazyImage from "@/components/shared/lazy-image";
+import { Link } from "@/i18n/navigation.client";
+import { useTranslations } from "@/i18n/provider";
 import { AuctionTimer } from "./auction-timer";
 
 export type MarketingProduct = {
   id: string;
   slug: string;
   title: string;
+  category?: string | null;
   price?: number | null;
   currency?: string | null;
   vendor: string;

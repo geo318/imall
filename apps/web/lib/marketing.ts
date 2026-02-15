@@ -27,6 +27,7 @@ export function mapApiProductToMarketing(product: ApiProduct): MarketingProduct 
     id: product.id,
     slug: product.slug,
     title: product.title,
+    category: product.category ?? null,
     price: firstVariant ? Number(firstVariant.price) : null,
     currency: firstVariant?.currency ?? null,
     vendor: shopName,

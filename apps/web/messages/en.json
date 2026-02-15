@@ -3,6 +3,12 @@
     "products": "Products",
     "faq": "FAQ",
     "searchPlaceholder": "Search products…",
+    "categories": "Categories",
+    "allIn": "All {category}",
+    "browseAllIn": "Browse all in {category}",
+    "seeAllIn": "See all {category} →",
+    "noCategories": "No categories available yet.",
+    "greeting": "Hi",
     "admin": "Admin",
     "createShop": "Create shop",
     "signIn": "Sign in",
@@ -23,7 +29,7 @@
       }
     },
     "why": {
-      "tag": "Why MarketHub",
+      "tag": "Why iMall",
       "title": "Built for marketplaces that need trust, speed, and flexibility.",
       "description": "Multi-tenant shops, auctions when you need them, and a shared admin space that keeps everything running smoothly."
     },
@@ -186,7 +192,28 @@
     "eyebrow": "Legal",
     "title": "Legal and Compliance",
     "description": "Review privacy, terms, consent, and cookie policies in one place.",
-    "emptySections": "Legal sections are not available yet."
+    "emptySections": "Legal sections are not available yet.",
+    "tabs": {
+      "labels": {
+        "privacy": "Privacy",
+        "terms": "Terms",
+        "cookies": "Cookies",
+        "returns": "Returns",
+        "glossary": "Glossary",
+        "contact": "Contact",
+        "overview": "Overview"
+      },
+      "subtitles": {
+        "privacy": "How we collect, use, and protect your data",
+        "terms": "Rules and conditions for using our platform",
+        "cookies": "How we use cookies and similar technologies",
+        "returns": "Our commitment to fair returns and refunds",
+        "glossary": "Reference terms across supported languages",
+        "contact": "How to reach us for legal and data-right requests",
+        "overview": "How iMall operates as a marketplace intermediary",
+        "generic": "Legal policy details"
+      }
+    }
   },
   "vendors": {
     "title": "Our Vendors",
@@ -215,8 +242,12 @@
     "filtersSortBy": "Sort by",
     "filtersSortPlaceholder": "Sort by...",
     "filtersNewest": "Newest first",
+    "loadingMore": "Loading more products...",
     "showingCount": "Showing {count} products",
     "emptyBody": "No products found matching your criteria."
+  },
+  "shopProducts": {
+    "searchPlaceholder": "Search {shopSlug} products..."
   },
   "sell": {
     "eyebrow": "Start selling",

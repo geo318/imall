@@ -1,19 +1,5 @@
 import { z } from "zod";
 
-// Mock categories - can be replaced with real data later
-export const MOCK_CATEGORIES = [
-  "Electronics",
-  "Clothing",
-  "Home & Garden",
-  "Sports & Outdoors",
-  "Books",
-  "Toys & Games",
-  "Food & Beverages",
-  "Health & Beauty",
-  "Automotive",
-  "Other",
-] as const;
-
 // File validation schema for images
 // Note: z.file() with .min(), .max(), .mime() is available in Zod 4+
 // Currently using Zod 3, so using instanceof(File) with refinements
@@ -37,29 +23,26 @@ const optionalNumberString = z.preprocess(
     const trimmed = value.trim();
     return trimmed === "" ? undefined : trimmed;
   },
-  z.string().regex(/^\d+(\.\d{1,2})?$/, "Must be a valid number").optional(),
+  z
+    .string()
+    .regex(/^\d+(\.\d{1,2})?$/, "Must be a valid number")
+    .optional(),
 );
 
-const optionalIntegerString = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value === "number") return value.toString();
-    if (typeof value !== "string") return value;
-    const trimmed = value.trim();
-    return trimmed === "" ? undefined : trimmed;
-  },
-  z.string().regex(/^\d+$/, "Must be a whole number").optional(),
-);
+const optionalIntegerString = z.preprocess((value) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value === "number") return value.toString();
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}, z.string().regex(/^\d+$/, "Must be a whole number").optional());
 
-const optionalDateTimeString = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined) return undefined;
-    if (typeof value !== "string") return value;
-    const trimmed = value.trim();
-    return trimmed === "" ? undefined : trimmed;
-  },
-  z.string().optional(),
-);
+const optionalDateTimeString = z.preprocess((value) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}, z.string().optional());
 
 // Variant schema
 export const variantSchema = z.object({
@@ -104,7 +87,9 @@ export const productFormSchema = z
       .min(1, "At least one variant is required")
       .refine(
         (variants) =>
-          variants.every((v) => !v.price || (!Number.isNaN(Number(v.price)) && Number(v.price) > 0)),
+          variants.every(
+            (v) => !v.price || (!Number.isNaN(Number(v.price)) && Number(v.price) > 0),
+          ),
         "All variants must have a valid price greater than 0",
       ),
   })
@@ -113,10 +98,7 @@ export const productFormSchema = z
       !data.isAuction ||
       data.variants.length === 0 ||
       data.variants.some(
-        (v) =>
-          v.auctionStartBid &&
-          v.auctionEndsAt &&
-          new Date(v.auctionEndsAt) > new Date(),
+        (v) => v.auctionStartBid && v.auctionEndsAt && new Date(v.auctionEndsAt) > new Date(),
       ),
     {
       message: "Auction products must have at least one variant with valid auction settings",
