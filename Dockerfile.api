@@ -24,6 +24,8 @@ COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/apps/api /app/apps/api
 COPY --from=build /app/packages /app/packages
 COPY --from=build /app/package.json /app/package.json
+COPY --from=build /app/drizzle.config.ts /app/drizzle.config.ts
+COPY --from=build /app/tsconfig.json /app/tsconfig.json
 
 EXPOSE 3001
-CMD ["bun", "apps/api/dist/index.js"]
+CMD ["sh", "-c", "bun run db:push && bun apps/api/dist/index.js"]
