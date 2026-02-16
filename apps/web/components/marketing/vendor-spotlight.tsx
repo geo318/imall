@@ -1,7 +1,6 @@
 import Image from "next/image";
+import { getCurrentLocale, Link } from "@/i18n/navigation.server";
 import { getTranslations } from "@/i18n/server";
-import { getCurrentLocale } from "@/i18n/navigation.server";
-import { Link } from "@/i18n/navigation.server";
 import { homeVendorsMock } from "@/MOCKS/homeVendors.mock";
 
 export async function VendorSpotlight() {
@@ -19,12 +18,12 @@ export async function VendorSpotlight() {
           <p className="mt-2 text-slate-600">{t("vendorSpotlight.subtitle")}</p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
           {homeVendorsMock.map((vendor) => (
             <Link
               key={vendor.name}
               href={vendor.href ?? "/demo-shop"}
-              className="card-hover flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-6 text-center"
+              className="card-hover flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-4 text-center sm:p-6"
               prefetch
             >
               <div className="relative mb-3 h-20 w-20 overflow-hidden rounded-full bg-slate-100">

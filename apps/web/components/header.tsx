@@ -108,7 +108,7 @@ export function Header({
           {/* Logo */}
           <Link href="/" className="flex items-center gap-1 flex-shrink-0">
             <MarketHubLogo width={32} height={32} className="h-8 w-8" />
-            <span className="font-bold text-xl hidden sm:inline -ml-1">Mall</span>
+            <span className="-ml-1 whitespace-nowrap font-bold text-xl">Mall</span>
           </Link>
 
           {/* Categories Trigger */}
@@ -158,7 +158,7 @@ export function Header({
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-2 flex-shrink-0 ml-auto">
-            <LanguageSwitcher />
+            <LanguageSwitcher className="hidden lg:inline-flex" />
             <HeaderFavorites />
             <Link href="/cart">
               <Button variant="ghost" size="sm" className="relative">
@@ -211,36 +211,8 @@ export function Header({
           </div>
 
           {/* Mobile Actions */}
-          <div className="flex md:hidden items-center gap-1 flex-1">
-            <form
-              className="flex flex-1"
-              onSubmit={(e) => {
-                e.preventDefault();
-                pushSearch(q);
-                setQ("");
-              }}
-            >
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder={t("nav.searchPlaceholder")}
-                  className="w-full pl-10 pr-10"
-                />
-                {q && (
-                  <button
-                    type="button"
-                    onClick={() => setQ("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2"
-                  >
-                    <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                  </button>
-                )}
-              </div>
-            </form>
+          <div className="flex md:hidden items-center gap-1 ml-auto">
             <HeaderFavorites />
-            <LanguageSwitcher className="ml-1" />
             <Link href="/cart">
               <Button variant="ghost" size="sm" className="relative">
                 <ShoppingBag className="h-5 w-5" />
@@ -264,6 +236,34 @@ export function Header({
             categories={categories}
           />
         </div>
+
+        <form
+          className="container pb-3 md:hidden"
+          onSubmit={(e) => {
+            e.preventDefault();
+            pushSearch(q);
+            setQ("");
+          }}
+        >
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t("nav.searchPlaceholder")}
+              className="w-full pl-10 pr-10"
+            />
+            {q && (
+              <button
+                type="button"
+                onClick={() => setQ("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+              >
+                <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </button>
+            )}
+          </div>
+        </form>
       </div>
 
       {/* Mobile Menu */}
@@ -319,6 +319,14 @@ export function Header({
                 )}
               </div>
             ))}
+
+            <div className="my-2 border-t" />
+            <div className="px-2 pt-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("common.language")}
+              </p>
+              <LanguageSwitcher className="w-full justify-center" />
+            </div>
 
             <div className="my-2 border-t" />
             <div className="pt-4 border-t border-border flex flex-col space-y-2">
