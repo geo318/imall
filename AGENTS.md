@@ -98,6 +98,11 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Added `SUPERADMIN_EMAIL` and `SUPERADMIN_PASSWORD` to Render env vars and Docker web build placeholders.
 - Added header/footer language switcher that rewrites the locale prefix while preserving path and query.
 - Added global category tree schema (categories + relations), seed data, and superadmin UI/actions to manage categories; added per-shop auction toggle (`canAuction`) in superadmin.
+- Category tree API now guards malformed relations (ignores self-links, de-duplicates children, and falls back to all categories as roots if no roots are detected) so menus still render with imperfect data.
+- Product/shop filter sidebars now show only root categories by default and reveal nested categories when a root is checked; selecting a root without sub-filters now matches all descendants.
+- Header mobile UX updated: language switcher is hidden under `lg`, moved into the mobile side menu, mobile search moved to its own row, and the `iMall` wordmark is always visible.
+- Home hero was replaced with the design-aligned variant and its static data moved into `components/marketing/hero-content.ts`.
+- Public seller contact fields were added end-to-end (`sellerEmail`, `sellerPhone`, `sellerRules`): DB migration/schema, admin settings form/API, public shop profile API, and rendering on both shop and product pages when present.
 - `dev:all` now rebuilds `@repo/db` first to keep generated exports in sync during local dev.
 - Superadmin category tree now loads roots first and fetches child categories on expand via API routes.
 - Added `seed:categories` script and Render build flag `SEED_CATEGORIES` for idempotent category seeding during API builds.
