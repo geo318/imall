@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import type { Locale } from "@/i18n/config";
+import { getTranslations } from "@/i18n/server";
 import { getSuperadminCookieHeader } from "@/lib/superadmin";
 import { ShopSettingsForm } from "./shop-settings-form";
 
@@ -21,25 +23,30 @@ async function fetchSettings(slug: string) {
   return response.json();
 }
 
-export default async function ShopSettingsPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function ShopSettingsPage({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { slug, locale } = await params;
+  const t = await getTranslations(locale as Locale);
   const settings = await fetchSettings(slug);
 
   return (
     <div className="container py-10 space-y-8">
       <div className="space-y-2">
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Settings
+          {t("adminSettings.eyebrow")}
         </p>
-        <h1 className="text-3xl font-bold">{settings.name ?? slug} Configuration</h1>
-        <p className="text-sm text-muted-foreground">
-          Update the storefront metadata and custom settings that your shop exposes.
-        </p>
+        <h1 className="text-3xl font-bold">
+          {settings.name ?? slug} {t("adminSettings.configuration")}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t("adminSettings.description")}</p>
       </div>
 
       {!settings.canSell ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          Selling is currently disabled for this shop. Your application is pending approval.
+          {t("adminSettings.pendingApproval")}
         </div>
       ) : null}
 
@@ -52,6 +59,9 @@ export default async function ShopSettingsPage({ params }: { params: Promise<{ s
           initialPayoutNotes={settings.payoutNotes ?? null}
           initialOrderNotes={settings.orderNotes ?? null}
           initialInventoryNotes={settings.inventoryNotes ?? null}
+          initialSellerEmail={settings.sellerEmail ?? null}
+          initialSellerPhone={settings.sellerPhone ?? null}
+          initialSellerRules={settings.sellerRules ?? null}
         />
       </div>
     </div>

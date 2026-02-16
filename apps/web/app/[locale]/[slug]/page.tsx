@@ -1,5 +1,7 @@
 import { env } from "@repo/shared";
+import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { getShopProfile } from "@/app/actions/shops";
 import { isProductIdentifier, isReservedRoute } from "@/lib/utils";
 import { ProductServer } from "./_components/product/product-server";
 import { ShopProfileClient } from "./_components/shop/shop-profile-client";
@@ -10,14 +12,7 @@ export default async function SlugPage({ params }: { params: Promise<{ slug: str
 
   // Check if it's a reserved route name
   if (isReservedRoute(slug)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">404 - Page Not Found</h1>
-          <p className="text-slate-600">The page you're looking for doesn't exist.</p>
-        </div>
-      </div>
-    );
+    notFound();
   }
 
   // Check if it's a product identifier (format: slug-abc12345)
@@ -26,10 +21,17 @@ export default async function SlugPage({ params }: { params: Promise<{ slug: str
   }
 
   // Otherwise treat it as a shop slug
-  const shopName = slug === env.SEED_SHOP_SLUG ? env.SEED_SHOP_NAME : slug;
+  const profile = await getShopProfile(slug);
+  const shopName = profile?.name ?? (slug === env.SEED_SHOP_SLUG ? env.SEED_SHOP_NAME : slug);
   return (
     <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
-      <ShopProfileClient shopName={shopName} shopSlug={slug} />
+      <ShopProfileClient
+        shopName={shopName}
+        shopSlug={slug}
+        sellerEmail={profile?.sellerEmail ?? null}
+        sellerPhone={profile?.sellerPhone ?? null}
+        sellerRules={profile?.sellerRules ?? null}
+      />
     </Suspense>
   );
 }

@@ -1,4 +1,4 @@
-import { db, memberships, tenants, users } from "@repo/db";
+import { db, memberships, shopSettings, tenants, users } from "@repo/db";
 import { slugify } from "@repo/shared";
 import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
@@ -86,6 +86,43 @@ export const shopsRoutes = new Elysia({ prefix: "/shops" })
       return { error: err instanceof Error ? err.message : "Failed to load shops" };
     }
   })
+  .get("/:shopSlug/profile", async ({ params, set }) => {
+    try {
+      const { shopSlug } = params as { shopSlug: string };
+      const [row] = await db
+        .select({
+          id: tenants.id,
+          slug: tenants.shopSlug,
+          name: tenants.name,
+          canSell: tenants.canSell,
+          sellerEmail: shopSettings.sellerEmail,
+          sellerPhone: shopSettings.sellerPhone,
+          sellerRules: shopSettings.sellerRules,
+        })
+        .from(tenants)
+        .leftJoin(shopSettings, eq(shopSettings.tenantId, tenants.id))
+        .where(eq(tenants.shopSlug, shopSlug))
+        .limit(1);
+
+      if (!row || !row.canSell) {
+        set.status = 404;
+        return { error: "Shop not found" };
+      }
+
+      return {
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        sellerEmail: row.sellerEmail ?? null,
+        sellerPhone: row.sellerPhone ?? null,
+        sellerRules: row.sellerRules ?? null,
+      };
+    } catch (err) {
+      if (err instanceof Response) return err;
+      set.status = 500;
+      return { error: err instanceof Error ? err.message : "Failed to load shop profile" };
+    }
+  })
   .post("/register", async ({ auth, body, request, set }) => {
     try {
       const payload = createShopSchema.parse(body);
@@ -124,7 +161,12 @@ export const shopsRoutes = new Elysia({ prefix: "/shops" })
           name: payload.name,
           canSell: false,
         })
-        .returning({ id: tenants.id, slug: tenants.shopSlug, name: tenants.name, canSell: tenants.canSell });
+        .returning({
+          id: tenants.id,
+          slug: tenants.shopSlug,
+          name: tenants.name,
+          canSell: tenants.canSell,
+        });
 
       if (!createdTenant?.id) {
         set.status = 500;

@@ -17,11 +17,11 @@ import {
   tenants,
   variants,
 } from "@repo/db";
+import { slugify } from "@repo/shared";
 import { and, desc, eq, inArray, ne, sql, sum } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { adminOrSuperadminGuard, getTenantIdBySlug } from "../context";
-import { slugify } from "@repo/shared";
 
 const settingsSchema = z.object({
   name: z.string().min(1).optional(),
@@ -30,6 +30,9 @@ const settingsSchema = z.object({
   payoutNotes: z.string().optional(),
   orderNotes: z.string().optional(),
   inventoryNotes: z.string().optional(),
+  sellerEmail: z.string().email().optional().or(z.literal("")),
+  sellerPhone: z.string().optional(),
+  sellerRules: z.string().optional(),
 });
 
 function extractSlugSuffix(slug: string | null | undefined) {
@@ -73,21 +76,15 @@ const orderStatusSchema = z.object({
   status: z.enum(["pending", "processing", "completed", "cancelled"]),
 });
 
-const optionalNumber = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined || value === "") return undefined;
-    return value;
-  },
-  z.coerce.number().optional(),
-);
+const optionalNumber = z.preprocess((value) => {
+  if (value === null || value === undefined || value === "") return undefined;
+  return value;
+}, z.coerce.number().optional());
 
-const optionalDate = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined || value === "") return undefined;
-    return value;
-  },
-  z.coerce.date().optional(),
-);
+const optionalDate = z.preprocess((value) => {
+  if (value === null || value === undefined || value === "") return undefined;
+  return value;
+}, z.coerce.date().optional());
 
 const payoutCreateSchema = z.object({
   status: z.string().optional(),
@@ -252,6 +249,9 @@ async function getOrCreateShopSettings(tenantId: string) {
       payoutNotes: null,
       orderNotes: null,
       inventoryNotes: null,
+      sellerEmail: null,
+      sellerPhone: null,
+      sellerRules: null,
     })
     .returning();
   return created;
@@ -288,6 +288,9 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       payoutNotes: settings?.payoutNotes ?? null,
       orderNotes: settings?.orderNotes ?? null,
       inventoryNotes: settings?.inventoryNotes ?? null,
+      sellerEmail: settings?.sellerEmail ?? null,
+      sellerPhone: settings?.sellerPhone ?? null,
+      sellerRules: settings?.sellerRules ?? null,
     };
   })
   .patch("/settings", async ({ params, body }) => {
@@ -295,7 +298,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
     const tenantId = await getTenantIdBySlug(shopSlug);
     const payload = settingsSchema.parse(body);
 
-    const settingsRow = await getOrCreateShopSettings(tenantId);
+    await getOrCreateShopSettings(tenantId);
 
     await db.transaction(async (tx) => {
       if (payload.name) {
@@ -324,6 +327,9 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
           | "payoutNotes"
           | "orderNotes"
           | "inventoryNotes"
+          | "sellerEmail"
+          | "sellerPhone"
+          | "sellerRules"
         >
       > = {};
 
@@ -332,12 +338,12 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       if (payload.payoutNotes !== undefined) updates.payoutNotes = payload.payoutNotes;
       if (payload.orderNotes !== undefined) updates.orderNotes = payload.orderNotes;
       if (payload.inventoryNotes !== undefined) updates.inventoryNotes = payload.inventoryNotes;
+      if (payload.sellerEmail !== undefined) updates.sellerEmail = payload.sellerEmail || null;
+      if (payload.sellerPhone !== undefined) updates.sellerPhone = payload.sellerPhone;
+      if (payload.sellerRules !== undefined) updates.sellerRules = payload.sellerRules;
 
       if (Object.keys(updates).length > 0) {
-        await tx
-          .update(shopSettings)
-          .set(updates)
-          .where(eq(shopSettings.tenantId, tenantId));
+        await tx.update(shopSettings).set(updates).where(eq(shopSettings.tenantId, tenantId));
       }
     });
 
@@ -351,6 +357,9 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
         payoutNotes: shopSettings.payoutNotes,
         orderNotes: shopSettings.orderNotes,
         inventoryNotes: shopSettings.inventoryNotes,
+        sellerEmail: shopSettings.sellerEmail,
+        sellerPhone: shopSettings.sellerPhone,
+        sellerRules: shopSettings.sellerRules,
       })
       .from(tenants)
       .innerJoin(shopSettings, eq(shopSettings.tenantId, tenants.id))
@@ -366,6 +375,9 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       payoutNotes: refreshed[0]?.payoutNotes ?? null,
       orderNotes: refreshed[0]?.orderNotes ?? null,
       inventoryNotes: refreshed[0]?.inventoryNotes ?? null,
+      sellerEmail: refreshed[0]?.sellerEmail ?? null,
+      sellerPhone: refreshed[0]?.sellerPhone ?? null,
+      sellerRules: refreshed[0]?.sellerRules ?? null,
     };
   })
   .get("/inventory", async ({ params }) => {
@@ -909,37 +921,34 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
 
     return { segmentId, customerId: payload.customerId };
   })
-  .delete(
-    "/customers/segments/:segmentId/members/:customerId",
-    async ({ params }) => {
+  .delete("/customers/segments/:segmentId/members/:customerId", async ({ params }) => {
     const { shopSlug, segmentId, customerId } = params as {
-        shopSlug: string;
-        segmentId: string;
-        customerId: string;
-      };
-      const tenantId = await getTenantIdBySlug(shopSlug);
+      shopSlug: string;
+      segmentId: string;
+      customerId: string;
+    };
+    const tenantId = await getTenantIdBySlug(shopSlug);
 
-      const [segment] = await db
-        .select({ id: customerSegments.id })
-        .from(customerSegments)
-        .where(and(eq(customerSegments.id, segmentId), eq(customerSegments.tenantId, tenantId)))
-        .limit(1);
-      if (!segment) {
-        return new Response("Segment not found", { status: 404 });
-      }
+    const [segment] = await db
+      .select({ id: customerSegments.id })
+      .from(customerSegments)
+      .where(and(eq(customerSegments.id, segmentId), eq(customerSegments.tenantId, tenantId)))
+      .limit(1);
+    if (!segment) {
+      return new Response("Segment not found", { status: 404 });
+    }
 
-      await db
-        .delete(customerSegmentMembers)
-        .where(
-          and(
-            eq(customerSegmentMembers.segmentId, segmentId),
-            eq(customerSegmentMembers.customerId, customerId),
-          ),
-        );
+    await db
+      .delete(customerSegmentMembers)
+      .where(
+        and(
+          eq(customerSegmentMembers.segmentId, segmentId),
+          eq(customerSegmentMembers.customerId, customerId),
+        ),
+      );
 
-      return { segmentId, customerId };
-    },
-  )
+    return { segmentId, customerId };
+  })
   .get("/customers/messages", async ({ params }) => {
     const { shopSlug } = params as { shopSlug: string };
     const tenantId = await getTenantIdBySlug(shopSlug);

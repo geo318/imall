@@ -1,4 +1,4 @@
-import { auctions, bids, db, products, tenants, users, variants } from "@repo/db";
+import { auctions, bids, db, products, shopSettings, tenants, users, variants } from "@repo/db";
 import {
   and,
   asc,
@@ -15,7 +15,7 @@ import {
 } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { getAvailableStock, getTenantIdBySlug, listQuerySchema } from "../context";
+import { getAvailableStock, listQuerySchema } from "../context";
 
 const shopProductsQuerySchema = z.object({
   limit: z
@@ -249,6 +249,16 @@ export const productsRoutes = new Elysia({
         return "Product not found";
       }
 
+      const [sellerProfile] = await db
+        .select({
+          sellerEmail: shopSettings.sellerEmail,
+          sellerPhone: shopSettings.sellerPhone,
+          sellerRules: shopSettings.sellerRules,
+        })
+        .from(shopSettings)
+        .where(eq(shopSettings.tenantId, tenantId))
+        .limit(1);
+
       // Fetch variants for this product
       const productVariants = await db
         .select({
@@ -347,6 +357,9 @@ export const productsRoutes = new Elysia({
         ...product,
         variants: serializedVariants,
         images,
+        sellerEmail: sellerProfile?.sellerEmail ?? null,
+        sellerPhone: sellerProfile?.sellerPhone ?? null,
+        sellerRules: sellerProfile?.sellerRules ?? null,
       };
     } catch (err) {
       if (err instanceof Response) return err;
@@ -772,6 +785,16 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         return "Product not found";
       }
 
+      const [sellerProfile] = await db
+        .select({
+          sellerEmail: shopSettings.sellerEmail,
+          sellerPhone: shopSettings.sellerPhone,
+          sellerRules: shopSettings.sellerRules,
+        })
+        .from(shopSettings)
+        .where(eq(shopSettings.tenantId, product.tenantId))
+        .limit(1);
+
       // Fetch variants for this product
       const productVariants = await db
         .select({
@@ -863,6 +886,9 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         ...product,
         variants: serializedVariants,
         images,
+        sellerEmail: sellerProfile?.sellerEmail ?? null,
+        sellerPhone: sellerProfile?.sellerPhone ?? null,
+        sellerRules: sellerProfile?.sellerRules ?? null,
         deletedAt: product.deletedAt
           ? product.deletedAt instanceof Date
             ? product.deletedAt.toISOString()

@@ -1,10 +1,21 @@
 "use client";
 
 import { Badge } from "@repo/ui/badge";
-import { ArrowLeft, CheckCircle, Gavel, Heart, ShieldCheck, Star, Truck } from "lucide-react";
-import { Link } from "@/i18n/navigation.client";
+import {
+  ArrowLeft,
+  CheckCircle,
+  Gavel,
+  Heart,
+  Mail,
+  Phone,
+  ShieldCheck,
+  Star,
+  Truck,
+} from "lucide-react";
 import { useState } from "react";
 import LazyImage from "@/components/shared/lazy-image";
+import { Link } from "@/i18n/navigation.client";
+import { useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
 import { cn } from "@/lib/utils";
 import {
@@ -26,6 +37,7 @@ type Props = {
  * Main client component - 95% static, only dynamic slots use Suspense
  */
 export function ProductDetailClient({ product, productIdentifier }: Props) {
+  const t = useTranslations();
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
     product.variants[0]?.id ?? null,
   );
@@ -35,6 +47,7 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
   const auction = selectedVariant?.auction ?? null;
   const shopSlug = product.tenantSlug ?? "demo-shop";
   const shopName = product.tenantName ?? shopSlug;
+  const hasSellerInfo = Boolean(product.sellerEmail || product.sellerPhone || product.sellerRules);
 
   // Use actual product images, filter out invalid URLs
   const productImages = product.images
@@ -53,7 +66,7 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
         className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Products
+        {t("productDetail.backToProducts")}
       </Link>
 
       {/* Status Banner - shows if product is deleted or draft */}
@@ -74,7 +87,7 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
             {auction && (
               <Badge className="absolute top-4 left-4 bg-warning text-warning-foreground gap-1 z-10">
                 <Gavel className="h-3 w-3" />
-                Live Auction
+                {t("productDetail.liveAuction")}
               </Badge>
             )}
           </div>
@@ -126,7 +139,7 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
                   <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                   <span>5.0</span>
                   <span>•</span>
-                  <span>Verified Vendor</span>
+                  <span>{t("productDetail.verifiedVendor")}</span>
                 </div>
               </div>
             </div>
@@ -138,7 +151,7 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
           {/* Static: Variant Selection */}
           {product.variants.length > 1 && (
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-800">Variants</p>
+              <p className="text-sm font-semibold text-slate-800">{t("productDetail.variants")}</p>
               <div className="flex flex-wrap gap-2">
                 {product.variants.map((v) => (
                   <button
@@ -152,7 +165,7 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
                         : "border-slate-200 hover:border-slate-300",
                     )}
                   >
-                    {v.sku ?? "Default"} • {v.price} {v.currency}
+                    {v.sku ?? t("productDetail.defaultVariant")} • {v.price} {v.currency}
                   </button>
                 ))}
               </div>
@@ -183,28 +196,62 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
           {/* Static: Description */}
           {product.description && (
             <div className="space-y-2">
-              <h3 className="font-semibold">Description</h3>
+              <h3 className="font-semibold">{t("productDetail.description")}</h3>
               <p className="text-muted-foreground whitespace-pre-wrap">{product.description}</p>
             </div>
           )}
+
+          {hasSellerInfo ? (
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <h3 className="font-semibold text-slate-900">{t("sellerInfo.title")}</h3>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {product.sellerEmail ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-700">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>
+                      {t("sellerInfo.email")}: {product.sellerEmail}
+                    </span>
+                  </div>
+                ) : null}
+                {product.sellerPhone ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-700">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>
+                      {t("sellerInfo.phone")}: {product.sellerPhone}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+              {product.sellerRules ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {t("sellerInfo.rules")}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                    {product.sellerRules}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* Static: Features */}
           <div className="grid grid-cols-2 gap-4 pt-4 border-t">
             <div className="flex items-center gap-2 text-sm">
               <Truck className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Free shipping</span>
+              <span className="text-muted-foreground">{t("productDetail.freeShipping")}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Secure payment</span>
+              <span className="text-muted-foreground">{t("productDetail.securePayment")}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Verified vendor</span>
+              <span className="text-muted-foreground">{t("productDetail.verifiedVendor")}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Heart className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Quality guaranteed</span>
+              <span className="text-muted-foreground">{t("productDetail.qualityGuaranteed")}</span>
             </div>
           </div>
 

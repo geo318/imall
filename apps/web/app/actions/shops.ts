@@ -88,6 +88,12 @@ export type MyShop = Shop & {
   role?: string | null;
 };
 
+export type ShopProfile = Shop & {
+  sellerEmail?: string | null;
+  sellerPhone?: string | null;
+  sellerRules?: string | null;
+};
+
 /**
  * Get list of shops
  * Cached for PPR - public data, no auth required
@@ -122,12 +128,34 @@ export async function getMyShops(): Promise<MyShop[]> {
 }
 
 /**
+ * Get public profile data for a shop
+ * Cached for PPR - public data, no auth required
+ */
+export async function getShopProfile(shopSlug: string): Promise<ShopProfile | null> {
+  "use cache";
+  cacheLife({ stale: 120, expire: 1800 }); // 2m stale, 30m expire
+  cacheTag(CACHE_TAGS.SHOPS);
+  cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
+
+  const response = await backendRequest(`/shops/${shopSlug}/profile`, {
+    token: null,
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error("Failed to load shop profile");
+  }
+
+  return response.json();
+}
+
+/**
  * Register a new shop for the current user
  */
-export async function registerShop(
-  _prevState: { error?: string } | undefined,
-  formData: FormData,
-) {
+export async function registerShop(_prevState: { error?: string } | undefined, formData: FormData) {
   const name = String(formData.get("name") || "").trim();
 
   if (!name) {

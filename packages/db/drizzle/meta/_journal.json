@@ -113,6 +113,13 @@
       "when": 1770581676915,
       "tag": "0015_wild_silver_surfer",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1771183742239,
+      "tag": "0016_stale_joseph",
+      "breakpoints": true
     }
   ]
 }
