@@ -22,6 +22,20 @@
       "description": "Открывайте уникальные товары, участвуйте в эксклюзивных аукционах и напрямую связывайтесь с продавцами. Ваш следующий любимый товар — в одном клике.",
       "ctaShop": "Начать покупки",
       "ctaVendor": "Стать продавцом",
+      "features": {
+        "verified": {
+          "title": "Проверенные продавцы",
+          "body": "Каждый продавец проходит проверку"
+        },
+        "shipping": {
+          "title": "Быстрая доставка",
+          "body": "От продавца прямо к вам"
+        },
+        "protection": {
+          "title": "Защита покупателя",
+          "body": "Покупайте с уверенностью"
+        }
+      },
       "stats": {
         "products": "Товары",
         "vendors": "Продавцы",
@@ -248,6 +262,82 @@
   },
   "shopProducts": {
     "searchPlaceholder": "Поиск товаров магазина {shopSlug}..."
+  },
+  "shopProfile": {
+    "subtitle": "Профиль магазина {shopSlug}"
+  },
+  "sellerInfo": {
+    "title": "Контакты продавца",
+    "email": "Эл. почта",
+    "phone": "Мобильный",
+    "rules": "Личные правила"
+  },
+  "productDetail": {
+    "backToProducts": "Назад к товарам",
+    "liveAuction": "Активный аукцион",
+    "verifiedVendor": "Проверенный продавец",
+    "variants": "Варианты",
+    "defaultVariant": "По умолчанию",
+    "description": "Описание",
+    "freeShipping": "Бесплатная доставка",
+    "securePayment": "Безопасная оплата",
+    "qualityGuaranteed": "Гарантия качества"
+  },
+  "common": {
+    "language": "Язык"
+  },
+  "adminSettings": {
+    "eyebrow": "Настройки",
+    "configuration": "Конфигурация",
+    "description": "Обновите метаданные витрины и пользовательские настройки вашего магазина.",
+    "pendingApproval": "Продажи для этого магазина сейчас отключены. Ваша заявка ожидает одобрения.",
+    "actions": {
+      "save": "Сохранить настройки"
+    },
+    "toasts": {
+      "saved": "Настройки сохранены"
+    },
+    "errors": {
+      "updateFailed": "Не удалось обновить настройки"
+    },
+    "fields": {
+      "shopName": {
+        "label": "Название магазина",
+        "placeholder": "Название магазина"
+      },
+      "bankDetails": {
+        "label": "Банковские реквизиты",
+        "placeholder": "Банк / IBAN / отделение"
+      },
+      "payoutAccount": {
+        "label": "Счёт для выплат",
+        "placeholder": "Счёт / IBAN"
+      },
+      "payoutNotes": {
+        "label": "Примечания по выплатам",
+        "placeholder": "Периодичность выплат и требования"
+      },
+      "orderNotes": {
+        "label": "Примечания к заказам",
+        "placeholder": "Инструкции по выполнению заказов"
+      },
+      "inventoryNotes": {
+        "label": "Примечания по складу",
+        "placeholder": "Пороговые значения и политика пополнения"
+      },
+      "sellerEmail": {
+        "label": "Эл. почта продавца",
+        "placeholder": "seller@shop.com"
+      },
+      "sellerPhone": {
+        "label": "Мобильный номер продавца",
+        "placeholder": "+995 5XX XXX XXX"
+      },
+      "sellerRules": {
+        "label": "Личные правила",
+        "placeholder": "Окна доставки, правила коммуникации, условия возврата и т.д."
+      }
+    }
   },
   "sell": {
     "eyebrow": "Начать продавать",

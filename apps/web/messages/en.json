@@ -22,6 +22,20 @@
       "description": "Discover unique products, bid on exclusive auctions, and connect directly with sellers. Your next favorite find is just a click away.",
       "ctaShop": "Start shopping",
       "ctaVendor": "Become a vendor",
+      "features": {
+        "verified": {
+          "title": "Verified vendors",
+          "body": "Every seller is vetted"
+        },
+        "shipping": {
+          "title": "Fast shipping",
+          "body": "Direct from sellers to you"
+        },
+        "protection": {
+          "title": "Buyer protection",
+          "body": "Shop with confidence"
+        }
+      },
       "stats": {
         "products": "Products",
         "vendors": "Vendors",
@@ -248,6 +262,82 @@
   },
   "shopProducts": {
     "searchPlaceholder": "Search {shopSlug} products..."
+  },
+  "shopProfile": {
+    "subtitle": "Shop profile for {shopSlug}"
+  },
+  "sellerInfo": {
+    "title": "Seller contact",
+    "email": "Email",
+    "phone": "Mobile",
+    "rules": "Personal rules"
+  },
+  "productDetail": {
+    "backToProducts": "Back to products",
+    "liveAuction": "Live auction",
+    "verifiedVendor": "Verified vendor",
+    "variants": "Variants",
+    "defaultVariant": "Default",
+    "description": "Description",
+    "freeShipping": "Free shipping",
+    "securePayment": "Secure payment",
+    "qualityGuaranteed": "Quality guaranteed"
+  },
+  "common": {
+    "language": "Language"
+  },
+  "adminSettings": {
+    "eyebrow": "Settings",
+    "configuration": "Configuration",
+    "description": "Update the storefront metadata and custom settings that your shop exposes.",
+    "pendingApproval": "Selling is currently disabled for this shop. Your application is pending approval.",
+    "actions": {
+      "save": "Save settings"
+    },
+    "toasts": {
+      "saved": "Settings saved"
+    },
+    "errors": {
+      "updateFailed": "Failed to update settings"
+    },
+    "fields": {
+      "shopName": {
+        "label": "Shop name",
+        "placeholder": "Shop name"
+      },
+      "bankDetails": {
+        "label": "Bank details",
+        "placeholder": "Bank name / IBAN / branch"
+      },
+      "payoutAccount": {
+        "label": "Payout account",
+        "placeholder": "Account / IBAN"
+      },
+      "payoutNotes": {
+        "label": "Payout notes",
+        "placeholder": "Payment cadence or requirements"
+      },
+      "orderNotes": {
+        "label": "Order notes",
+        "placeholder": "Fulfillment instructions"
+      },
+      "inventoryNotes": {
+        "label": "Inventory notes",
+        "placeholder": "Thresholds, restock policy"
+      },
+      "sellerEmail": {
+        "label": "Seller email",
+        "placeholder": "seller@shop.com"
+      },
+      "sellerPhone": {
+        "label": "Seller mobile number",
+        "placeholder": "+995 5XX XXX XXX"
+      },
+      "sellerRules": {
+        "label": "Personal rules",
+        "placeholder": "Delivery windows, communication preferences, accepted returns, etc."
+      }
+    }
   },
   "sell": {
     "eyebrow": "Start selling",
