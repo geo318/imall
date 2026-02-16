@@ -25,6 +25,7 @@ export function ProductsExplorerClient() {
   const searchParams = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const categoryParam = searchParams.get("category") || "";
+  const subCategoryParam = searchParams.get("sub") || "";
 
   // State - sync with URL params
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
@@ -43,14 +44,15 @@ export function ProductsExplorerClient() {
     retry: false,
   });
 
-  const categoryOptions = useMemo<CategoryFilterOption[]>(
-    () =>
-      flattenCategoryOptions(categoryTree).map((category) => ({
-        value: category.key,
-        label: category.label,
-      })),
-    [categoryTree],
-  );
+  const categoryOptions = useMemo<CategoryFilterOption[]>(() => {
+    const toOption = (node: (typeof categoryTree)[number]): CategoryFilterOption => ({
+      value: node.key,
+      label: node.name,
+      children: node.children.map((child) => toOption(child)),
+    });
+
+    return categoryTree.map((node) => toOption(node));
+  }, [categoryTree]);
 
   const categoryNameToKey = useMemo(() => {
     const mapping = new Map<string, string>();
@@ -62,6 +64,100 @@ export function ProductsExplorerClient() {
     return mapping;
   }, [categoryTree]);
 
+  const rootCategoryKeys = useMemo(
+    () => new Set(categoryTree.map((category) => category.key)),
+    [categoryTree],
+  );
+
+  const keyToRoot = useMemo(() => {
+    const mapping = new Map<string, string>();
+
+    const visit = (node: (typeof categoryTree)[number], rootKey: string) => {
+      mapping.set(node.key, rootKey);
+      node.children.forEach((child) => {
+        visit(child, rootKey);
+      });
+    };
+
+    categoryTree.forEach((root) => {
+      visit(root, root.key);
+    });
+    return mapping;
+  }, [categoryTree]);
+
+  const descendantsByRoot = useMemo(() => {
+    const mapping = new Map<string, Set<string>>();
+
+    const collect = (node: (typeof categoryTree)[number], bucket: Set<string>) => {
+      bucket.add(node.key);
+      node.children.forEach((child) => {
+        collect(child, bucket);
+      });
+    };
+
+    categoryTree.forEach((root) => {
+      const bucket = new Set<string>();
+      collect(root, bucket);
+      mapping.set(root.key, bucket);
+    });
+
+    return mapping;
+  }, [categoryTree]);
+
+  const effectiveCategoryKeys = useMemo(() => {
+    if (selectedCategories.length === 0) {
+      return null;
+    }
+
+    const selectedSet = new Set(selectedCategories);
+    const selectedRoots = Array.from(selectedSet).filter((key) => rootCategoryKeys.has(key));
+    const selectedChildren = Array.from(selectedSet).filter((key) => !rootCategoryKeys.has(key));
+    const childrenByRoot = new Map<string, Set<string>>();
+
+    selectedChildren.forEach((childKey) => {
+      const rootKey = keyToRoot.get(childKey);
+      if (!rootKey) return;
+      const bucket = childrenByRoot.get(rootKey) ?? new Set<string>();
+      bucket.add(childKey);
+      childrenByRoot.set(rootKey, bucket);
+    });
+
+    const effectiveKeys = new Set<string>();
+
+    selectedRoots.forEach((rootKey) => {
+      const explicitChildren = childrenByRoot.get(rootKey);
+      if (explicitChildren && explicitChildren.size > 0) {
+        explicitChildren.forEach((key) => {
+          effectiveKeys.add(key);
+        });
+        return;
+      }
+
+      const descendants = descendantsByRoot.get(rootKey);
+      if (descendants && descendants.size > 0) {
+        descendants.forEach((key) => {
+          effectiveKeys.add(key);
+        });
+      } else {
+        effectiveKeys.add(rootKey);
+      }
+    });
+
+    if (selectedRoots.length === 0) {
+      selectedChildren.forEach((key) => {
+        effectiveKeys.add(key);
+      });
+    } else {
+      selectedChildren.forEach((key) => {
+        if (!keyToRoot.has(key)) {
+          effectiveKeys.add(key);
+        }
+      });
+    }
+
+    return effectiveKeys;
+  }, [descendantsByRoot, keyToRoot, rootCategoryKeys, selectedCategories]);
+
   // Sync search query with URL params
   useEffect(() => {
     const urlSearch = searchParams.get("search") || "";
@@ -72,14 +168,28 @@ export function ProductsExplorerClient() {
 
   useEffect(() => {
     setSelectedCategories((prev) => {
-      if (categoryParam) {
-        const normalized = categoryNameToKey.get(categoryParam.toLowerCase()) ?? categoryParam;
-        if (prev.length === 1 && prev[0] === normalized) return prev;
-        return [normalized];
+      if (categoryParam || subCategoryParam) {
+        const rootKey = categoryParam
+          ? (categoryNameToKey.get(categoryParam.toLowerCase()) ?? categoryParam)
+          : null;
+        const subKey = subCategoryParam
+          ? (categoryNameToKey.get(subCategoryParam.toLowerCase()) ?? subCategoryParam)
+          : null;
+
+        const next = new Set<string>();
+        if (rootKey) next.add(rootKey);
+        if (subKey) next.add(subKey);
+        const nextValues = Array.from(next);
+
+        if (prev.length === nextValues.length && prev.every((value) => next.has(value))) {
+          return prev;
+        }
+
+        return nextValues;
       }
       return prev.length === 0 ? prev : [];
     });
-  }, [categoryNameToKey, categoryParam]);
+  }, [categoryNameToKey, categoryParam, subCategoryParam]);
 
   // Map frontend sort keys to backend sort values
   const sortMap: Record<SortKey, "newest" | "oldest" | "priceAsc" | "priceDesc" | "random"> = {
@@ -153,17 +263,17 @@ export function ProductsExplorerClient() {
     let result = validProducts.map((product) => mapApiProductToMarketing(product));
 
     // Category filter
-    if (selectedCategories.length > 0) {
+    if (effectiveCategoryKeys && effectiveCategoryKeys.size > 0) {
       result = result.filter((product) => {
         const category = product.category?.trim().toLowerCase();
         if (!category) return false;
         const resolvedKey = categoryNameToKey.get(category);
-        return resolvedKey ? selectedCategories.includes(resolvedKey) : false;
+        return resolvedKey ? effectiveCategoryKeys.has(resolvedKey) : false;
       });
     }
 
     return result;
-  }, [allProducts, categoryNameToKey, selectedCategories]);
+  }, [allProducts, categoryNameToKey, effectiveCategoryKeys]);
 
   const clearAllFilters = () => {
     setSearchQuery("");

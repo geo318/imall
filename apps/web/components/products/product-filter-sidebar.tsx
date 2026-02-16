@@ -15,6 +15,7 @@ export type ListingType = "all" | "buy-now" | "auction";
 export type CategoryFilterOption = {
   value: string;
   label: string;
+  children?: CategoryFilterOption[];
 };
 
 type Props = {
@@ -62,13 +63,69 @@ export function ProductFilterSidebar({
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
-  const toggleCategory = (categoryValue: string) => {
-    onCategoriesChange(
-      selectedCategories.includes(categoryValue)
-        ? selectedCategories.filter((c) => c !== categoryValue)
-        : [...selectedCategories, categoryValue],
-    );
+  const collectDescendantValues = (category: CategoryFilterOption): string[] => {
+    const values: string[] = [category.value];
+    for (const child of category.children ?? []) {
+      values.push(...collectDescendantValues(child));
+    }
+    return values;
   };
+
+  const toggleRootCategory = (category: CategoryFilterOption) => {
+    const selected = new Set(selectedCategories);
+    const descendants = collectDescendantValues(category);
+
+    if (selected.has(category.value)) {
+      for (const value of descendants) selected.delete(value);
+    } else {
+      selected.add(category.value);
+    }
+
+    onCategoriesChange(Array.from(selected));
+  };
+
+  const toggleChildCategory = (rootValue: string, categoryValue: string) => {
+    const selected = new Set(selectedCategories);
+
+    selected.add(rootValue);
+
+    if (selected.has(categoryValue)) {
+      selected.delete(categoryValue);
+    } else {
+      selected.add(categoryValue);
+    }
+
+    onCategoriesChange(Array.from(selected));
+  };
+
+  const renderChildCategories = (
+    rootValue: string,
+    children: CategoryFilterOption[],
+    depth = 0,
+  ) => (
+    <div className={cn("space-y-2", depth === 0 ? "mt-2 pl-6" : "pl-4")}>
+      {children.map((child) => (
+        <div key={child.value}>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={`category-${rootValue}-${child.value}`}
+              checked={selectedCategories.includes(child.value)}
+              onCheckedChange={() => toggleChildCategory(rootValue, child.value)}
+            />
+            <Label
+              htmlFor={`category-${rootValue}-${child.value}`}
+              className="text-sm font-normal cursor-pointer text-muted-foreground"
+            >
+              {child.label}
+            </Label>
+          </div>
+          {child.children?.length
+            ? renderChildCategories(rootValue, child.children, depth + 1)
+            : null}
+        </div>
+      ))}
+    </div>
+  );
 
   const hasActiveFilters =
     priceRange[0] > 0 ||
@@ -149,18 +206,24 @@ export function ProductFilterSidebar({
           {expandedSections.categories && (
             <div className="space-y-2 pt-2">
               {categories.map((category) => (
-                <div key={category.value} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`category-${category.value}`}
-                    checked={selectedCategories.includes(category.value)}
-                    onCheckedChange={() => toggleCategory(category.value)}
-                  />
-                  <Label
-                    htmlFor={`category-${category.value}`}
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    {category.label}
-                  </Label>
+                <div key={category.value}>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`category-${category.value}`}
+                      checked={selectedCategories.includes(category.value)}
+                      onCheckedChange={() => toggleRootCategory(category)}
+                    />
+                    <Label
+                      htmlFor={`category-${category.value}`}
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      {category.label}
+                    </Label>
+                  </div>
+                  {selectedCategories.includes(category.value) &&
+                  (category.children?.length ?? 0) > 0
+                    ? renderChildCategories(category.value, category.children ?? [])
+                    : null}
                 </div>
               ))}
             </div>

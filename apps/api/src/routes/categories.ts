@@ -38,7 +38,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" }).get(
   async ({ query }) => {
     const locale = categoryLocaleSchema.parse(query?.locale ?? "en");
 
-    const rows = await db
+    let rows = await db
       .select({
         id: categories.id,
         slug: categories.slug,
@@ -53,6 +53,24 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" }).get(
       .where(and(eq(categories.isActive, true), isNull(categories.deletedAt)))
       .orderBy(asc(categories.createdAt), asc(categories.name));
 
+    // Fallback for misconfigured data where categories exist but were left inactive.
+    if (rows.length === 0) {
+      rows = await db
+        .select({
+          id: categories.id,
+          slug: categories.slug,
+          categoryKey: categories.categoryKey,
+          name: categories.name,
+          nameEn: categories.nameEn,
+          nameKa: categories.nameKa,
+          nameRu: categories.nameRu,
+          icon: categories.icon,
+        })
+        .from(categories)
+        .where(isNull(categories.deletedAt))
+        .orderBy(asc(categories.createdAt), asc(categories.name));
+    }
+
     const rowsById = new Map(rows.map((row) => [row.id, row]));
     const relations = await db
       .select({
@@ -65,6 +83,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" }).get(
     const childIds = new Set<string>();
 
     for (const relation of relations) {
+      if (relation.parentId === relation.childId) continue;
       if (!rowsById.has(relation.parentId) || !rowsById.has(relation.childId)) continue;
       childIds.add(relation.childId);
       const current = childrenByParent.get(relation.parentId) ?? [];
@@ -73,6 +92,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" }).get(
     }
 
     const roots = rows.filter((row) => !childIds.has(row.id));
+    const effectiveRoots = roots.length > 0 ? roots : rows;
 
     const buildNode = (row: CategoryRow, trail: Set<string>): PublicCategoryNode => {
       if (trail.has(row.id)) {
@@ -90,7 +110,8 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" }).get(
       const nextTrail = new Set(trail);
       nextTrail.add(row.id);
 
-      const children: PublicCategoryNode[] = (childrenByParent.get(row.id) ?? [])
+      const childIds = Array.from(new Set(childrenByParent.get(row.id) ?? []));
+      const children: PublicCategoryNode[] = childIds
         .map((childId) => rowsById.get(childId))
         .filter((child): child is CategoryRow => Boolean(child))
         .map((child) => buildNode(child, nextTrail));
@@ -107,7 +128,7 @@ export const categoriesRoutes = new Elysia({ prefix: "/categories" }).get(
     };
 
     return {
-      categories: roots.map((root) => buildNode(root, new Set())),
+      categories: effectiveRoots.map((root) => buildNode(root, new Set())),
     };
   },
 );
