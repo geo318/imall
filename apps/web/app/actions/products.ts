@@ -48,7 +48,7 @@ async function backendRequest(
   } = {},
 ): Promise<Response> {
   // Use provided token or get from auth (outside cached scope)
-  const token = options.token ?? (await getAuthToken());
+  const token = options.token !== undefined ? options.token : await getAuthToken();
   const url = new URL(`${env.BACKEND_URL}/api${path}`);
 
   // Add query params
