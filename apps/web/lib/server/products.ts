@@ -1,7 +1,7 @@
 "use server";
 
 import { env } from "@repo/shared";
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife, cacheTag, unstable_noStore as noStore } from "next/cache";
 import type { Product } from "@/lib/types/products";
 import { CACHE_TAGS } from "../constants";
 import type { ProductSearchParams, ProductSearchResponse } from "../services/products.service";
@@ -43,10 +43,7 @@ export async function getShopProductsServer(shopSlug: string, limit = 20): Promi
  * Uses Cache Components with 'use cache' directive for PPR
  */
 export async function getProductByIdentifierServer(productIdentifier: string): Promise<Product> {
-  "use cache";
-  cacheLife({ stale: 30, expire: 1800 }); // 30s stale, 30m expire
-  cacheTag(CACHE_TAGS.PRODUCT);
-  cacheTag(`${CACHE_TAGS.PRODUCT}-${productIdentifier}`);
+  noStore();
 
   const response = await fetch(`${API_BASE}/api/products/${productIdentifier}`);
 

@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { env } from "@repo/shared";
-import { cacheLife, cacheTag } from "next/cache";
+import { cacheLife, cacheTag, unstable_noStore as noStore } from "next/cache";
 import { redirect } from "@/i18n/navigation.server";
 import { CACHE_TAGS } from "@/lib/constants";
 
@@ -132,10 +132,7 @@ export async function getMyShops(): Promise<MyShop[]> {
  * Cached for PPR - public data, no auth required
  */
 export async function getShopProfile(shopSlug: string): Promise<ShopProfile | null> {
-  "use cache";
-  cacheLife({ stale: 120, expire: 1800 }); // 2m stale, 30m expire
-  cacheTag(CACHE_TAGS.SHOPS);
-  cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
+  noStore();
 
   const response = await backendRequest(`/shops/${shopSlug}/profile`, {
     token: null,
