@@ -1,42 +1,13 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { env } from "@repo/shared";
 import { cacheLife, cacheTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/constants";
 import type { Product } from "@/lib/types/products";
 
 /**
- * Helper to get Clerk token for backend requests
- * Must be called outside 'use cache' scope
- */
-async function getAuthToken(): Promise<string | null> {
-  try {
-    const authResult = await auth();
-    if (!authResult.userId) {
-      return null;
-    }
-
-    let token = await authResult.getToken();
-    if (!token) {
-      try {
-        token = await authResult.getToken({
-          template: "integration_fallback",
-        });
-      } catch {
-        // Token not available
-      }
-    }
-
-    return token;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Helper to make authenticated backend requests
- * For cached requests, token must be passed as argument (read auth outside cached scope)
+ * Public backend request helper for cached product reads.
+ * Keep this auth-free so Cache Components never touch request-bound APIs.
  */
 async function backendRequest(
   path: string,
@@ -44,11 +15,8 @@ async function backendRequest(
     method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
     body?: unknown;
     params?: Record<string, string | number | undefined>;
-    token?: string | null;
   } = {},
 ): Promise<Response> {
-  // Use provided token or get from auth (outside cached scope)
-  const token = options.token !== undefined ? options.token : await getAuthToken();
   const url = new URL(`${env.BACKEND_URL}/api${path}`);
 
   // Add query params
@@ -63,10 +31,6 @@ async function backendRequest(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
 
   const response = await fetch(url.toString(), {
     method: options.method || "GET",
@@ -105,7 +69,6 @@ export async function getShopProducts(shopSlug: string, limit = 20): Promise<Pro
   // Public endpoint - no auth token needed
   const response = await backendRequest(`/shops/${shopSlug}/products`, {
     params: { limit },
-    token: null, // Explicitly no token for public data
   });
 
   if (!response.ok) {
@@ -148,7 +111,6 @@ export async function searchShopProducts(
       maxPrice: params.maxPrice,
       sort: params.sort,
     },
-    token: null, // Explicitly no token for public data
   });
 
   if (!response.ok) {
@@ -173,7 +135,6 @@ export async function getProductByIdentifier(productIdentifier: string): Promise
 
   // Public endpoint - no auth token needed
   const response = await backendRequest(`/products/${productIdentifier}`, {
-    token: null, // Explicitly no token for public data
   });
 
   if (!response.ok) {
@@ -198,7 +159,6 @@ export async function getProductBySlug(shopSlug: string, productSlug: string): P
 
   // Public endpoint - no auth token needed
   const response = await backendRequest(`/shops/${shopSlug}/products/${productSlug}`, {
-    token: null, // Explicitly no token for public data
   });
 
   if (!response.ok) {
@@ -223,7 +183,6 @@ export async function getAnyProducts(limit = 20): Promise<Product[]> {
   // Public endpoint - no auth token needed
   const response = await backendRequest("/products", {
     params: { limit },
-    token: null, // Explicitly no token for public data
   });
 
   if (!response.ok) {
@@ -257,7 +216,6 @@ export async function searchProducts(params: ProductSearchParams): Promise<Produ
       minPrice: params.minPrice,
       maxPrice: params.maxPrice,
     },
-    token: null, // Explicitly no token for public data
   });
 
   if (!response.ok) {

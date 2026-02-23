@@ -1,9 +1,7 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { env } from "@repo/shared";
-import { cacheLife, cacheTag, unstable_noStore as noStore } from "next/cache";
-import { redirect } from "@/i18n/navigation.server";
+import { cacheLife, cacheTag } from "next/cache";
 import { CACHE_TAGS } from "@/lib/constants";
 
 /**
@@ -12,6 +10,7 @@ import { CACHE_TAGS } from "@/lib/constants";
  */
 async function getAuthToken(): Promise<string | null> {
   try {
+    const { auth } = await import("@clerk/nextjs/server");
     const authResult = await auth();
     if (!authResult.userId) {
       return null;
@@ -38,7 +37,34 @@ async function getAuthToken(): Promise<string | null> {
  * Helper to make authenticated backend requests
  * For cached requests, token must be passed as argument (read auth outside cached scope)
  */
-async function backendRequest(
+async function publicBackendRequest(
+  path: string,
+  options: {
+    method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+    body?: unknown;
+    params?: Record<string, string | number | undefined>;
+  } = {},
+): Promise<Response> {
+  const url = new URL(`${env.BACKEND_URL}/api${path}`);
+
+  if (options.params) {
+    for (const [key, value] of Object.entries(options.params)) {
+      if (value !== undefined) {
+        url.searchParams.set(key, String(value));
+      }
+    }
+  }
+
+  return fetch(url.toString(), {
+    method: options.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+}
+
+async function authedBackendRequest(
   path: string,
   options: {
     method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -104,9 +130,8 @@ export async function getShops(limit = 50): Promise<Shop[]> {
   cacheTag(CACHE_TAGS.SHOPS);
 
   // Public endpoint - no auth token needed
-  const response = await backendRequest("/shops", {
+  const response = await publicBackendRequest("/shops", {
     params: { limit },
-    token: null, // Explicitly no token for public data
   });
 
   if (!response.ok) {
@@ -120,7 +145,7 @@ export async function getShops(limit = 50): Promise<Shop[]> {
  * Get shops for current authenticated user
  */
 export async function getMyShops(): Promise<MyShop[]> {
-  const response = await backendRequest("/shops/mine");
+  const response = await authedBackendRequest("/shops/mine");
   if (!response.ok) {
     throw new Error("Failed to load your shops");
   }
@@ -132,11 +157,12 @@ export async function getMyShops(): Promise<MyShop[]> {
  * Cached for PPR - public data, no auth required
  */
 export async function getShopProfile(shopSlug: string): Promise<ShopProfile | null> {
-  noStore();
+  "use cache";
+  cacheLife({ stale: 120, expire: 1800 }); // 2m stale, 30m expire
+  cacheTag(CACHE_TAGS.SHOPS);
+  cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
 
-  const response = await backendRequest(`/shops/${shopSlug}/profile`, {
-    token: null,
-  });
+  const response = await publicBackendRequest(`/shops/${shopSlug}/profile`);
 
   if (response.status === 404) {
     return null;
@@ -160,11 +186,10 @@ export async function registerShop(_prevState: { error?: string } | undefined, f
   }
 
   try {
-    const response = await backendRequest("/shops/register", {
+    const response = await authedBackendRequest("/shops/register", {
       method: "POST",
       body: { name },
     });
-
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       return { error: errorData?.error ?? "Failed to register shop" };
@@ -175,6 +200,7 @@ export async function registerShop(_prevState: { error?: string } | undefined, f
       return { error: "Failed to register shop" };
     }
 
+    const { redirect } = await import("@/i18n/navigation.server");
     return redirect(`/admin/${data.slug}`);
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Failed to register shop" };
