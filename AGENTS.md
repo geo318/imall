@@ -107,6 +107,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Superadmin category tree now loads roots first and fetches child categories on expand via API routes.
 - Added `seed:categories` script and Render build flag `SEED_CATEGORIES` for idempotent category seeding during API builds.
 - Fixed Next 16 Cache Components bailout on `/[locale]/[slug]` by separating cached public fetchers from request-bound APIs (`auth()`, locale redirect helpers) in web server actions; `registerShop` now lazily imports locale redirect and cached shop/profile reads stay auth-free.
+- Public shop profile server fetch now degrades to `null` on backend 5xx/network failures (instead of throwing) so Render/web startup does not spam `Failed to load shop profile`; favorites Next API proxies also avoid logging expected unauthorized guest/token-missing cases as errors.
 
 ## Known gaps / follow-ups
 

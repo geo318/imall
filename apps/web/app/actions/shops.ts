@@ -162,17 +162,33 @@ export async function getShopProfile(shopSlug: string): Promise<ShopProfile | nu
   cacheTag(CACHE_TAGS.SHOPS);
   cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
 
-  const response = await publicBackendRequest(`/shops/${shopSlug}/profile`);
+  try {
+    const response = await publicBackendRequest(`/shops/${shopSlug}/profile`);
 
-  if (response.status === 404) {
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[getShopProfile] Failed to load shop profile", {
+          shopSlug,
+          status: response.status,
+        });
+      }
+      return null;
+    }
+
+    return response.json();
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[getShopProfile] Backend unavailable, returning fallback profile", {
+        shopSlug,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     return null;
   }
-
-  if (!response.ok) {
-    throw new Error("Failed to load shop profile");
-  }
-
-  return response.json();
 }
 
 /**

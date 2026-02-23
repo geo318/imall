@@ -73,7 +73,6 @@ export async function POST(
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error("[Favorites API] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
     if (errorMessage.includes("Unauthorized")) {
@@ -83,6 +82,7 @@ export async function POST(
       );
     }
 
+    console.error("[Favorites API] Error:", error);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
@@ -109,7 +109,6 @@ export async function DELETE(
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error("[Favorites API] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
     if (errorMessage.includes("Unauthorized")) {
@@ -121,6 +120,7 @@ export async function DELETE(
       );
     }
 
+    console.error("[Favorites API] Error:", error);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
@@ -145,13 +145,13 @@ export async function GET(
     const data = await response.json();
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
-    console.error("[Favorites API] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
     if (errorMessage.includes("Unauthorized")) {
       return NextResponse.json({ isFavorited: false }, { status: 200 });
     }
 
+    console.error("[Favorites API] Error:", error);
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
