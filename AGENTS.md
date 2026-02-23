@@ -106,6 +106,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - `dev:all` now rebuilds `@repo/db` first to keep generated exports in sync during local dev.
 - Superadmin category tree now loads roots first and fetches child categories on expand via API routes.
 - Added `seed:categories` script and Render build flag `SEED_CATEGORIES` for idempotent category seeding during API builds.
+- Fixed Next 16 Cache Components bailout on `/[locale]/[slug]` by separating cached public fetchers from request-bound APIs (`auth()`, locale redirect helpers) in web server actions; `registerShop` now lazily imports locale redirect and cached shop/profile reads stay auth-free.
 
 ## Known gaps / follow-ups
 
