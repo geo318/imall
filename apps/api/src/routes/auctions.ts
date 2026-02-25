@@ -19,6 +19,24 @@ type AuctionSocket = WsContext<{
 type AuctionSubscriptions = Record<string, Set<AuctionSocket>>;
 const subscriptions: AuctionSubscriptions = {};
 
+function getErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+
+  const record = error as Record<string, unknown>;
+  if (typeof record.code === "string") return record.code;
+
+  const cause = record.cause;
+  if (!cause || typeof cause !== "object") return undefined;
+
+  const causeRecord = cause as Record<string, unknown>;
+  return typeof causeRecord.code === "string" ? causeRecord.code : undefined;
+}
+
+function isMissingAuctionsTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return getErrorCode(error) === "42P01" || message.includes('relation "auctions" does not exist');
+}
+
 function broadcastBidEvent(auctionId: string, payload: unknown) {
   const sockets = subscriptions[auctionId];
   if (!sockets) return;
@@ -517,7 +535,21 @@ export const auctionsRoutes = new Elysia({
   });
 
 export function startAuctionCloser() {
+  let disabled = false;
+
   setInterval(() => {
-    closeExpiredAuctions().catch((err) => console.error("close auctions failed", err));
+    if (disabled) return;
+
+    closeExpiredAuctions().catch((err) => {
+      if (isMissingAuctionsTableError(err)) {
+        disabled = true;
+        logger.warn(
+          '[Auctions] Auction closer disabled: relation "auctions" does not exist. Run DB migrations (e.g. `bun run db:push`) and restart the API.',
+        );
+        return;
+      }
+
+      logger.error("close auctions failed", err);
+    });
   }, 30_000);
 }

@@ -1,3 +1,5 @@
+import { db } from "@repo/db";
+import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { bidPayloadSchema, env, listQuerySchema } from "./context";
 import { adminProductsRoutes } from "./routes/admin-products";
@@ -18,6 +20,68 @@ if (cartRoutes) {
   console.log("[API] cartRoutes loaded: ✓");
 } else {
   console.error("[API] cartRoutes failed to load: ✗");
+}
+
+const summarizeDatabaseUrl = (value: string | undefined) => {
+  if (!value) return { present: false };
+
+  try {
+    const url = new URL(value);
+    return {
+      present: true,
+      protocol: url.protocol.replace(":", ""),
+      host: url.hostname || undefined,
+      port: url.port || undefined,
+      database: url.pathname.replace(/^\//, "") || undefined,
+      sslmode: url.searchParams.get("sslmode") || undefined,
+    };
+  } catch {
+    return { present: true, parseable: false };
+  }
+};
+
+async function logStartupDiagnostics(port: number) {
+  const start = Date.now();
+  console.log("[API][BOOT] Step 1/4: Environment summary");
+  console.log("[API][BOOT] NODE_ENV:", env.NODE_ENV);
+  console.log("[API][BOOT] PORT:", port);
+  console.log("[API][BOOT] DOMAIN:", env.DOMAIN);
+  console.log("[API][BOOT] NEXT_PUBLIC_DOMAIN:", env.NEXT_PUBLIC_DOMAIN);
+  console.log("[API][BOOT] DOMAIN set:", Boolean(env.DOMAIN));
+  console.log("[API][BOOT] NEXT_PUBLIC_DOMAIN set:", Boolean(env.NEXT_PUBLIC_DOMAIN));
+  console.log("[API][BOOT] DATABASE_URL:", summarizeDatabaseUrl(env.DATABASE_URL));
+
+  console.log("[API][BOOT] Step 2/4: Database probe");
+  try {
+    const probe = (await db.execute(sql`
+      select
+        current_database() as database,
+        current_schema() as schema,
+        current_user as db_user,
+        to_regclass('public.auctions')::text as auctions_table
+    `)) as {
+      rows?: Array<{
+        database?: string;
+        schema?: string;
+        db_user?: string;
+        auctions_table?: string | null;
+      }>;
+    };
+
+    const row = probe.rows?.[0];
+    console.log("[API][BOOT] DB probe success:", {
+      database: row?.database,
+      schema: row?.schema,
+      user: row?.db_user,
+      auctionsTable: row?.auctions_table ?? null,
+    });
+  } catch (error) {
+    console.error("[API][BOOT] DB probe failed:", error);
+  }
+
+  console.log("[API][BOOT] Step 3/4: Route registration complete");
+  console.log("[API][BOOT] Route prefix: /api");
+  console.log("[API][BOOT] Step 4/4: Startup diagnostics complete in", `${Date.now() - start}ms`);
 }
 
 const corsHeaders = (origin: string | null) => {
@@ -79,16 +143,28 @@ const app = new Elysia({ prefix: "/api" })
     console.log("[API]   - /api/auctions");
   });
 
-if (env.NODE_ENV !== "test") {
-  startAuctionCloser();
+async function bootstrapApi() {
   const port = env.PORT ?? 3001;
+  await logStartupDiagnostics(port);
+
+  startAuctionCloser();
   app.listen(port);
-  console.log(`API server running on http://localhost:${port}`);
+  console.log("[API][BOOT] Listening:", {
+    local: `http://localhost:${port}`,
+    apiBase: `http://localhost:${port}/api`,
+  });
   console.log("[API] Registered routes:");
   console.log("[API]   POST /api/carts");
   console.log("[API]   GET  /api/carts/:cartId");
   console.log("[API]   POST /api/carts/:cartId/items");
   console.log("[API]   POST /api/carts/:cartId/checkout");
+}
+
+if (env.NODE_ENV !== "test") {
+  bootstrapApi().catch((error) => {
+    console.error("[API][BOOT] Fatal startup error:", error);
+    process.exit(1);
+  });
 }
 
 export type App = typeof app;

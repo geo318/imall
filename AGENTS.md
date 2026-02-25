@@ -108,6 +108,9 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Added `seed:categories` script and Render build flag `SEED_CATEGORIES` for idempotent category seeding during API builds.
 - Fixed Next 16 Cache Components bailout on `/[locale]/[slug]` by separating cached public fetchers from request-bound APIs (`auth()`, locale redirect helpers) in web server actions; `registerShop` now lazily imports locale redirect and cached shop/profile reads stay auth-free.
 - Public shop profile server fetch now degrades to `null` on backend 5xx/network failures (instead of throwing) so Render/web startup does not spam `Failed to load shop profile`; favorites Next API proxies also avoid logging expected unauthorized guest/token-missing cases as errors.
+- Auction closer background worker now detects missing `auctions` table (`42P01`) and disables itself after a single warning instead of logging the same error every 30s when DB migrations are missing/out-of-sync.
+- API startup diagnostics now log a redacted env/DB summary and DB probe (`current_database`, schema, `to_regclass('public.auctions')`) before listening; `Dockerfile.api` now starts via `scripts/api-entrypoint.mjs`, which logs step-by-step startup and explicit `db:push` migration success/failure before launching the API process.
+- Web Docker runtime now starts via `scripts/web-entrypoint.mjs` to log startup env/backend wiring and optional memory heartbeats (`WEB_MEMORY_LOG_INTERVAL_MS`); `render.yaml` web `BACKEND_URL` service reference was corrected to `imall-api`.
 
 ## Known gaps / follow-ups
 
