@@ -111,6 +111,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Auction closer background worker now detects missing `auctions` table (`42P01`) and disables itself after a single warning instead of logging the same error every 30s when DB migrations are missing/out-of-sync.
 - API startup diagnostics now log a redacted env/DB summary and DB probe (`current_database`, schema, `to_regclass('public.auctions')`) before listening; `Dockerfile.api` now starts via `scripts/api-entrypoint.mjs`, which logs step-by-step startup and explicit `db:push` migration success/failure before launching the API process.
 - Web Docker runtime now starts via `scripts/web-entrypoint.mjs` to log startup env/backend wiring and optional memory heartbeats (`WEB_MEMORY_LOG_INTERVAL_MS`); `render.yaml` web `BACKEND_URL` service reference was corrected to `imall-api`.
+- `drizzle.config.ts` now reads `DATABASE_URL` directly from `process.env` instead of importing the shared app env validator, so `drizzle-kit push/generate` can run in Render/API startup without requiring unrelated app vars (Clerk, `DOMAIN`, `SUPERADMIN_*`).
 
 ## Known gaps / follow-ups
 
