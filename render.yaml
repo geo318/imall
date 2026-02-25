@@ -1,7 +1,7 @@
 services:
   - type: web
     name: imall-api
-    env: docker
+    runtime: docker
     region: frankfurt
     dockerfilePath: ./Dockerfile.api
     autoDeploy: true
@@ -29,7 +29,7 @@ services:
 
   - type: web
     name: imall
-    env: docker
+    runtime: docker
     region: frankfurt
     dockerfilePath: ./Dockerfile.web
     autoDeploy: true
