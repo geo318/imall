@@ -21,6 +21,7 @@
     "dev:all": "turbo run build --filter=@repo/db && turbo run dev --filter=api --filter=web --parallel",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:push": "drizzle-kit push --config drizzle.config.ts",
+    "db:push:ci": "drizzle-kit push --config drizzle.config.ts --force",
     "db:studio": "drizzle-kit studio --config drizzle.config.ts",
     "db:docker": "docker compose up --build -d db",
     "db:studio:docker": "docker compose up --build -d db && bun run db:push && bun run db:studio",

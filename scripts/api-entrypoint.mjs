@@ -59,8 +59,8 @@ log("1/4", "Runtime env", {
   databaseUrl: summarizeDatabaseUrl(process.env.DATABASE_URL),
 });
 
-log("2/4", "Running database migrations (db:push)");
-runChecked("2/4", "bun", ["run", "db:push"]);
+log("2/4", "Running database migrations (db:push:ci, non-interactive)");
+runChecked("2/4", "bun", ["run", "db:push:ci"]);
 
 log("3/4", "Starting API process");
 const child = spawn("bun", ["apps/api/dist/index.js"], { stdio: "inherit" });

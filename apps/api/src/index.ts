@@ -58,25 +58,44 @@ async function logStartupDiagnostics(port: number) {
         current_database() as database,
         current_schema() as schema,
         current_user as db_user,
+        to_regclass('public.products')::text as products_table,
+        to_regclass('public.tenants')::text as tenants_table,
         to_regclass('public.auctions')::text as auctions_table
     `)) as {
       rows?: Array<{
         database?: string;
         schema?: string;
         db_user?: string;
+        products_table?: string | null;
+        tenants_table?: string | null;
         auctions_table?: string | null;
       }>;
     };
 
     const row = probe.rows?.[0];
-    console.log("[API][BOOT] DB probe success:", {
+    const summary = {
       database: row?.database,
       schema: row?.schema,
       user: row?.db_user,
+      productsTable: row?.products_table ?? null,
+      tenantsTable: row?.tenants_table ?? null,
       auctionsTable: row?.auctions_table ?? null,
-    });
+    };
+    console.log("[API][BOOT] DB probe success:", summary);
+
+    const missingCoreTables = [
+      summary.productsTable ? null : "products",
+      summary.tenantsTable ? null : "tenants",
+    ].filter(Boolean) as string[];
+
+    if (missingCoreTables.length > 0) {
+      throw new Error(
+        `Database schema is incomplete for API startup. Missing core tables: ${missingCoreTables.join(", ")}. Migration may have been aborted or DATABASE_URL points to the wrong database.`,
+      );
+    }
   } catch (error) {
     console.error("[API][BOOT] DB probe failed:", error);
+    throw error;
   }
 
   console.log("[API][BOOT] Step 3/4: Route registration complete");
