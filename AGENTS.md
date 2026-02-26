@@ -114,6 +114,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - `drizzle.config.ts` now reads `DATABASE_URL` directly from `process.env` instead of importing the shared app env validator, so `drizzle-kit push/generate` can run in Render/API startup without requiring unrelated app vars (Clerk, `DOMAIN`, `SUPERADMIN_*`).
 - API startup migrations now use non-interactive `db:push:ci` (`drizzle-kit push --force`) in `scripts/api-entrypoint.mjs`; API boot DB probe checks `products`/`tenants` tables and exits startup if core schema is missing (prevents serving a broken API after a migration prompt/abort).
 - Admin server pages (`orders`, `settings`, `payouts`, `shipping`, `returns`, `customers`) no longer build local admin API URLs from `NEXT_PUBLIC_DOMAIN` (which was baked as Docker build placeholders); they now derive request origin from runtime headers via `apps/web/lib/server/request-origin.ts`.
+- Superadmin category UI now includes a one-time "Seed initial categories" button; backend route `/superadmin/categories/seed-initial` runs `scripts/seed-categories.ts` in-process via Bun and skips if any category already exists.
 
 ## Known gaps / follow-ups
 

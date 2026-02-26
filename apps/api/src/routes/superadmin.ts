@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { categories, categoryRelations, db, tenants } from "@repo/db";
 import { slugify } from "@repo/shared";
 import { and, desc, eq, inArray, isNull, notInArray } from "drizzle-orm";
@@ -66,6 +68,11 @@ async function attachHasChildren(
   const parentSet = new Set(childRows.map((row) => row.parentId));
   return list.map((item) => ({ ...item, hasChildren: parentSet.has(item.id) }));
 }
+
+const projectRootPath = fileURLToPath(new URL("../../../../", import.meta.url));
+const categorySeedScriptPath = fileURLToPath(
+  new URL("../../../../scripts/seed-categories.ts", import.meta.url),
+);
 
 export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
   .use(superadminGuard)
@@ -225,6 +232,40 @@ export const superadminRoutes = new Elysia({ prefix: "/superadmin" })
       .from(categories)
       .where(isNull(categories.deletedAt))
       .orderBy(desc(categories.createdAt));
+  })
+  .post("/categories/seed-initial", async () => {
+    const [existing] = await db.select({ id: categories.id }).from(categories).limit(1);
+    if (existing) {
+      return {
+        ok: true,
+        seeded: false,
+        message: "Categories already exist. Initial seed can only be used once.",
+      };
+    }
+
+    const result = spawnSync(process.execPath, [categorySeedScriptPath], {
+      cwd: projectRootPath,
+      env: process.env,
+      encoding: "utf8",
+    });
+
+    if (result.status !== 0) {
+      const stderr = result.stderr?.trim();
+      const stdout = result.stdout?.trim();
+      return new Response(stderr || stdout || "Category seed failed", { status: 500 });
+    }
+
+    const [created] = await db.select({ id: categories.id }).from(categories).limit(1);
+    if (!created) {
+      return new Response("Category seed finished without creating categories", { status: 500 });
+    }
+
+    return {
+      ok: true,
+      seeded: true,
+      message: "Initial categories seeded",
+      output: result.stdout?.trim() || null,
+    };
   })
   .post("/categories", async ({ body }) => {
     const payload = categoryCreateSchema.parse(body);

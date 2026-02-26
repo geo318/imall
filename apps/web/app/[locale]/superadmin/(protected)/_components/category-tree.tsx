@@ -36,12 +36,21 @@ type CategoryOption = {
 
 type Props = {
   roots: SuperadminCategoryNode[];
+  canSeedInitialCategories: boolean;
   createAction: CategoryAction;
+  seedInitialAction: CategoryAction;
   updateAction: CategoryAction;
   deleteAction: CategoryAction;
 };
 
-export function SuperadminCategoryTree({ roots, createAction, updateAction, deleteAction }: Props) {
+export function SuperadminCategoryTree({
+  roots,
+  canSeedInitialCategories,
+  createAction,
+  seedInitialAction,
+  updateAction,
+  deleteAction,
+}: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [childrenById, setChildrenById] = useState<Record<string, SuperadminCategoryNode[]>>({});
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
@@ -290,6 +299,21 @@ export function SuperadminCategoryTree({ roots, createAction, updateAction, dele
         {treeError ? <p className="text-sm text-red-600">{treeError}</p> : null}
       </div>
       <div className="px-6 py-4 border-b border-slate-100">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-600">
+            Initial seed creates the default category tree once for a blank database.
+          </p>
+          <form action={seedInitialAction}>
+            <Button
+              type="submit"
+              size="sm"
+              variant={canSeedInitialCategories ? "secondary" : "outline"}
+              disabled={!canSeedInitialCategories}
+            >
+              {canSeedInitialCategories ? "Seed initial categories" : "Initial seed already used"}
+            </Button>
+          </form>
+        </div>
         <form action={createAction} className="flex flex-wrap gap-2 items-end">
           <div className="flex flex-col gap-1">
             <label htmlFor="create-category-icon" className="text-xs text-slate-600">

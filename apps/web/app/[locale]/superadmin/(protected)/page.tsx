@@ -4,6 +4,7 @@ import {
   deleteSuperadminCategory,
   listSuperadminCategoryRoots,
   listSuperadminShops,
+  seedInitialSuperadminCategories,
   superadminLogout,
   updateShopAuction,
   updateShopSelling,
@@ -157,7 +158,9 @@ export default async function SuperadminPage() {
 
       <SuperadminCategoryTree
         roots={categoryRoots}
+        canSeedInitialCategories={categoryRoots.length === 0}
         createAction={createSuperadminCategory}
+        seedInitialAction={seedInitialSuperadminCategories}
         updateAction={updateSuperadminCategory}
         deleteAction={deleteSuperadminCategory}
       />

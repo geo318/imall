@@ -232,6 +232,19 @@ export async function createSuperadminCategory(formData: FormData): Promise<void
   revalidatePath("/superadmin");
 }
 
+export async function seedInitialSuperadminCategories(_formData?: FormData): Promise<void> {
+  const response = await superadminRequest("/superadmin/categories/seed-initial", {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new Error(errorText || "Failed to seed initial categories");
+  }
+
+  revalidatePath("/superadmin");
+}
+
 export async function updateSuperadminCategory(formData: FormData): Promise<void> {
   const id = String(formData.get("id") || "").trim();
   const name = String(formData.get("name") || "").trim();
