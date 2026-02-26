@@ -2,9 +2,8 @@ import { Badge } from "@repo/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@repo/ui/table";
 import type { Metadata } from "next";
+import { getRequestOrigin } from "@/lib/server/request-origin";
 import { getSuperadminCookieHeader } from "@/lib/superadmin";
-
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "http://localhost:3000";
 
 type PayoutEntry = {
   id: string;
@@ -27,7 +26,8 @@ type LedgerEntry = {
 };
 
 async function fetchPayouts(slug: string): Promise<PayoutEntry[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/payouts`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/payouts`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });
@@ -38,7 +38,8 @@ async function fetchPayouts(slug: string): Promise<PayoutEntry[]> {
 }
 
 async function fetchLedger(slug: string): Promise<LedgerEntry[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/payouts/ledger`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/payouts/ledger`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });

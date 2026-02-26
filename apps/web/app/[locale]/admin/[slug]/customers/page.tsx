@@ -2,9 +2,8 @@ import { Badge } from "@repo/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@repo/ui/table";
 import type { Metadata } from "next";
+import { getRequestOrigin } from "@/lib/server/request-origin";
 import { getSuperadminCookieHeader } from "@/lib/superadmin";
-
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "http://localhost:3000";
 
 type CustomerEntry = {
   id: string;
@@ -33,7 +32,8 @@ type MessageEntry = {
 };
 
 async function fetchCustomers(slug: string): Promise<CustomerEntry[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/customers`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/customers`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });
@@ -44,7 +44,8 @@ async function fetchCustomers(slug: string): Promise<CustomerEntry[]> {
 }
 
 async function fetchSegments(slug: string): Promise<SegmentEntry[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/customers/segments`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/customers/segments`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });
@@ -55,7 +56,8 @@ async function fetchSegments(slug: string): Promise<SegmentEntry[]> {
 }
 
 async function fetchMessages(slug: string): Promise<MessageEntry[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/customers/messages`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/customers/messages`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });

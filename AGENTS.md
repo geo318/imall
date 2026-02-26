@@ -113,6 +113,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 - Web Docker runtime now starts via `scripts/web-entrypoint.mjs` to log startup env/backend wiring and optional memory heartbeats (`WEB_MEMORY_LOG_INTERVAL_MS`); `render.yaml` web `BACKEND_URL` service reference was corrected to `imall-api`.
 - `drizzle.config.ts` now reads `DATABASE_URL` directly from `process.env` instead of importing the shared app env validator, so `drizzle-kit push/generate` can run in Render/API startup without requiring unrelated app vars (Clerk, `DOMAIN`, `SUPERADMIN_*`).
 - API startup migrations now use non-interactive `db:push:ci` (`drizzle-kit push --force`) in `scripts/api-entrypoint.mjs`; API boot DB probe checks `products`/`tenants` tables and exits startup if core schema is missing (prevents serving a broken API after a migration prompt/abort).
+- Admin server pages (`orders`, `settings`, `payouts`, `shipping`, `returns`, `customers`) no longer build local admin API URLs from `NEXT_PUBLIC_DOMAIN` (which was baked as Docker build placeholders); they now derive request origin from runtime headers via `apps/web/lib/server/request-origin.ts`.
 
 ## Known gaps / follow-ups
 

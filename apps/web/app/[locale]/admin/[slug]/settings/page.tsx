@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
 import type { Locale } from "@/i18n/config";
 import { getTranslations } from "@/i18n/server";
+import { getRequestOrigin } from "@/lib/server/request-origin";
 import { getSuperadminCookieHeader } from "@/lib/superadmin";
 import { ShopSettingsForm } from "./shop-settings-form";
-
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "http://localhost:3000";
 
 export const metadata: Metadata = {
   title: "Shop Settings",
 };
 
 async function fetchSettings(slug: string) {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/settings`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/settings`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });

@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import type { ApiProduct } from "@/lib/api/products";
+import { getRequestOrigin } from "@/lib/server/request-origin";
 import { getSuperadminCookieHeader } from "@/lib/superadmin";
 import { OrdersTable } from "./orders-table";
-
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "http://localhost:3000";
 
 type ApiOrderEntry = {
   id: string;
@@ -37,7 +36,8 @@ type OrderEntry = ApiOrderEntry & {
 };
 
 async function fetchOrders(slug: string): Promise<ApiOrderEntry[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/orders`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/orders`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });
@@ -48,7 +48,8 @@ async function fetchOrders(slug: string): Promise<ApiOrderEntry[]> {
 }
 
 async function fetchProducts(slug: string): Promise<ApiProduct[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/products?status=active`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/products?status=active`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });

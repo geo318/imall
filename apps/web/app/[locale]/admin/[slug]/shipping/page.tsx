@@ -9,9 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/table";
+import { getRequestOrigin } from "@/lib/server/request-origin";
 import { getSuperadminCookieHeader } from "@/lib/superadmin";
-
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "http://localhost:3000";
 
 type ShippingProfile = {
   id: string;
@@ -38,7 +37,8 @@ type FulfillmentRule = {
 };
 
 async function fetchProfiles(slug: string): Promise<ShippingProfile[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/shipping-profiles`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/shipping-profiles`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });
@@ -49,7 +49,8 @@ async function fetchProfiles(slug: string): Promise<ShippingProfile[]> {
 }
 
 async function fetchRules(slug: string): Promise<FulfillmentRule[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/fulfillment-rules`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/fulfillment-rules`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });

@@ -10,9 +10,8 @@ import {
   TableRow,
 } from "@repo/ui/table";
 import type { ApiProduct } from "@/lib/api/products";
+import { getRequestOrigin } from "@/lib/server/request-origin";
 import { getSuperadminCookieHeader } from "@/lib/superadmin";
-
-const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "http://localhost:3000";
 
 type ReturnItem = {
   id: string;
@@ -33,7 +32,8 @@ type ReturnEntry = {
 };
 
 async function fetchReturns(slug: string): Promise<ReturnEntry[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/returns`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/returns`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });
@@ -44,7 +44,8 @@ async function fetchReturns(slug: string): Promise<ReturnEntry[]> {
 }
 
 async function fetchProducts(slug: string): Promise<ApiProduct[]> {
-  const response = await fetch(`${DOMAIN}/api/admin/${slug}/products?status=active`, {
+  const origin = await getRequestOrigin();
+  const response = await fetch(`${origin}/api/admin/${slug}/products?status=active`, {
     cache: "no-store",
     headers: await getSuperadminCookieHeader(),
   });
