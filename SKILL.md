@@ -33,6 +33,40 @@ TypeScript: also upgrade `@types/react` and `@types/react-dom`.
 - `proxy.ts`: clearer network boundary; `middleware.ts` deprecated for most use.
 - Better logs/metrics: more detailed `next dev` and build timing output.
 
+## Cache Components (Expanded)
+
+- Enable with `cacheComponents: true` in `next.config.*`.
+- Model: Next 16 treats routes as dynamic by default, and you explicitly cache safe subtrees/functions with directives.
+- Use `"use cache"` for shared reusable results (data fetchers, expensive pure render functions, static-like sections).
+- Keep request APIs outside cached scopes: `cookies()`, `headers()`, `searchParams`, and auth/session reads should happen before/around cached functions.
+- If request-specific caching is absolutely required, `"use cache: private"` exists but is experimental and has significant scope/lifecycle limits.
+- `"use cache: remote"` is for cross-instance cache sharing when a remote cache handler is configured.
+
+### Practical boundaries
+
+- Good candidates:
+  - catalog/category trees
+  - public product lists
+  - non-user-specific config/content
+- Bad candidates:
+  - per-user dashboards without clear keying strategy
+  - auth/session-dependent render paths
+  - anything that directly touches request context APIs
+
+### Invalidation model
+
+- Attach tags in cached functions with `cacheTag(...)`.
+- `updateTag(tag)` (Server Actions) for read-your-writes UX after mutations.
+- `revalidateTag(tag, profile)` for SWR-like refresh semantics (v16 requires profile or `{ expire }`).
+- `refresh()` refreshes uncached reads in Server Actions; it is not a cache mutation primitive.
+
+### Migration heuristics (PPR-era code)
+
+- If old code depended on broad route-level static behavior, split into:
+  - a request-aware shell (auth/params/headers)
+  - cached data/render helpers (`"use cache"`)
+- When hitting static-generation bailout errors, move request-bound code out of the cached function first; do not disable caching globally as first response.
+
 ## Performance / DX
 
 - Turbopack: stable; default bundler (opt out with `next dev --webpack`, `next build --webpack`).

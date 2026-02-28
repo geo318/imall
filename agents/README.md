@@ -2,6 +2,10 @@
 
 Purpose: quick orientation for future agents working on this monorepo.
 
+## Entry point
+
+- Start with `agents/SKILL.md` for the structured repository playbook (stack, commands, env/deploy rules, and common failure playbooks).
+
 ## What changed recently
 
 - Web app now uses TanStack React Query (provider in `apps/web/app/layout.tsx`) and API helpers in `apps/web/lib/api/` with marketing mapping in `apps/web/lib/marketing.ts`. Shop/product pages fetch on the client instead of server-blocking.
