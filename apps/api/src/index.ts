@@ -14,6 +14,7 @@ import { inventoryRoutes } from "./routes/inventory";
 import { allProductsRoutes, productsRoutes } from "./routes/products";
 import { shopsRoutes } from "./routes/shops";
 import { superadminRoutes } from "./routes/superadmin";
+import { startProductStatsQueue } from "./utils/product-stats-queue";
 
 // Verify cartRoutes is loaded
 if (cartRoutes) {
@@ -167,6 +168,7 @@ async function bootstrapApi() {
   await logStartupDiagnostics(port);
 
   startAuctionCloser();
+  startProductStatsQueue();
   app.listen(port);
   console.log("[API][BOOT] Listening:", {
     local: `http://localhost:${port}`,

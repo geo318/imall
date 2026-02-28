@@ -1,5 +1,5 @@
 import { auctions, bids, db, inventoryLedger, orderItems, orders, users } from "@repo/db";
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, lte, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import {
   authPlugin,
@@ -18,6 +18,8 @@ type AuctionSocket = WsContext<{
 }>;
 type AuctionSubscriptions = Record<string, Set<AuctionSocket>>;
 const subscriptions: AuctionSubscriptions = {};
+const AUCTION_CLOSER_LOCK_KEY_1 = 27017;
+const AUCTION_CLOSER_LOCK_KEY_2 = 1;
 
 function getErrorCode(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return undefined;
@@ -45,6 +47,24 @@ function broadcastBidEvent(auctionId: string, payload: unknown) {
     if (ws.readyState === 1) {
       ws.send(message);
     }
+  }
+}
+
+async function tryAcquireAuctionCloserLock() {
+  const result = (await db.execute(sql`
+    select pg_try_advisory_lock(${AUCTION_CLOSER_LOCK_KEY_1}, ${AUCTION_CLOSER_LOCK_KEY_2}) as locked
+  `)) as { rows?: Array<{ locked?: boolean | string | number | null }> };
+  const locked = result.rows?.[0]?.locked;
+  return locked === true || locked === "t" || locked === "true" || locked === 1;
+}
+
+async function releaseAuctionCloserLock() {
+  try {
+    await db.execute(sql`
+      select pg_advisory_unlock(${AUCTION_CLOSER_LOCK_KEY_1}, ${AUCTION_CLOSER_LOCK_KEY_2})
+    `);
+  } catch (error) {
+    logger.debug("[Auctions] Failed to release advisory lock:", error);
   }
 }
 
@@ -536,20 +556,38 @@ export const auctionsRoutes = new Elysia({
 
 export function startAuctionCloser() {
   let disabled = false;
+  let inFlight = false;
 
-  setInterval(() => {
+  const tick = async () => {
     if (disabled) return;
+    if (inFlight) return;
+    inFlight = true;
+    let lockAcquired = false;
 
-    closeExpiredAuctions().catch((err) => {
+    try {
+      lockAcquired = await tryAcquireAuctionCloserLock();
+      if (!lockAcquired) return;
+
+      await closeExpiredAuctions();
+    } catch (err) {
       if (isMissingAuctionsTableError(err)) {
         disabled = true;
         logger.warn(
           '[Auctions] Auction closer disabled: relation "auctions" does not exist. Run DB migrations (e.g. `bun run db:push`) and restart the API.',
         );
-        return;
+      } else {
+        logger.error("close auctions failed", err);
       }
+    } finally {
+      if (lockAcquired) {
+        await releaseAuctionCloserLock();
+      }
+      inFlight = false;
+    }
+  };
 
-      logger.error("close auctions failed", err);
-    });
+  void tick();
+  setInterval(() => {
+    void tick();
   }, 30_000);
 }

@@ -17,7 +17,13 @@ import * as schema from "./schema";
 // Create a pooled Postgres client. The pool will manage its own
 // connections for efficiency. If you need advanced configuration,
 // replace this with your own Pool instance.
-const pool = new Pool({ connectionString: env.DATABASE_URL });
+const pool = new Pool({
+  connectionString: env.DATABASE_URL,
+  max: env.DB_POOL_MAX,
+  idleTimeoutMillis: env.DB_POOL_IDLE_TIMEOUT_MS,
+  connectionTimeoutMillis: env.DB_POOL_CONNECTION_TIMEOUT_MS,
+  allowExitOnIdle: env.NODE_ENV !== "production",
+});
 
 // Initialize drizzle using the node-postgres dialect. The drizzle
 // instance exposes a query API with full type-safety based on your

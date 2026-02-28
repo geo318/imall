@@ -11,21 +11,24 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { authPlugin, cartItemSchema, getAvailableStock, INVENTORY_REASONS } from "../context";
+import {
+  authPlugin,
+  cartItemSchema,
+  getAvailableStock,
+  getAvailableStockMap,
+  INVENTORY_REASONS,
+} from "../context";
 
 // Cart routes - single cart that can hold items from multiple shops
 export const cartRoutes = new Elysia({ prefix: "/carts" })
   .use(authPlugin)
   .get("/", async () => {
-    console.log("[Cart Route] GET /carts - Health check");
     return { status: "ok", message: "Cart routes are working" };
   })
   .post("/", async ({ auth, set }) => {
-    console.log("[Cart Route] POST /carts - Creating cart");
     try {
       // Use userId from verified Clerk auth token, not from request body
       const userId = auth?.userId;
-      console.log("[Cart Route] Creating cart with userId from auth:", userId);
 
       // Create cart (single cart across shops). tenantId is nullable by design.
       const [inserted] = await db
@@ -37,7 +40,6 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           userId,
         })
         .returning({ id: carts.id });
-      console.log("[Cart Route] Cart created:", inserted?.id);
       set.status = 201;
       return { id: inserted?.id, status: "open" };
     } catch (err) {
@@ -99,23 +101,36 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         .innerJoin(products, eq(variants.productId, products.id))
         .where(eq(cartItems.cartId, cartId));
 
-      // Attach availability and parse image URLs for each item (small N, ok for cart sizes)
-      const itemsWithAvailability = await Promise.all(
-        items.map(async (item) => {
-          const availableQty = await getAvailableStock(item.tenantId, item.variantId);
+      const variantIdsByTenant = new Map<string, Set<string>>();
+      for (const item of items) {
+        const tenantVariants = variantIdsByTenant.get(item.tenantId) ?? new Set<string>();
+        tenantVariants.add(item.variantId);
+        variantIdsByTenant.set(item.tenantId, tenantVariants);
+      }
 
-          // Parse image URLs from comma-delimited string
-          const productImageUrl = item.productImageUrls
-            ? item.productImageUrls.split(",")[0]?.trim() || null
-            : null;
-
-          return {
-            ...item,
-            availableQty,
-            productImageUrl,
-          };
+      const stockByTenant = new Map<string, Map<string, number>>();
+      await Promise.all(
+        Array.from(variantIdsByTenant.entries()).map(async ([tenantId, variantIds]) => {
+          const stockMap = await getAvailableStockMap(tenantId, Array.from(variantIds));
+          stockByTenant.set(tenantId, stockMap);
         }),
       );
+
+      // Attach availability and parse image URLs for each item
+      const itemsWithAvailability = items.map((item) => {
+        const availableQty = stockByTenant.get(item.tenantId)?.get(item.variantId) ?? 0;
+
+        // Parse image URLs from comma-delimited string
+        const productImageUrl = item.productImageUrls
+          ? item.productImageUrls.split(",")[0]?.trim() || null
+          : null;
+
+        return {
+          ...item,
+          availableQty,
+          productImageUrl,
+        };
+      });
 
       return { id: cart.id, status: cart.status, items: itemsWithAvailability };
     } catch (err) {
@@ -402,13 +417,24 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           throw new Response("Cart is empty", { status: 400 });
         }
 
-        // Check stock for each item (using its own tenantId)
+        // Check stock for each item (using batched lookups per tenant)
+        const variantIdsByTenant = new Map<string, Set<string>>();
         for (const item of items) {
-          if (!item.variantId || !item.tenantId) {
-            continue;
-          }
+          if (!item.variantId || !item.tenantId) continue;
+          const tenantVariants = variantIdsByTenant.get(item.tenantId) ?? new Set<string>();
+          tenantVariants.add(item.variantId);
+          variantIdsByTenant.set(item.tenantId, tenantVariants);
+        }
 
-          const available = await getAvailableStock(item.tenantId, item.variantId);
+        const stockByTenant = new Map<string, Map<string, number>>();
+        await Promise.all(
+          Array.from(variantIdsByTenant.entries()).map(async ([tenantId, variantIds]) => {
+            stockByTenant.set(tenantId, await getAvailableStockMap(tenantId, Array.from(variantIds)));
+          }),
+        );
+
+        for (const item of items) {
+          const available = stockByTenant.get(item.tenantId)?.get(item.variantId) ?? 0;
           if (available < (item.qty ?? 0)) {
             throw new Response("Insufficient stock", { status: 409 });
           }

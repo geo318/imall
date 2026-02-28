@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { authPlugin, listQuerySchema } from "../context";
+import { withCachedResponse } from "../utils/response-cache";
 import { ensureAuth, requireAuth } from "../utils/auth";
 
 const createShopSchema = z.object({
@@ -36,15 +37,18 @@ export const shopsRoutes = new Elysia({ prefix: "/shops" })
   .get("/", async ({ query, set }) => {
     try {
       const { limit } = listQuerySchema.parse(query);
-      const rows = await db
-        .select({
-          id: tenants.id,
-          slug: tenants.shopSlug,
-          name: tenants.name,
-        })
-        .from(tenants)
-        .where(eq(tenants.canSell, true))
-        .limit(limit);
+      const rows = await withCachedResponse(`shops:list:${limit}`, 60_000, async () => {
+        return db
+          .select({
+            id: tenants.id,
+            slug: tenants.shopSlug,
+            name: tenants.name,
+          })
+          .from(tenants)
+          .where(eq(tenants.canSell, true))
+          .limit(limit);
+      });
+      set.headers["Cache-Control"] = "public, max-age=120, s-maxage=120, stale-while-revalidate=600";
       return rows;
     } catch (err) {
       if (err instanceof Response) return err;
@@ -89,26 +93,30 @@ export const shopsRoutes = new Elysia({ prefix: "/shops" })
   .get("/:shopSlug/profile", async ({ params, set }) => {
     try {
       const { shopSlug } = params as { shopSlug: string };
-      const [row] = await db
-        .select({
-          id: tenants.id,
-          slug: tenants.shopSlug,
-          name: tenants.name,
-          canSell: tenants.canSell,
-          sellerEmail: shopSettings.sellerEmail,
-          sellerPhone: shopSettings.sellerPhone,
-          sellerRules: shopSettings.sellerRules,
-        })
-        .from(tenants)
-        .leftJoin(shopSettings, eq(shopSettings.tenantId, tenants.id))
-        .where(eq(tenants.shopSlug, shopSlug))
-        .limit(1);
+      const row = await withCachedResponse(`shops:profile:${shopSlug}`, 60_000, async () => {
+        const [value] = await db
+          .select({
+            id: tenants.id,
+            slug: tenants.shopSlug,
+            name: tenants.name,
+            canSell: tenants.canSell,
+            sellerEmail: shopSettings.sellerEmail,
+            sellerPhone: shopSettings.sellerPhone,
+            sellerRules: shopSettings.sellerRules,
+          })
+          .from(tenants)
+          .leftJoin(shopSettings, eq(shopSettings.tenantId, tenants.id))
+          .where(eq(tenants.shopSlug, shopSlug))
+          .limit(1);
+        return value ?? null;
+      });
 
       if (!row || !row.canSell) {
         set.status = 404;
         return { error: "Shop not found" };
       }
 
+      set.headers["Cache-Control"] = "public, max-age=120, s-maxage=120, stale-while-revalidate=600";
       return {
         id: row.id,
         slug: row.slug,

@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   numeric,
   pgTable,
@@ -20,15 +21,21 @@ import {
  */
 
 // Tenants table stores high‑level information about each shop.
-export const tenants = pgTable("tenants", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  shopSlug: varchar("shop_slug", { length: 128 }).notNull().unique(),
-  name: varchar("name", { length: 256 }).notNull(),
-  canSell: boolean("can_sell").default(false).notNull(),
-  canAuction: boolean("can_auction").default(false).notNull(),
-  settings: text("settings_json"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const tenants = pgTable(
+  "tenants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    shopSlug: varchar("shop_slug", { length: 128 }).notNull().unique(),
+    name: varchar("name", { length: 256 }).notNull(),
+    canSell: boolean("can_sell").default(false).notNull(),
+    canAuction: boolean("can_auction").default(false).notNull(),
+    settings: text("settings_json"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    canSellCreatedAtIdx: index("tenants_can_sell_created_at_idx").on(table.canSell, table.createdAt),
+  }),
+);
 
 // Categories are global across tenants and support a multi-level tree.
 export const categories = pgTable(
@@ -96,25 +103,38 @@ export const shopSettings = pgTable(
 // Users table stores application users. External auth IDs (e.g. from Clerk)
 // map users to external providers. Email is optional because Clerk can
 // supply it, but it is kept here for convenience.
-export const users = pgTable("users", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  externalAuthId: varchar("external_auth_id", { length: 256 }).notNull(),
-  email: varchar("email", { length: 256 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    externalAuthId: varchar("external_auth_id", { length: 256 }).notNull(),
+    email: varchar("email", { length: 256 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    externalAuthIdIdx: index("users_external_auth_id_idx").on(table.externalAuthId),
+  }),
+);
 
 // Memberships table links users to tenants with a role. A user can belong
 // to multiple tenants.
-export const memberships = pgTable("memberships", {
-  userId: uuid("user_id")
-    .references(() => users.id)
-    .notNull(),
-  tenantId: uuid("tenant_id")
-    .references(() => tenants.id)
-    .notNull(),
-  role: varchar("role", { length: 32 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const memberships = pgTable(
+  "memberships",
+  {
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    role: varchar("role", { length: 32 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userTenantIdx: index("memberships_user_tenant_idx").on(table.userId, table.tenantId),
+    tenantUserIdx: index("memberships_tenant_user_idx").on(table.tenantId, table.userId),
+  }),
+);
 
 // Products table contains high level product definitions. Each product
 // belongs to a tenant. Use slugs on the product for friendly URLs.
@@ -137,6 +157,13 @@ export const products = pgTable(
   },
   (table) => ({
     tenantSlugIdx: uniqueIndex("products_tenant_slug_unique").on(table.tenantId, table.slug),
+    tenantDeletedCreatedAtIdx: index("products_tenant_deleted_created_at_idx").on(
+      table.tenantId,
+      table.deletedAt,
+      table.createdAt,
+    ),
+    slugIdx: index("products_slug_idx").on(table.slug),
+    categoryIdx: index("products_category_idx").on(table.category),
   }),
 );
 
@@ -159,22 +186,30 @@ export const variants = pgTable(
   },
   (table) => ({
     productSkuIdx: uniqueIndex("variants_product_sku_unique").on(table.productId, table.sku),
+    productIdx: index("variants_product_id_idx").on(table.productId),
+    tenantProductIdx: index("variants_tenant_product_idx").on(table.tenantId, table.productId),
   }),
 );
 
 // Product images link uploaded assets to products. Sorting is stored on
 // the integer `sortOrder` field.
-export const productImages = pgTable("product_images", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  tenantId: uuid("tenant_id")
-    .references(() => tenants.id)
-    .notNull(),
-  productId: uuid("product_id")
-    .references(() => products.id, { onDelete: "cascade" })
-    .notNull(),
-  assetId: uuid("asset_id").notNull(),
-  sortOrder: integer("sort_order").default(0),
-});
+export const productImages = pgTable(
+  "product_images",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    productId: uuid("product_id")
+      .references(() => products.id, { onDelete: "cascade" })
+      .notNull(),
+    assetId: uuid("asset_id").notNull(),
+    sortOrder: integer("sort_order").default(0),
+  },
+  (table) => ({
+    productSortIdx: index("product_images_product_sort_idx").on(table.productId, table.sortOrder),
+  }),
+);
 
 // Assets table stores metadata for uploaded files. The file contents are
 // stored outside the database (e.g. in S3 or local filesystem). The
@@ -196,20 +231,30 @@ export const assets = pgTable("assets", {
 // Inventory ledger records every change to a variant's stock. Stock on
 // hand is computed by summing the `delta` values for a variant. See
 // the reservations and sale flows in the README for usage.
-export const inventoryLedger = pgTable("inventory_ledger", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  tenantId: uuid("tenant_id")
-    .references(() => tenants.id)
-    .notNull(),
-  variantId: uuid("variant_id")
-    .references(() => variants.id)
-    .notNull(),
-  delta: integer("delta").notNull(),
-  reason: varchar("reason", { length: 32 }).notNull(),
-  refType: varchar("ref_type", { length: 32 }),
-  refId: uuid("ref_id"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const inventoryLedger = pgTable(
+  "inventory_ledger",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    variantId: uuid("variant_id")
+      .references(() => variants.id)
+      .notNull(),
+    delta: integer("delta").notNull(),
+    reason: varchar("reason", { length: 32 }).notNull(),
+    refType: varchar("ref_type", { length: 32 }),
+    refId: uuid("ref_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    tenantVariantIdx: index("inventory_ledger_tenant_variant_idx").on(table.tenantId, table.variantId),
+    variantCreatedAtIdx: index("inventory_ledger_variant_created_at_idx").on(
+      table.variantId,
+      table.createdAt,
+    ),
+  }),
+);
 
 // Optional snapshot table caches available inventory counts for fast
 // reads. Use a job to recompute snapshots or maintain via triggers.
@@ -244,19 +289,26 @@ export const carts = pgTable("carts", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const cartItems = pgTable("cart_items", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  tenantId: uuid("tenant_id")
-    .references(() => tenants.id)
-    .notNull(),
-  cartId: uuid("cart_id")
-    .references(() => carts.id)
-    .notNull(),
-  variantId: uuid("variant_id")
-    .references(() => variants.id)
-    .notNull(),
-  qty: integer("qty").notNull(),
-});
+export const cartItems = pgTable(
+  "cart_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    cartId: uuid("cart_id")
+      .references(() => carts.id)
+      .notNull(),
+    variantId: uuid("variant_id")
+      .references(() => variants.id)
+      .notNull(),
+    qty: integer("qty").notNull(),
+  },
+  (table) => ({
+    cartVariantIdx: index("cart_items_cart_variant_idx").on(table.cartId, table.variantId),
+    cartIdx: index("cart_items_cart_id_idx").on(table.cartId),
+  }),
+);
 
 // Orders represent completed purchases. Each order may include many
 // order items. When an order is created from a cart or auction, the
@@ -480,22 +532,37 @@ export const auctions = pgTable("auctions", {
   currentPrice: numeric("current_price", { precision: 12, scale: 2 }),
   highestBidId: uuid("highest_bid_id"),
   highestBidderId: varchar("highest_bidder_id", { length: 256 }), // Clerk user ID (externalAuthId)
-});
+}, (table) => ({
+  tenantStatusEndsAtIdx: index("auctions_tenant_status_ends_at_idx").on(
+    table.tenantId,
+    table.status,
+    table.endsAt,
+  ),
+  statusEndsAtIdx: index("auctions_status_ends_at_idx").on(table.status, table.endsAt),
+  variantIdx: index("auctions_variant_id_idx").on(table.variantId),
+}));
 
-export const bids = pgTable("bids", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  tenantId: uuid("tenant_id")
-    .references(() => tenants.id)
-    .notNull(),
-  auctionId: uuid("auction_id")
-    .references(() => auctions.id)
-    .notNull(),
-  bidderId: uuid("bidder_id")
-    .references(() => users.id)
-    .notNull(),
-  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const bids = pgTable(
+  "bids",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    auctionId: uuid("auction_id")
+      .references(() => auctions.id)
+      .notNull(),
+    bidderId: uuid("bidder_id")
+      .references(() => users.id)
+      .notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    auctionCreatedAtIdx: index("bids_auction_created_at_idx").on(table.auctionId, table.createdAt),
+    bidderIdx: index("bids_bidder_id_idx").on(table.bidderId),
+  }),
+);
 
 // Product stats table tracks metrics for products (views, cart additions, etc.)
 export const productStats = pgTable(

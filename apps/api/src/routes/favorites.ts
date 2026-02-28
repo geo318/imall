@@ -200,9 +200,9 @@ export const favoritesRoutes = new Elysia({
         productId,
       });
 
-      // Track in stats
-      const { trackProductLoved } = await import("../utils/product-stats");
-      await trackProductLoved(productId);
+      // Track in stats asynchronously (non-critical analytics path)
+      const { enqueueProductStatsDelta } = await import("../utils/product-stats-queue");
+      enqueueProductStatsDelta(productId, { loved: 1 });
 
       set.status = 201;
       return { success: true };

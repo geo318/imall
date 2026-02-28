@@ -15,7 +15,9 @@ import {
 } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { getAvailableStock, listQuerySchema } from "../context";
+import { getAvailableStockMap, listQuerySchema } from "../context";
+import { logger } from "../utils/logger";
+import { withCachedResponse } from "../utils/response-cache";
 
 const shopProductsQuerySchema = z.object({
   limit: z
@@ -40,7 +42,45 @@ const shopProductsQuerySchema = z.object({
     .transform((v) => (v ? Number(v) : undefined))
     .refine((v) => v === undefined || (Number.isFinite(v) && v >= 0), "maxPrice invalid"),
   sort: z.enum(["newest", "oldest", "priceAsc", "priceDesc"]).optional().default("newest"),
+  categories: z
+    .string()
+    .optional()
+    .transform((value) =>
+      value
+        ? value
+            .split(",")
+            .map((item) => item.trim())
+            .filter((item) => item.length > 0)
+        : [],
+    ),
 });
+
+function mulberry32(seed: number) {
+  let value = seed;
+  return function next() {
+    value |= 0;
+    value = (value + 0x6d2b79f5) | 0;
+    let t = Math.imul(value ^ (value >>> 15), 1 | value);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seededShuffle<T>(items: T[], seed: number): T[] {
+  const output = [...items];
+  const random = mulberry32(seed);
+  for (let i = output.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    const tmp = output[i];
+    output[i] = output[j] as T;
+    output[j] = tmp as T;
+  }
+  return output;
+}
+
+function timeBucketSeed(bucketMs = 60_000) {
+  return Math.floor(Date.now() / bucketMs);
+}
 
 export const productsRoutes = new Elysia({
   prefix: "/shops/:shopSlug/products",
@@ -64,134 +104,148 @@ export const productsRoutes = new Elysia({
       }
 
       const tenantId = tenant.id;
-      const { limit, offset, q, minPrice, maxPrice, sort } = shopProductsQuerySchema.parse(query);
+      const { limit, offset, q, minPrice, maxPrice, sort, categories } =
+        shopProductsQuerySchema.parse(query);
+      const loadProducts = async () => {
+        const qLike = q ? `%${q}%` : undefined;
+        const minPriceSql = sql<number>`min(${variants.price})`;
 
-      const qLike = q ? `%${q}%` : undefined;
-      const minPriceSql = sql<number>`min(${variants.price})`;
-
-      // Build where clauses - filter out soft-deleted products
-      const whereClauses: SQL[] = [eq(products.tenantId, tenantId), isNull(products.deletedAt)];
-      if (qLike) {
-        const searchCondition = or(
-          ilike(products.title, qLike),
-          ilike(products.description, qLike),
-        );
-        if (searchCondition) {
-          whereClauses.push(searchCondition);
-        }
-      }
-
-      // Build base query
-      const baseQuery = db
-        .select({
-          id: products.id,
-          slug: products.slug,
-          title: products.title,
-          description: products.description,
-          category: products.category,
-          imageUrls: products.imageUrls,
-          status: products.status,
-          createdAt: products.createdAt,
-          price: minPriceSql,
-          currency: sql<string>`min(${variants.currency})`,
-        })
-        .from(products)
-        .innerJoin(variants, eq(variants.productId, products.id))
-        .where(and(...whereClauses))
-        .groupBy(products.id);
-
-      // HAVING for min/max price
-      const havingClauses: SQL[] = [];
-      if (minPrice !== undefined) havingClauses.push(gte(minPriceSql, minPrice));
-      if (maxPrice !== undefined) havingClauses.push(lte(minPriceSql, maxPrice));
-      const filteredQuery =
-        havingClauses.length > 0 ? baseQuery.having(and(...havingClauses)) : baseQuery;
-
-      // Apply sorting
-      const orderBy =
-        sort === "oldest"
-          ? asc(products.createdAt)
-          : sort === "priceAsc"
-            ? asc(minPriceSql)
-            : sort === "priceDesc"
-              ? desc(minPriceSql)
-              : desc(products.createdAt);
-
-      const rows = await filteredQuery.orderBy(orderBy).limit(limit).offset(offset);
-
-      if (rows.length === 0) {
-        return {
-          items: [],
-          nextOffset: null,
-        };
-      }
-
-      const productIds = rows.map((row) => row.id);
-
-      // Fetch full variants for all products
-      const variantRows =
-        productIds.length > 0
-          ? await db
-              .select({
-                id: variants.id,
-                productId: variants.productId,
-                sku: variants.sku,
-                price: variants.price,
-                currency: variants.currency,
-              })
-              .from(variants)
-              .where(inArray(variants.productId, productIds))
-          : [];
-      type VariantRow = (typeof variantRows)[number];
-
-      // Group variants by product
-      const variantsByProduct = new Map<string, VariantRow[]>();
-      for (const variant of variantRows) {
-        const existing = variantsByProduct.get(variant.productId) ?? [];
-        existing.push(variant);
-        variantsByProduct.set(variant.productId, existing);
-      }
-
-      // Get images from comma-delimited strings in products
-      const imagesByProduct = new Map<
-        string,
-        Array<{ id: string; url: string; isPrimary: boolean }>
-      >();
-      for (const row of rows) {
-        if (row.imageUrls) {
-          const imageUrls = row.imageUrls
-            .split(",")
-            .map((url) => url.trim())
-            .filter((url) => url.length > 0);
-
-          imagesByProduct.set(
-            row.id,
-            imageUrls.map((url, index) => ({
-              id: `img-${index}`,
-              url,
-              isPrimary: index === 0,
-            })),
+        // Build where clauses - filter out soft-deleted products
+        const whereClauses: SQL[] = [eq(products.tenantId, tenantId), isNull(products.deletedAt)];
+        if (qLike) {
+          const searchCondition = or(
+            ilike(products.title, qLike),
+            ilike(products.description, qLike),
           );
+          if (searchCondition) {
+            whereClauses.push(searchCondition);
+          }
         }
-      }
+        if (categories.length > 0) {
+          whereClauses.push(inArray(products.category, categories));
+        }
 
-      // Combine products with their variants and images
-      const items = rows.map((row) => ({
-        id: row.id,
-        slug: row.slug,
-        title: row.title,
-        description: row.description,
-        category: row.category,
-        status: row.status,
-        createdAt: row.createdAt,
-        variants: variantsByProduct.get(row.id) ?? [],
-        images: imagesByProduct.get(row.id) ?? [],
-      }));
+        // Build base query
+        const baseQuery = db
+          .select({
+            id: products.id,
+            slug: products.slug,
+            title: products.title,
+            description: products.description,
+            category: products.category,
+            imageUrls: products.imageUrls,
+            status: products.status,
+            createdAt: products.createdAt,
+            price: minPriceSql,
+            currency: sql<string>`min(${variants.currency})`,
+          })
+          .from(products)
+          .innerJoin(variants, eq(variants.productId, products.id))
+          .where(and(...whereClauses))
+          .groupBy(products.id);
 
-      return {
-        items,
-        nextOffset: rows.length < limit ? null : offset + limit,
+        // HAVING for min/max price
+        const havingClauses: SQL[] = [];
+        if (minPrice !== undefined) havingClauses.push(gte(minPriceSql, minPrice));
+        if (maxPrice !== undefined) havingClauses.push(lte(minPriceSql, maxPrice));
+        const filteredQuery =
+          havingClauses.length > 0 ? baseQuery.having(and(...havingClauses)) : baseQuery;
+
+        // Apply sorting
+        const orderBy =
+          sort === "oldest"
+            ? asc(products.createdAt)
+            : sort === "priceAsc"
+              ? asc(minPriceSql)
+              : sort === "priceDesc"
+                ? desc(minPriceSql)
+                : desc(products.createdAt);
+
+        const rows = await filteredQuery.orderBy(orderBy).limit(limit).offset(offset);
+
+        if (rows.length === 0) {
+          return {
+            items: [],
+            nextOffset: null,
+          };
+        }
+
+        const productIds = rows.map((row) => row.id);
+
+        // Fetch full variants for all products
+        const variantRows =
+          productIds.length > 0
+            ? await db
+                .select({
+                  id: variants.id,
+                  productId: variants.productId,
+                  sku: variants.sku,
+                  price: variants.price,
+                  currency: variants.currency,
+                })
+                .from(variants)
+                .where(inArray(variants.productId, productIds))
+            : [];
+        type VariantRow = (typeof variantRows)[number];
+
+        // Group variants by product
+        const variantsByProduct = new Map<string, VariantRow[]>();
+        for (const variant of variantRows) {
+          const existing = variantsByProduct.get(variant.productId) ?? [];
+          existing.push(variant);
+          variantsByProduct.set(variant.productId, existing);
+        }
+
+        // Get images from comma-delimited strings in products
+        const imagesByProduct = new Map<
+          string,
+          Array<{ id: string; url: string; isPrimary: boolean }>
+        >();
+        for (const row of rows) {
+          if (row.imageUrls) {
+            const imageUrls = row.imageUrls
+              .split(",")
+              .map((url) => url.trim())
+              .filter((url) => url.length > 0);
+
+            imagesByProduct.set(
+              row.id,
+              imageUrls.map((url, index) => ({
+                id: `img-${index}`,
+                url,
+                isPrimary: index === 0,
+              })),
+            );
+          }
+        }
+
+        // Combine products with their variants and images
+        const items = rows.map((row) => ({
+          id: row.id,
+          slug: row.slug,
+          title: row.title,
+          description: row.description,
+          category: row.category,
+          status: row.status,
+          createdAt: row.createdAt,
+          variants: variantsByProduct.get(row.id) ?? [],
+          images: imagesByProduct.get(row.id) ?? [],
+        }));
+
+        return {
+          items,
+          nextOffset: rows.length < limit ? null : offset + limit,
+        };
       };
+
+      const cacheKey = `products:shop:${params.shopSlug}:${limit}:${offset}:${sort}:${minPrice ?? ""}:${maxPrice ?? ""}:${q ?? ""}:${categories.join("|")}`;
+      const shouldUseCache = offset === 0 && !q && categories.length <= 4;
+      const response = shouldUseCache
+        ? await withCachedResponse(cacheKey, 20_000, loadProducts)
+        : await loadProducts();
+
+      set.headers["Cache-Control"] = "public, max-age=30, s-maxage=30, stale-while-revalidate=120";
+      return response;
     } catch (err) {
       if (err instanceof Response) {
         set.status = err.status;
@@ -295,51 +349,48 @@ export const productsRoutes = new Elysia({
               .leftJoin(bids, eq(auctions.highestBidId, bids.id))
               .leftJoin(users, eq(bids.bidderId, users.id))
               .where(inArray(auctions.variantId, variantIds));
+      const auctionByVariantId = new Map(variantAuctions.map((auction) => [auction.variantId, auction]));
+
+      const availableStockByVariant = await getAvailableStockMap(tenantId, variantIds);
 
       // Serialize dates to ISO strings for JSON response and add availability
-      const serializedVariants = await Promise.all(
-        productVariants.map(async (variant) => {
-          const auction = variantAuctions.find((a) => a.variantId === variant.id);
-          const availableQty = await getAvailableStock(product.tenantId, variant.id);
+      const serializedVariants = productVariants.map((variant) => {
+        const auction = auctionByVariantId.get(variant.id);
+        const availableQty = availableStockByVariant.get(variant.id) ?? 0;
 
-          if (!auction) {
-            return {
-              ...variant,
-              auction: null,
-              availableQty,
-            };
-          }
-
-          // Convert Date objects to ISO strings
-          // Note: highestBidderId is stored directly in auctions table (Clerk user ID)
-          // It will be null if there's no highest bid yet
-          const serializedAuction = {
-            id: auction.id,
-            variantId: auction.variantId,
-            status: auction.status,
-            currentPrice: auction.currentPrice,
-            highestBidId: auction.highestBidId,
-            highestBidderId: auction.highestBidderId ?? null, // Explicitly include even if null
-            startsAt:
-              auction.startsAt instanceof Date
-                ? auction.startsAt.toISOString()
-                : String(auction.startsAt),
-            endsAt:
-              auction.endsAt instanceof Date
-                ? auction.endsAt.toISOString()
-                : String(auction.endsAt),
-            startingBid: auction.startingBid,
-            minIncrement: auction.minIncrement,
-            buyNowPrice: auction.buyNowPrice,
-          };
-
+        if (!auction) {
           return {
             ...variant,
-            auction: serializedAuction,
+            auction: null,
             availableQty,
           };
-        }),
-      );
+        }
+
+        // Convert Date objects to ISO strings
+        // Note: highestBidderId is stored directly in auctions table (Clerk user ID)
+        // It will be null if there's no highest bid yet
+        const serializedAuction = {
+          id: auction.id,
+          variantId: auction.variantId,
+          status: auction.status,
+          currentPrice: auction.currentPrice,
+          highestBidId: auction.highestBidId,
+          highestBidderId: auction.highestBidderId ?? null, // Explicitly include even if null
+          startsAt:
+            auction.startsAt instanceof Date ? auction.startsAt.toISOString() : String(auction.startsAt),
+          endsAt:
+            auction.endsAt instanceof Date ? auction.endsAt.toISOString() : String(auction.endsAt),
+          startingBid: auction.startingBid,
+          minIncrement: auction.minIncrement,
+          buyNowPrice: auction.buyNowPrice,
+        };
+
+        return {
+          ...variant,
+          auction: serializedAuction,
+          availableQty,
+        };
+      });
 
       // Get images from comma-delimited string
       const images = product.imageUrls
@@ -352,6 +403,8 @@ export const productsRoutes = new Elysia({
             }))
             .filter((img) => img.url.length > 0)
         : [];
+
+      set.headers["Cache-Control"] = "public, max-age=10, s-maxage=10, stale-while-revalidate=30";
 
       return {
         ...product,
@@ -396,21 +449,29 @@ function getShortId(productId: string): string {
 export const allProductsRoutes = new Elysia({ prefix: "/products" })
   .get("/", async ({ query, set }) => {
     try {
-      console.log("[All Products Route] Starting request");
       const { limit } = listQuerySchema.parse(query);
-      console.log("[All Products Route] Limit:", limit);
+      const seed = timeBucketSeed();
+      const cacheKey = `products:any:${limit}:${seed}`;
+      const result = await withCachedResponse(cacheKey, 15_000, async () => {
+        type ProductRow = {
+          id: string;
+          slug: string;
+          title: string;
+          description: string | null;
+          createdAt: Date;
+          tenantSlug: string;
+          tenantName: string;
+        };
 
-      let rows: Array<{
-        id: string;
-        slug: string;
-        title: string;
-        description: string | null;
-        createdAt: Date;
-        tenantSlug: string;
-        tenantName: string;
-      }> = [];
-      try {
-        rows = await db
+        const baseWhere = and(sql`${products.deletedAt} IS NULL`, eq(tenants.canSell, true));
+
+        // Avoid `ORDER BY random()` full-table sort and avoid global COUNT(*) scans.
+        // Pull a bounded, indexed "recent window", rotate slightly by time bucket,
+        // then do deterministic in-memory shuffle.
+        const candidateSize = Math.min(Math.max(limit * 8, limit), 400);
+        const windowOffset = (seed % 6) * Math.max(1, Math.floor(limit / 2));
+
+        let candidateRows = (await db
           .select({
             id: products.id,
             slug: products.slug,
@@ -422,107 +483,129 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           })
           .from(products)
           .innerJoin(tenants, eq(products.tenantId, tenants.id))
-          .where(and(sql`${products.deletedAt} IS NULL`, eq(tenants.canSell, true)))
-          .orderBy(sql`random()`)
-          .limit(limit);
-        console.log("[All Products Route] Query succeeded, got", rows.length, "rows");
-      } catch (queryErr) {
-        console.error("[All Products Route] Query failed:", queryErr);
-        throw queryErr;
-      }
+          .where(baseWhere)
+          .orderBy(desc(products.createdAt))
+          .limit(candidateSize)
+          .offset(windowOffset)) as ProductRow[];
 
-      if (rows.length === 0) return [];
-
-      const productIds = rows.map((r) => r.id);
-      console.log("[All Products Route] Product IDs:", productIds.length);
-
-      // Fetch all variants for these products, then pick the lowest price one per product
-      const allVariants =
-        productIds.length > 0
-          ? await db
-              .select({
-                id: variants.id,
-                productId: variants.productId,
-                sku: variants.sku,
-                price: variants.price,
-                currency: variants.currency,
-              })
-              .from(variants)
-              .where(inArray(variants.productId, productIds))
-          : [];
-
-      console.log("[All Products Route] Found variants:", allVariants.length);
-
-      // Group by product and pick the variant with lowest price
-      const variantByProduct = new Map<string, (typeof allVariants)[number]>();
-      for (const v of allVariants) {
-        const existing = variantByProduct.get(v.productId);
-        if (!existing || Number(v.price) < Number(existing.price)) {
-          variantByProduct.set(v.productId, v);
+        if (candidateRows.length === 0 && windowOffset > 0) {
+          candidateRows = (await db
+            .select({
+              id: products.id,
+              slug: products.slug,
+              title: products.title,
+              description: products.description,
+              createdAt: products.createdAt,
+              tenantSlug: tenants.shopSlug,
+              tenantName: tenants.name,
+            })
+            .from(products)
+            .innerJoin(tenants, eq(products.tenantId, tenants.id))
+            .where(baseWhere)
+            .orderBy(desc(products.createdAt))
+            .limit(candidateSize)) as ProductRow[];
         }
-      }
 
-      const variantIds = Array.from(variantByProduct.values()).map((v) => v.id);
-      console.log("[All Products Route] Variant IDs for auctions:", variantIds.length);
+        const rows = seededShuffle(candidateRows, seed).slice(0, limit);
+        logger.debug("[All Products Route] Selected rows", {
+          candidateSize,
+          windowOffset,
+          requestedLimit: limit,
+          returned: rows.length,
+        });
 
-      const auctionRows =
-        variantIds.length === 0
-          ? []
-          : await db
-              .select({
-                id: auctions.id,
-                variantId: auctions.variantId,
-                status: auctions.status,
-                currentPrice: auctions.currentPrice,
-                highestBidId: auctions.highestBidId,
-                startsAt: auctions.startsAt,
-                endsAt: auctions.endsAt,
-                startingBid: auctions.startingBid,
-                minIncrement: auctions.minIncrement,
-                buyNowPrice: auctions.buyNowPrice,
-              })
-              .from(auctions)
-              .where(inArray(auctions.variantId, variantIds));
+        if (rows.length === 0) {
+          return [];
+        }
 
-      console.log("[All Products Route] Found auctions:", auctionRows.length);
+        const productIds = rows.map((r) => r.id);
 
-      const auctionByVariant = new Map<string, (typeof auctionRows)[number]>();
-      for (const a of auctionRows) auctionByVariant.set(a.variantId, a);
+        // Fetch all variants for these products, then pick the lowest price one per product
+        const allVariants =
+          productIds.length > 0
+            ? await db
+                .select({
+                  id: variants.id,
+                  productId: variants.productId,
+                  sku: variants.sku,
+                  price: variants.price,
+                  currency: variants.currency,
+                })
+                .from(variants)
+                .where(inArray(variants.productId, productIds))
+            : [];
 
-      return rows.map((row) => {
-        const v = variantByProduct.get(row.id);
-        const auction = v ? auctionByVariant.get(v.id) : undefined;
+        // Group by product and pick the variant with lowest price
+        const variantByProduct = new Map<string, (typeof allVariants)[number]>();
+        for (const v of allVariants) {
+          const existing = variantByProduct.get(v.productId);
+          if (!existing || Number(v.price) < Number(existing.price)) {
+            variantByProduct.set(v.productId, v);
+          }
+        }
 
-        const serializedAuction = auction
-          ? {
-              ...auction,
-              startsAt:
-                auction.startsAt instanceof Date
-                  ? auction.startsAt.toISOString()
-                  : String(auction.startsAt),
-              endsAt:
-                auction.endsAt instanceof Date
-                  ? auction.endsAt.toISOString()
-                  : String(auction.endsAt),
-            }
-          : null;
+        const variantIds = Array.from(variantByProduct.values()).map((v) => v.id);
 
-        return {
-          ...row,
-          hasAuction: Boolean(auction),
-          variants: v
-            ? [
-                {
-                  id: v.id,
-                  sku: v.sku,
-                  price: v.price,
-                  currency: v.currency,
-                  auction: serializedAuction,
-                },
-              ]
-            : [],
-        };
+        const auctionRows =
+          variantIds.length === 0
+            ? []
+            : await db
+                .select({
+                  id: auctions.id,
+                  variantId: auctions.variantId,
+                  status: auctions.status,
+                  currentPrice: auctions.currentPrice,
+                  highestBidId: auctions.highestBidId,
+                  startsAt: auctions.startsAt,
+                  endsAt: auctions.endsAt,
+                  startingBid: auctions.startingBid,
+                  minIncrement: auctions.minIncrement,
+                  buyNowPrice: auctions.buyNowPrice,
+                })
+                .from(auctions)
+                .where(inArray(auctions.variantId, variantIds));
+
+        const auctionByVariant = new Map<string, (typeof auctionRows)[number]>();
+        for (const a of auctionRows) auctionByVariant.set(a.variantId, a);
+
+        return rows.map((row) => {
+          const v = variantByProduct.get(row.id);
+          const auction = v ? auctionByVariant.get(v.id) : undefined;
+
+          const serializedAuction = auction
+            ? {
+                ...auction,
+                startsAt:
+                  auction.startsAt instanceof Date
+                    ? auction.startsAt.toISOString()
+                    : String(auction.startsAt),
+                endsAt:
+                  auction.endsAt instanceof Date
+                    ? auction.endsAt.toISOString()
+                    : String(auction.endsAt),
+              }
+            : null;
+
+          return {
+            ...row,
+            hasAuction: Boolean(auction),
+            variants: v
+              ? [
+                  {
+                    id: v.id,
+                    sku: v.sku,
+                    price: v.price,
+                    currency: v.currency,
+                    auction: serializedAuction,
+                  },
+                ]
+              : [],
+          };
+        });
       });
+
+      set.headers["Cache-Control"] = "public, max-age=30, s-maxage=30, stale-while-revalidate=120";
+      return result;
     } catch (err) {
       if (err instanceof Response) return err;
       console.error("[Products Route] Failed to list all products:", err);
@@ -566,66 +649,84 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         .optional()
         .transform((v) => (v ? Number(v) : undefined))
         .refine((v) => v === undefined || (Number.isFinite(v) && v >= 0), "maxPrice invalid"),
+      categories: z
+        .string()
+        .optional()
+        .transform((value) =>
+          value
+            ? value
+                .split(",")
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0)
+            : [],
+        ),
     });
 
     try {
-      const { limit, offset, q, type, sort, minPrice, maxPrice } = searchSchema.parse(query);
+      const { limit, offset, q, type, sort, minPrice, maxPrice, categories } =
+        searchSchema.parse(query);
+      const randomSeed = sort === "random" ? timeBucketSeed() : 0;
+      const cacheKey =
+        `products:search:${limit}:${offset}:${type}:${sort}:${q ?? ""}:${minPrice ?? ""}:${maxPrice ?? ""}:${categories.join("|")}:${randomSeed}`;
+      const loadSearch = async () => {
+        const qLike = q ? `%${q}%` : undefined;
+        const hasAuctionSql = sql<boolean>`
+          exists (
+            select 1
+            from auctions a
+            join variants v on v.id = a.variant_id
+            where v.product_id = ${products.id}
+          )
+        `;
+        const minPriceSql = sql<number>`min(${variants.price})`;
 
-      const qLike = q ? `%${q}%` : undefined;
-      const hasAuctionSql = sql<boolean>`
-        exists (
-          select 1
-          from auctions a
-          join variants v on v.id = a.variant_id
-          where v.product_id = ${products.id}
-        )
-      `;
-      const minPriceSql = sql<number>`min(${variants.price})`;
-
-      const whereClauses: SQL[] = [isNull(products.deletedAt)];
-      if (qLike) {
-        const searchCondition = or(
-          ilike(products.title, qLike),
-          ilike(products.description, qLike),
-        );
-        if (searchCondition) {
-          whereClauses.push(searchCondition);
+        const whereClauses: SQL[] = [isNull(products.deletedAt)];
+        if (qLike) {
+          const searchCondition = or(
+            ilike(products.title, qLike),
+            ilike(products.description, qLike),
+          );
+          if (searchCondition) {
+            whereClauses.push(searchCondition);
+          }
         }
-      }
-      if (type === "auction") whereClauses.push(eq(hasAuctionSql, true));
-      if (type === "buyNow") whereClauses.push(eq(hasAuctionSql, false));
+        if (categories.length > 0) {
+          whereClauses.push(inArray(products.category, categories));
+        }
+        if (type === "auction") whereClauses.push(eq(hasAuctionSql, true));
+        if (type === "buyNow") whereClauses.push(eq(hasAuctionSql, false));
 
-      // Build base query with aggregates for price and hasAuction.
-      const baseQuery = db
-        .select({
-          id: products.id,
-          slug: products.slug,
-          title: products.title,
-          description: products.description,
-          imageUrls: products.imageUrls,
-          createdAt: products.createdAt,
-          tenantSlug: tenants.shopSlug,
-          tenantName: tenants.name,
-          price: minPriceSql,
-          currency: sql<string>`min(${variants.currency})`,
-          hasAuction: hasAuctionSql,
-        })
-        .from(products)
-        .innerJoin(tenants, eq(products.tenantId, tenants.id))
-        .innerJoin(variants, eq(variants.productId, products.id))
-        .where(and(...whereClauses, eq(tenants.canSell, true)))
-        .groupBy(products.id, tenants.shopSlug, tenants.name);
+        // Build base query with aggregates for price and hasAuction.
+        const baseQuery = db
+          .select({
+            id: products.id,
+            slug: products.slug,
+            title: products.title,
+            description: products.description,
+            imageUrls: products.imageUrls,
+            createdAt: products.createdAt,
+            tenantSlug: tenants.shopSlug,
+            tenantName: tenants.name,
+            price: minPriceSql,
+            currency: sql<string>`min(${variants.currency})`,
+            hasAuction: hasAuctionSql,
+          })
+          .from(products)
+          .innerJoin(tenants, eq(products.tenantId, tenants.id))
+          .innerJoin(variants, eq(variants.productId, products.id))
+          .where(and(...whereClauses, eq(tenants.canSell, true)))
+          .groupBy(products.id, tenants.shopSlug, tenants.name);
 
-      // HAVING for min/max price
-      const havingClauses: SQL[] = [];
-      if (minPrice !== undefined) havingClauses.push(gte(minPriceSql, minPrice));
-      if (maxPrice !== undefined) havingClauses.push(lte(minPriceSql, maxPrice));
-      const filteredQuery =
-        havingClauses.length > 0 ? baseQuery.having(and(...havingClauses)) : baseQuery;
+        // HAVING for min/max price
+        const havingClauses: SQL[] = [];
+        if (minPrice !== undefined) havingClauses.push(gte(minPriceSql, minPrice));
+        if (maxPrice !== undefined) havingClauses.push(lte(minPriceSql, maxPrice));
+        const filteredQuery =
+          havingClauses.length > 0 ? baseQuery.having(and(...havingClauses)) : baseQuery;
 
-      const orderBy =
-        sort === "random"
-          ? sql`random()`
+        const isRandomSort = sort === "random";
+        const orderBy = isRandomSort
+          ? desc(products.createdAt)
           : sort === "oldest"
             ? asc(products.createdAt)
             : sort === "priceAsc"
@@ -634,56 +735,65 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
                 ? desc(minPriceSql)
                 : desc(products.createdAt);
 
-      const rows = await filteredQuery.orderBy(orderBy).limit(limit).offset(offset);
+        const rows = await filteredQuery.orderBy(orderBy).limit(limit).offset(offset);
+        const orderedRows = isRandomSort ? seededShuffle(rows, randomSeed) : rows;
 
-      // Get images from comma-delimited strings in products
-      const imagesByProduct = new Map<
-        string,
-        Array<{ id: string; url: string; isPrimary: boolean }>
-      >();
-      for (const row of rows) {
-        if (row.imageUrls) {
-          const imageUrls = row.imageUrls
-            .split(",")
-            .map((url) => url.trim())
-            .filter((url) => url.length > 0);
+        // Get images from comma-delimited strings in products
+        const imagesByProduct = new Map<
+          string,
+          Array<{ id: string; url: string; isPrimary: boolean }>
+        >();
+        for (const row of orderedRows) {
+          if (row.imageUrls) {
+            const imageUrls = row.imageUrls
+              .split(",")
+              .map((url) => url.trim())
+              .filter((url) => url.length > 0);
 
-          imagesByProduct.set(
-            row.id,
-            imageUrls.map((url, index) => ({
-              id: `img-${index}`,
-              url,
-              isPrimary: index === 0,
-            })),
-          );
+            imagesByProduct.set(
+              row.id,
+              imageUrls.map((url, index) => ({
+                id: `img-${index}`,
+                url,
+                isPrimary: index === 0,
+              })),
+            );
+          }
         }
-      }
 
-      const items = rows.map((row) => ({
-        id: row.id,
-        slug: row.slug,
-        title: row.title,
-        description: row.description,
-        createdAt: row.createdAt,
-        tenantSlug: row.tenantSlug,
-        tenantName: row.tenantName,
-        hasAuction: Boolean(row.hasAuction),
-        variants: [
-          {
-            id: "summary",
-            sku: null,
-            price: String(row.price ?? "0"),
-            currency: row.currency ?? "USD",
-            auction: null,
-          },
-        ],
-        images: imagesByProduct.get(row.id) ?? [],
-      }));
+        const items = orderedRows.map((row) => ({
+          id: row.id,
+          slug: row.slug,
+          title: row.title,
+          description: row.description,
+          createdAt: row.createdAt,
+          tenantSlug: row.tenantSlug,
+          tenantName: row.tenantName,
+          hasAuction: Boolean(row.hasAuction),
+          variants: [
+            {
+              id: "summary",
+              sku: null,
+              price: String(row.price ?? "0"),
+              currency: row.currency ?? "USD",
+              auction: null,
+            },
+          ],
+          images: imagesByProduct.get(row.id) ?? [],
+        }));
 
-      return {
-        items,
-        nextOffset: rows.length < limit ? null : offset + limit,
+        return {
+          items,
+          nextOffset: orderedRows.length < limit ? null : offset + limit,
+        };
       };
+      const shouldUseCache = offset === 0 && (q?.length ?? 0) <= 48 && categories.length <= 6;
+      const result = shouldUseCache
+        ? await withCachedResponse(cacheKey, 20_000, loadSearch)
+        : await loadSearch();
+
+      set.headers["Cache-Control"] = "public, max-age=30, s-maxage=30, stale-while-revalidate=120";
+      return result;
     } catch (err) {
       if (err instanceof Response) return err;
       set.status = 500;
@@ -831,10 +941,11 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
               .leftJoin(bids, eq(auctions.highestBidId, bids.id))
               .leftJoin(users, eq(bids.bidderId, users.id))
               .where(inArray(auctions.variantId, variantIds));
+      const auctionByVariantId = new Map(variantAuctions.map((auction) => [auction.variantId, auction]));
 
       // Serialize dates to ISO strings for JSON response
       const serializedVariants = productVariants.map((variant) => {
-        const auction = variantAuctions.find((a) => a.variantId === variant.id);
+        const auction = auctionByVariantId.get(variant.id);
 
         if (!auction) {
           return {
@@ -881,6 +992,8 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
             }))
             .filter((img) => img.url.length > 0)
         : [];
+
+      set.headers["Cache-Control"] = "public, max-age=10, s-maxage=10, stale-while-revalidate=30";
 
       return {
         ...product,
@@ -952,8 +1065,11 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         isUnique = false;
       }
 
-      const { trackProductView } = await import("../utils/product-stats");
-      await trackProductView(productId, isUnique);
+      const { enqueueProductStatsDelta } = await import("../utils/product-stats-queue");
+      enqueueProductStatsDelta(productId, {
+        viewsTotal: 1,
+        viewsUnique: isUnique ? 1 : 0,
+      });
       return { success: true };
     } catch (error) {
       console.error("[Products] Error tracking view:", error);

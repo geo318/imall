@@ -1,6 +1,6 @@
 import { db, inventoryLedger, tenants } from "@repo/db";
 import { INVENTORY_REASONS, env as sharedEnv } from "@repo/shared";
-import { and, eq, sum } from "drizzle-orm";
+import { and, eq, inArray, sum } from "drizzle-orm";
 import { Elysia } from "elysia";
 import type { ElysiaWS } from "elysia/dist/ws";
 
@@ -198,6 +198,28 @@ export async function getAvailableStock(tenantId: string, variantId: string) {
   // PostgreSQL sum() returns null when no rows exist, convert to 0
   const stock = row?.onHand ? Number(row.onHand) : 0;
   return stock;
+}
+
+export async function getAvailableStockMap(tenantId: string, variantIds: string[]) {
+  const map = new Map<string, number>();
+  if (variantIds.length === 0) return map;
+
+  const rows = await db
+    .select({
+      variantId: inventoryLedger.variantId,
+      onHand: sum(inventoryLedger.delta),
+    })
+    .from(inventoryLedger)
+    .where(
+      and(eq(inventoryLedger.tenantId, tenantId), inArray(inventoryLedger.variantId, variantIds)),
+    )
+    .groupBy(inventoryLedger.variantId);
+
+  for (const row of rows) {
+    map.set(row.variantId, row.onHand ? Number(row.onHand) : 0);
+  }
+
+  return map;
 }
 
 export async function decrementStock(
