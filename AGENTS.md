@@ -10,6 +10,10 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 
 ## Recent changes
 
+- Hero flicker mitigation now avoids touching murmuration logic: the canvas layer reveals with a delayed CSS animation (`hero-canvas-reveal`) while hero text animates independently on its own composited layer (`hero-content-layer`).
+- Hero content now uses a dedicated `animate-hero-enter` motion (0.8s, subtle 8px rise + fade) so entry feels smoother/longer without restoring per-element stagger animations.
+- Hero copy/actions now use one parent fade-in only (no per-element slide/delay animations) to avoid visible flicker/jank on first paint while keeping murmuration unchanged.
+- Hero rendering is split into server + client pieces: `HeroSection` is now server-rendered (locale translations on server), and the canvas animation moved to `hero-background.tsx`; `useMurmuration` was optimized (viewport-scaled particle count, capped DPR/FPS, spatial-grid neighbor checks, pause on hidden/offscreen, reduced-motion static mode, and pointer-events disabled on canvas) to reduce startup jank and steady CPU usage.
 - Added Render-aware build/start routing via `scripts/render.mjs` and updated root scripts to build/start only the matching service (web vs api) based on `RENDER_SERVICE_NAME`.
 - Render start now optionally runs `db:push` before boot when `RUN_MIGRATIONS` is enabled (intended for the API service).
 - Added `Dockerfile.api`, `Dockerfile.web`, and a root `.dockerignore` for Render Docker deployments.

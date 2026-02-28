@@ -1,12 +1,11 @@
-"use client";
-
 import { Button } from "@repo/ui/button";
 import { ArrowRight, ShieldCheck, Sparkles, Star, Truck } from "lucide-react";
-import { type ComponentType, useRef } from "react";
-import { Link } from "@/i18n/navigation.client";
-import { useTranslations } from "@/i18n/provider";
+import type { ComponentType } from "react";
+import type { Locale } from "@/i18n/config";
+import { Link } from "@/i18n/navigation.server";
+import { getTranslations } from "@/i18n/server";
+import { HeroBackground } from "./hero-background";
 import { HERO_FEATURES, type HeroFeatureId } from "./hero-content";
-import { useMurmuration } from "./use-murmuration";
 
 const FEATURE_ICON: Record<HeroFeatureId, ComponentType<{ className?: string }>> = {
   verified: ShieldCheck,
@@ -14,44 +13,35 @@ const FEATURE_ICON: Record<HeroFeatureId, ComponentType<{ className?: string }>>
   protection: Star,
 };
 
-export function HeroSection() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useMurmuration(canvasRef);
-  const t = useTranslations();
+type HeroSectionProps = {
+  locale: Locale;
+};
+
+export async function HeroSection({ locale }: HeroSectionProps) {
+  const t = await getTranslations(locale);
 
   return (
-    <section className="relative flex min-h-[600px] items-center overflow-hidden bg-gradient-hero">
-      <canvas
-        ref={canvasRef}
-        aria-hidden
-        className="absolute inset-0 h-full w-full"
-        style={{ pointerEvents: "auto" }}
-      />
+    <section className="relative isolate flex min-h-[600px] items-center overflow-hidden bg-gradient-hero">
+      <HeroBackground />
 
-      <div className="container relative z-10 py-16 md:py-24 lg:py-32 pointer-events-none">
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary backdrop-blur-sm border border-primary/20 pointer-events-auto animate-fade-in">
+      <div className="container hero-content-layer relative z-10 py-16 md:py-24 lg:py-32 pointer-events-none">
+        <div className="mx-auto max-w-3xl text-center animate-hero-enter">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary backdrop-blur-sm border border-primary/20 pointer-events-auto">
             <Sparkles className="h-4 w-4" />
             <span>{t("home.hero.badge")}</span>
           </div>
 
-          <h1 className="mb-6 text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl lg:text-6xl animate-slide-up">
+          <h1 className="mb-6 text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl lg:text-6xl">
             {t.rich("home.hero.title", {
               highlight: (chunks) => <span className="text-gradient">{chunks}</span>,
             })}
           </h1>
 
-          <p
-            className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground md:text-xl animate-slide-up"
-            style={{ animationDelay: "0.1s" }}
-          >
+          <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground md:text-xl">
             {t("home.hero.description")}
           </p>
 
-          <div
-            className="flex flex-col justify-center gap-4 sm:flex-row pointer-events-auto animate-slide-up"
-            style={{ animationDelay: "0.2s" }}
-          >
+          <div className="flex flex-col justify-center gap-4 sm:flex-row pointer-events-auto">
             <Link href="/products" prefetch className="pointer-events-auto">
               <Button variant="hero" size="lg">
                 {t("home.hero.ctaShop")}
@@ -65,10 +55,7 @@ export function HeroSection() {
             </Link>
           </div>
 
-          <div
-            className="mt-14 grid grid-cols-1 gap-6 border-t border-border/50 pt-8 sm:grid-cols-3 animate-fade-in"
-            style={{ animationDelay: "0.3s" }}
-          >
+          <div className="mt-14 grid grid-cols-1 gap-6 border-t border-border/50 pt-8 sm:grid-cols-3">
             {HERO_FEATURES.map((item) => {
               const Icon = FEATURE_ICON[item.id];
               return (

@@ -1,11 +1,11 @@
 import { Button } from "@repo/ui/button";
-import { getTranslations } from "@/i18n/server";
-import type { Locale } from "@/i18n/config";
-import { Link } from "@/i18n/navigation.server";
 import { CategoryBanner } from "@/components/marketing/category-banner";
 import { FeaturedProductsServer } from "@/components/marketing/featured-products-server";
 import { HeroSection } from "@/components/marketing/hero";
 import { VendorSpotlight } from "@/components/marketing/vendor-spotlight";
+import type { Locale } from "@/i18n/config";
+import { Link } from "@/i18n/navigation.server";
+import { getTranslations } from "@/i18n/server";
 
 export const metadata = {
   title: "MarketHub - Modern Multi-Vendor Marketplace",
@@ -15,14 +15,15 @@ export const metadata = {
 // PPR: Static shell with dynamic content slots
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const t = await getTranslations(locale as Locale);
+  const localeValue = locale as Locale;
+  const t = await getTranslations(localeValue);
   const valueProps = t.raw("home.valueProps") as Array<{ title: string; body: string }>;
   const vendorFeatures = t.raw("home.forVendors.features") as string[];
 
   return (
     <div className="bg-white">
       {/* Static: Hero section */}
-      <HeroSection />
+      <HeroSection locale={localeValue} />
       {/* Dynamic slot: Featured products */}
       <FeaturedProductsServer />
       {/* Static: Category banner */}
@@ -36,9 +37,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
                 {t("home.why.tag")}
               </p>
-              <h3 className="text-3xl font-semibold text-slate-900">
-                {t("home.why.title")}
-              </h3>
+              <h3 className="text-3xl font-semibold text-slate-900">{t("home.why.title")}</h3>
               <p className="text-slate-600">{t("home.why.description")}</p>
               <div className="grid gap-4 sm:grid-cols-3">
                 {valueProps.map((item) => (
@@ -53,9 +52,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               </div>
             </div>
             <div className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
-              <h4 className="text-lg font-semibold text-slate-900">
-                {t("home.forVendors.title")}
-              </h4>
+              <h4 className="text-lg font-semibold text-slate-900">{t("home.forVendors.title")}</h4>
               <ul className="space-y-3 text-sm text-slate-600">
                 {vendorFeatures.map((feature) => (
                   <li key={feature}>• {feature}</li>
