@@ -44,19 +44,15 @@ export async function GET(
 
     const response = await fetch(`${API_BASE}/api/products/${productIdentifier}`, {
       headers,
+      cache: "no-store",
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[Products API] Backend error:", response.status, errorText);
-      return NextResponse.json(
-        { error: errorText || "Failed to fetch product" },
-        { status: response.status },
-      );
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return new NextResponse(response.body, {
+      status: response.status,
+      headers: {
+        "content-type": response.headers.get("content-type") ?? "application/json",
+        "cache-control": response.headers.get("cache-control") ?? "no-store",
+      },
+    });
   } catch (error) {
     console.error("[Products API] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";

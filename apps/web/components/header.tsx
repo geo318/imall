@@ -75,14 +75,20 @@ export function Header({
     queryKey: ["cart", cartId],
     queryFn: () => getCart(cartId as string),
     enabled: Boolean(cartId),
-    staleTime: 10_000,
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: false,
   });
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories-tree", locale],
     queryFn: () => fetchCategoryTree(locale),
-    staleTime: 60_000,
+    staleTime: 30 * 60_000,
+    gcTime: 2 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: false,
   });
 

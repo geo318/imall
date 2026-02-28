@@ -40,7 +40,10 @@ export function ProductsExplorerClient() {
   const { data: categoryTree = [] } = useQuery({
     queryKey: ["categories-tree", locale],
     queryFn: () => fetchCategoryTree(locale),
-    staleTime: 60_000,
+    staleTime: 30 * 60_000,
+    gcTime: 2 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: false,
   });
 
@@ -158,6 +161,11 @@ export function ProductsExplorerClient() {
     return effectiveKeys;
   }, [descendantsByRoot, keyToRoot, rootCategoryKeys, selectedCategories]);
 
+  const effectiveCategoryList = useMemo(
+    () => (effectiveCategoryKeys ? Array.from(effectiveCategoryKeys).sort() : []),
+    [effectiveCategoryKeys],
+  );
+
   // Sync search query with URL params
   useEffect(() => {
     const urlSearch = searchParams.get("search") || "";
@@ -201,7 +209,14 @@ export function ProductsExplorerClient() {
 
   // Infinite query for products
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
-    queryKey: ["products", searchQuery, priceRange, selectedCategories, listingType, sortBy],
+    queryKey: [
+      "products",
+      searchQuery,
+      priceRange,
+      effectiveCategoryList.join(","),
+      listingType,
+      sortBy,
+    ],
     queryFn: async ({ pageParam = 0 }) => {
       try {
         const response = await searchProducts({
@@ -211,6 +226,7 @@ export function ProductsExplorerClient() {
           type:
             listingType === "all" ? undefined : listingType === "auction" ? "auction" : "buyNow",
           sort: sortMap[sortBy],
+          categories: effectiveCategoryList.length > 0 ? effectiveCategoryList : undefined,
           limit: 20,
           offset: pageParam,
         });
@@ -232,6 +248,12 @@ export function ProductsExplorerClient() {
       return lastPage.nextOffset ?? undefined;
     },
     initialPageParam: 0,
+    maxPages: 5,
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 
   // Intersection Observer for infinite scroll
@@ -260,20 +282,8 @@ export function ProductsExplorerClient() {
   const filteredProducts = useMemo(() => {
     // Filter out products with missing required data before mapping
     const validProducts = allProducts.filter((product) => product.id && product.slug);
-    let result = validProducts.map((product) => mapApiProductToMarketing(product));
-
-    // Category filter
-    if (effectiveCategoryKeys && effectiveCategoryKeys.size > 0) {
-      result = result.filter((product) => {
-        const category = product.category?.trim().toLowerCase();
-        if (!category) return false;
-        const resolvedKey = categoryNameToKey.get(category);
-        return resolvedKey ? effectiveCategoryKeys.has(resolvedKey) : false;
-      });
-    }
-
-    return result;
-  }, [allProducts, categoryNameToKey, effectiveCategoryKeys]);
+    return validProducts.map((product) => mapApiProductToMarketing(product));
+  }, [allProducts]);
 
   const clearAllFilters = () => {
     setSearchQuery("");

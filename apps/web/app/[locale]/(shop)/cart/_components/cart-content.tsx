@@ -33,7 +33,10 @@ export function CartContent() {
     queryKey: ["cart", cartId],
     queryFn: () => getCart(cartId as string),
     enabled: Boolean(cartId),
-    staleTime: 10_000,
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: (failureCount, error) => {
       // Don't retry on 404 (cart not found)
       if (error instanceof Error && error.message.includes("not found")) {

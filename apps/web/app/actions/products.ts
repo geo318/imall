@@ -49,6 +49,7 @@ export type ProductSearchParams = {
   sort?: "newest" | "oldest" | "priceAsc" | "priceDesc" | "random";
   minPrice?: number;
   maxPrice?: number;
+  categories?: string[];
 };
 
 export type ProductSearchResponse = {
@@ -94,6 +95,7 @@ export async function searchShopProducts(
     minPrice?: number;
     maxPrice?: number;
     sort?: "newest" | "oldest" | "priceAsc" | "priceDesc";
+    categories?: string[];
   },
 ): Promise<ProductSearchResponse> {
   "use cache";
@@ -110,6 +112,7 @@ export async function searchShopProducts(
       minPrice: params.minPrice,
       maxPrice: params.maxPrice,
       sort: params.sort,
+      categories: params.categories?.join(","),
     },
   });
 
@@ -215,6 +218,7 @@ export async function searchProducts(params: ProductSearchParams): Promise<Produ
       sort: params.sort,
       minPrice: params.minPrice,
       maxPrice: params.maxPrice,
+      categories: params.categories?.join(","),
     },
   });
 

@@ -9,13 +9,28 @@ export async function GET(request: Request) {
   if (locale) params.set("locale", locale);
 
   const backendUrl = `${API_BASE}/api/categories/tree${params.toString() ? `?${params}` : ""}`;
-  const response = await fetch(backendUrl, { cache: "no-store" });
+  const response = await fetch(backendUrl, {
+    next: { revalidate: 300 },
+  });
 
   if (!response.ok) {
-    const text = await response.text().catch(() => "Failed to load categories");
-    return new Response(text, { status: response.status });
+    return new Response(response.body, {
+      status: response.status,
+      headers: {
+        "content-type": response.headers.get("content-type") ?? "application/json",
+        "cache-control":
+          response.headers.get("cache-control") ??
+          "public, max-age=60, s-maxage=60, stale-while-revalidate=300",
+      },
+    });
   }
-
-  const data = await response.json();
-  return Response.json(data);
+  return new Response(response.body, {
+    status: response.status,
+    headers: {
+      "content-type": response.headers.get("content-type") ?? "application/json",
+      "cache-control":
+        response.headers.get("cache-control") ??
+        "public, max-age=300, s-maxage=300, stale-while-revalidate=3600",
+    },
+  });
 }

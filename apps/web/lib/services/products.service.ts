@@ -10,6 +10,7 @@ export type ProductSearchParams = {
   sort?: "newest" | "oldest" | "priceAsc" | "priceDesc" | "random";
   minPrice?: number;
   maxPrice?: number;
+  categories?: string[];
 };
 
 export type ProductSearchResponse = {
@@ -17,9 +18,15 @@ export type ProductSearchResponse = {
   nextOffset: number | null;
 };
 
+const backendBase =
+  typeof process !== "undefined" && process.env.NEXT_PUBLIC_BACKEND_URL
+    ? process.env.NEXT_PUBLIC_BACKEND_URL.replace(/\/+$/, "")
+    : "";
+const apiBase = backendBase ? `${backendBase}/api` : "/api";
+
 export async function getShopProducts(shopSlug: string, limit = 20): Promise<Product[]> {
   const [data, error] = await tryCatch(
-    axios.get<Product[]>(`/api/shops/${shopSlug}/products`, {
+    axios.get<Product[]>(`${apiBase}/shops/${shopSlug}/products`, {
       params: { limit },
     }),
   );
@@ -43,11 +50,17 @@ export async function searchShopProducts(
     minPrice?: number;
     maxPrice?: number;
     sort?: "newest" | "oldest" | "priceAsc" | "priceDesc";
+    categories?: string[];
   },
 ): Promise<ProductSearchResponse> {
+  const normalizedParams = {
+    ...params,
+    categories: params.categories?.join(","),
+  };
+
   const [data, error] = await tryCatch(
-    axios.get<ProductSearchResponse>(`/api/shops/${shopSlug}/products`, {
-      params,
+    axios.get<ProductSearchResponse>(`${apiBase}/shops/${shopSlug}/products`, {
+      params: normalizedParams,
     }),
   );
 
@@ -62,7 +75,9 @@ export async function searchShopProducts(
 }
 
 export async function getProductByIdentifier(productIdentifier: string): Promise<Product> {
-  const [data, error] = await tryCatch(axios.get<Product>(`/api/products/${productIdentifier}`));
+  const [data, error] = await tryCatch(
+    axios.get<Product>(`${apiBase}/products/${productIdentifier}`),
+  );
 
   if (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
@@ -76,7 +91,7 @@ export async function getProductByIdentifier(productIdentifier: string): Promise
 
 export async function getProductBySlug(shopSlug: string, productSlug: string): Promise<Product> {
   const [data, error] = await tryCatch(
-    axios.get<Product>(`/api/shops/${shopSlug}/products/${productSlug}`),
+    axios.get<Product>(`${apiBase}/shops/${shopSlug}/products/${productSlug}`),
   );
 
   if (error) {
@@ -91,7 +106,7 @@ export async function getProductBySlug(shopSlug: string, productSlug: string): P
 
 export async function getAnyProducts(limit = 20): Promise<Product[]> {
   const [data, error] = await tryCatch(
-    axios.get<Product[]>("/api/products", {
+    axios.get<Product[]>(`${apiBase}/products`, {
       params: { limit },
     }),
   );
@@ -109,8 +124,13 @@ export async function getAnyProducts(limit = 20): Promise<Product[]> {
 }
 
 export async function searchProducts(params: ProductSearchParams): Promise<ProductSearchResponse> {
+  const normalizedParams = {
+    ...params,
+    categories: params.categories?.join(","),
+  };
+
   const [data, error] = await tryCatch(
-    axios.get<ProductSearchResponse>("/api/products/search", { params }),
+    axios.get<ProductSearchResponse>(`${apiBase}/products/search`, { params: normalizedParams }),
   );
 
   if (error) {

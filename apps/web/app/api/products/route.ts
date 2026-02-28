@@ -1,19 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { resolveBackendBase } from "../../../_utils/backend";
+import { resolveBackendBase } from "../_utils/backend";
 
 const API_BASE = resolveBackendBase();
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ shopSlug: string }> },
-) {
+export async function GET(request: NextRequest) {
   try {
-    const { shopSlug } = await params;
-    const searchParams = request.nextUrl.searchParams;
-
-    // Forward all query parameters to the backend
-    const backendUrl = new URL(`${API_BASE}/api/shops/${shopSlug}/products`);
-    searchParams.forEach((value, key) => {
+    const backendUrl = new URL(`${API_BASE}/api/products`);
+    request.nextUrl.searchParams.forEach((value, key) => {
       backendUrl.searchParams.set(key, value);
     });
 
@@ -24,6 +17,7 @@ export async function GET(
       },
       next: { revalidate: 30 },
     });
+
     return new NextResponse(response.body, {
       status: response.status,
       headers: {
@@ -34,8 +28,9 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("[Shop Products API] Error:", error);
+    console.error("[Products API] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
+

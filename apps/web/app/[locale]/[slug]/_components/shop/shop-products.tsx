@@ -14,7 +14,7 @@ import { ProductSearchBar } from "@/components/products/product-search-bar";
 import { ProductGridSkeleton } from "@/components/skeletons/product-card-skeleton";
 import { useSearchParams } from "@/i18n/navigation.client";
 import { useLocale, useTranslations } from "@/i18n/provider";
-import { fetchCategoryTree, flattenCategoryOptions } from "@/lib/api/categories";
+import { fetchCategoryTree } from "@/lib/api/categories";
 import { searchShopProducts } from "@/lib/api/products";
 import { mapApiProductToMarketing } from "@/lib/marketing";
 
@@ -38,7 +38,10 @@ export function ShopProducts({ shopSlug }: Props) {
   const { data: categoryTree = [] } = useQuery({
     queryKey: ["categories-tree", locale],
     queryFn: () => fetchCategoryTree(locale),
-    staleTime: 60_000,
+    staleTime: 30 * 60_000,
+    gcTime: 2 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     retry: false,
   });
 
@@ -50,16 +53,6 @@ export function ShopProducts({ shopSlug }: Props) {
     });
 
     return categoryTree.map((node) => toOption(node));
-  }, [categoryTree]);
-
-  const categoryNameToKey = useMemo(() => {
-    const mapping = new Map<string, string>();
-    flattenCategoryOptions(categoryTree).forEach((category) => {
-      mapping.set(category.key.toLowerCase(), category.key);
-      mapping.set(category.label.toLowerCase(), category.key);
-      mapping.set(category.fallbackName.toLowerCase(), category.key);
-    });
-    return mapping;
   }, [categoryTree]);
 
   const rootCategoryKeys = useMemo(
@@ -156,6 +149,11 @@ export function ShopProducts({ shopSlug }: Props) {
     return effectiveKeys;
   }, [descendantsByRoot, keyToRoot, rootCategoryKeys, selectedCategories]);
 
+  const effectiveCategoryList = useMemo(
+    () => (effectiveCategoryKeys ? Array.from(effectiveCategoryKeys).sort() : []),
+    [effectiveCategoryKeys],
+  );
+
   // Sync search query with URL params
   useEffect(() => {
     const urlSearch = searchParams.get("search") || "";
@@ -174,13 +172,21 @@ export function ShopProducts({ shopSlug }: Props) {
 
   // Infinite query for products
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
-    queryKey: ["shop-products", shopSlug, searchQuery, priceRange, selectedCategories, sortBy],
+    queryKey: [
+      "shop-products",
+      shopSlug,
+      searchQuery,
+      priceRange,
+      effectiveCategoryList.join(","),
+      sortBy,
+    ],
     queryFn: async ({ pageParam = 0 }) => {
       const response = await searchShopProducts(shopSlug, {
         q: searchQuery || undefined,
         minPrice: priceRange[0] > 0 ? priceRange[0] : undefined,
         maxPrice: priceRange[1] < 500 ? priceRange[1] : undefined,
         sort: sortMap[sortBy],
+        categories: effectiveCategoryList.length > 0 ? effectiveCategoryList : undefined,
         limit: 20,
         offset: pageParam,
       });
@@ -190,6 +196,12 @@ export function ShopProducts({ shopSlug }: Props) {
       return lastPage.nextOffset ?? undefined;
     },
     initialPageParam: 0,
+    maxPages: 5,
+    staleTime: 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 
   // Intersection Observer for infinite scroll
@@ -218,20 +230,8 @@ export function ShopProducts({ shopSlug }: Props) {
   const filteredProducts = useMemo(() => {
     // Filter out products with missing required data before mapping
     const validProducts = allProducts.filter((product) => product.id && product.slug);
-    let result = validProducts.map((product) => mapApiProductToMarketing(product));
-
-    // Category filter
-    if (effectiveCategoryKeys && effectiveCategoryKeys.size > 0) {
-      result = result.filter((product) => {
-        const category = product.category?.trim().toLowerCase();
-        if (!category) return false;
-        const resolvedKey = categoryNameToKey.get(category);
-        return resolvedKey ? effectiveCategoryKeys.has(resolvedKey) : false;
-      });
-    }
-
-    return result;
-  }, [allProducts, categoryNameToKey, effectiveCategoryKeys]);
+    return validProducts.map((product) => mapApiProductToMarketing(product));
+  }, [allProducts]);
 
   const clearAllFilters = () => {
     setSearchQuery("");
