@@ -12,7 +12,7 @@ export function HeroBackground() {
     <canvas
       ref={canvasRef}
       aria-hidden
-      className="hero-canvas-layer pointer-events-none absolute inset-0 h-full w-full"
+      className="hero-canvas-layer absolute inset-0 h-full w-full"
     />
   );
 }

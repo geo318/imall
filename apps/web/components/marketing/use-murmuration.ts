@@ -33,7 +33,7 @@ export function useMurmuration(canvasRef: RefObject<HTMLCanvasElement | null>) {
     resize();
     window.addEventListener("resize", resize);
 
-    const NUM = 144;
+    const NUM = 256;
     const particles: Particle[] = [];
     const w = () => canvas.width / dpr;
     const h = () => canvas.height / dpr;
