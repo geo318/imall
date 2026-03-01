@@ -20,6 +20,26 @@ const geistMono = localFont({
   src: "../../public/fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
 });
+const firago = localFont({
+  src: [
+    {
+      path: "../../public/fonts/Firago-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/Firago-Medium.ttf",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../../public/fonts/Firago-SemiBold.ttf",
+      weight: "600",
+      style: "normal",
+    },
+  ],
+  variable: "--font-firago",
+});
 
 export const metadata: Metadata = {
   title: "MyShop | Multi-tenant commerce with carts and auctions",
@@ -44,10 +64,19 @@ export default async function RootLayout({
   }
 
   const messages = await getDictionary(locale as Locale);
+  const isGeorgian = locale === "ka";
 
   return (
     <html lang={locale}>
-      <body className={cn("font-sans antialiased", geistSans.variable, geistMono.variable)}>
+      <body
+        className={cn(
+          "antialiased",
+          isGeorgian ? "font-firago" : "font-sans",
+          geistSans.variable,
+          geistMono.variable,
+          firago.variable,
+        )}
+      >
         <Suspense fallback={null}>
           <ClerkProviderWrapper>
             <QueryProvider>

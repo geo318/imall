@@ -19,6 +19,13 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-geist-sans)", "Inter", "system-ui", "sans-serif"],
+        firago: [
+          "var(--font-firago)",
+          "var(--font-geist-sans)",
+          "Inter",
+          "system-ui",
+          "sans-serif",
+        ],
         mono: ["var(--font-geist-mono)", "SFMono-Regular", "monospace"],
       },
       colors: {
