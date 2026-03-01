@@ -13,15 +13,27 @@
     "createShop": "Create shop",
     "signIn": "Sign in",
     "signOut": "Sign out",
-    "startSelling": "Start selling"
+    "startSelling": "Start selling",
+    "toggleCategories": "Toggle categories",
+    "searchInputLabel": "Search products",
+    "clearSearch": "Clear search",
+    "viewCart": "View cart",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "home": {
     "hero": {
-      "badge": "Multi-vendor marketplace",
-      "title": "Shop from <highlight>Thousands</highlight> of Trusted Vendors",
-      "description": "Discover unique products, bid on exclusive auctions, and connect directly with sellers. Your next favorite find is just a click away.",
-      "ctaShop": "Start shopping",
-      "ctaVendor": "Become a vendor",
+      "badge": "Multi-Vendor Marketplace",
+      "title": "Discover <highlight>Amazing Products</highlight> From Top Sellers",
+      "description": "One cart, many shops. Browse thousands of products from independent sellers, compare prices, and checkout seamlessly.",
+      "ctaShop": "Start Shopping",
+      "ctaVendor": "Become a Seller",
+      "pills": {
+        "multiVendorCart": "Multi-vendor cart",
+        "secureCheckout": "Secure checkout",
+        "orderTracking": "Order tracking",
+        "verifiedSellers": "Verified sellers"
+      },
       "features": {
         "verified": {
           "title": "Verified vendors",

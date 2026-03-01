@@ -108,7 +108,7 @@ export function Header({
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-[3px] supports-[backdrop-filter]:bg-background/60">
       <div ref={categoryRef} className="relative">
         <div className="container flex h-16 items-center gap-4">
           {/* Logo */}
@@ -124,6 +124,9 @@ export function Header({
               onClick={() => setIsCategoryOpen((prev) => !prev)}
               className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
               type="button"
+              aria-label={t("nav.toggleCategories")}
+              aria-haspopup="menu"
+              aria-expanded={isCategoryOpen}
             >
               <Menu className="h-4 w-4" />
               {t("nav.categories")}
@@ -148,13 +151,15 @@ export function Header({
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder={t("nav.searchPlaceholder")}
-                className="w-full pl-10 pr-10"
+                className="w-full border-emerald-200/80 pl-10 pr-10 focus-visible:border-emerald-400 focus-visible:ring-emerald-200"
+                aria-label={t("nav.searchInputLabel")}
               />
               {q && (
                 <button
                   type="button"
                   onClick={() => setQ("")}
                   className="absolute right-3 top-1/2 -translate-y-1/2"
+                  aria-label={t("nav.clearSearch")}
                 >
                   <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                 </button>
@@ -167,7 +172,7 @@ export function Header({
             <LanguageSwitcher className="hidden lg:inline-flex" />
             <HeaderFavorites />
             <Link href="/cart">
-              <Button variant="ghost" size="sm" className="relative">
+              <Button variant="ghost" size="sm" className="relative" aria-label={t("nav.viewCart")}>
                 <ShoppingBag className="h-5 w-5" />
                 {cartCount > 0 ? (
                   <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs text-primary-foreground">
@@ -211,7 +216,12 @@ export function Header({
               </>
             ) : (
               <Link href="/sign-in" prefetch>
-                <Button size="sm">{t("nav.signIn")}</Button>
+                <Button
+                  size="sm"
+                  className="rounded-full border border-emerald-500/40 bg-emerald-600 text-white hover:bg-emerald-700"
+                >
+                  {t("nav.signIn")}
+                </Button>
               </Link>
             )}
           </div>
@@ -220,7 +230,7 @@ export function Header({
           <div className="flex md:hidden items-center gap-1 ml-auto">
             <HeaderFavorites />
             <Link href="/cart">
-              <Button variant="ghost" size="sm" className="relative">
+              <Button variant="ghost" size="sm" className="relative" aria-label={t("nav.viewCart")}>
                 <ShoppingBag className="h-5 w-5" />
                 {cartCount > 0 ? (
                   <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs text-primary-foreground">
@@ -229,7 +239,14 @@ export function Header({
                 ) : null}
               </Button>
             </Link>
-            <button onClick={() => setIsMenuOpen((prev) => !prev)} className="p-2" type="button">
+            <button
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              className="p-2"
+              type="button"
+              aria-expanded={isMenuOpen}
+              aria-controls="mobile-main-nav"
+              aria-label={isMenuOpen ? t("nav.closeMenu") : t("nav.openMenu")}
+            >
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
@@ -257,13 +274,15 @@ export function Header({
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder={t("nav.searchPlaceholder")}
-              className="w-full pl-10 pr-10"
+              className="w-full border-emerald-200/80 pl-10 pr-10 focus-visible:border-emerald-400 focus-visible:ring-emerald-200"
+              aria-label={t("nav.searchInputLabel")}
             />
             {q && (
               <button
                 type="button"
                 onClick={() => setQ("")}
                 className="absolute right-3 top-1/2 -translate-y-1/2"
+                aria-label={t("nav.clearSearch")}
               >
                 <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
               </button>
@@ -275,7 +294,7 @@ export function Header({
       {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="md:hidden border-t bg-background max-h-[80vh] overflow-y-auto">
-          <nav className="container py-4 flex flex-col space-y-1">
+          <nav id="mobile-main-nav" className="container py-4 flex flex-col space-y-1">
             <span className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {t("nav.categories")}
             </span>
@@ -357,7 +376,9 @@ export function Header({
                 </>
               ) : (
                 <Link href="/sign-in" className="w-full">
-                  <Button className="w-full">{t("nav.signIn")}</Button>
+                  <Button className="w-full rounded-full border border-emerald-500/40 bg-emerald-600 text-white hover:bg-emerald-700">
+                    {t("nav.signIn")}
+                  </Button>
                 </Link>
               )}
             </div>

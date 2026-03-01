@@ -5,8 +5,8 @@ import { Button } from "@repo/ui/button";
 import { Dropdown, DropdownItem } from "@repo/ui/dropdown";
 import { useQuery } from "@tanstack/react-query";
 import { Heart } from "lucide-react";
-import { Link } from "@/i18n/navigation.client";
 import LazyImage from "@/components/shared/lazy-image";
+import { Link } from "@/i18n/navigation.client";
 import { getProductIdentifier } from "@/lib/api/products";
 
 type FavoriteItem = {
@@ -42,7 +42,9 @@ export function HeaderFavorites() {
           items: Array.isArray(data.items) ? data.items : [],
         };
       } catch (error) {
-        console.error("[HeaderFavorites] Error fetching favorites:", error);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[HeaderFavorites] Error fetching favorites:", error);
+        }
         return { items: [] };
       }
     },
@@ -61,7 +63,7 @@ export function HeaderFavorites() {
   return (
     <Dropdown
       trigger={
-        <Button variant="ghost" size="sm" className="rounded-full">
+        <Button variant="ghost" size="sm" className="rounded-full" aria-label="Favorites">
           <Heart className="h-5 w-5" />
         </Button>
       }
