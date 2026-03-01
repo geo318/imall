@@ -24,12 +24,19 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
     <div className="bg-white">
       {/* Static: Hero section */}
       <HeroSection locale={localeValue} />
+      <div className="pointer-events-none -mt-14 h-16 bg-gradient-to-b from-emerald-100/60 via-white/90 to-white" />
       {/* Dynamic slot: Featured products */}
-      <FeaturedProductsServer />
+      <div className="render-budget-section">
+        <FeaturedProductsServer />
+      </div>
       {/* Static: Category banner */}
-      <CategoryBanner />
+      <div className="render-budget-section">
+        <CategoryBanner />
+      </div>
       {/* Dynamic slot: Vendor spotlight */}
-      <VendorSpotlight />
+      <div className="render-budget-section">
+        <VendorSpotlight />
+      </div>
       <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
         <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/40 to-sky-50/40 p-8 shadow-sm sm:p-10">
           <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">

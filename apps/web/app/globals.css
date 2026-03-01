@@ -105,6 +105,11 @@
     @apply -translate-y-1;
     box-shadow: var(--shadow-xl-custom);
   }
+
+  .render-budget-section {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 900px;
+  }
 }
 
 @layer utilities {
@@ -164,39 +169,127 @@
     }
   }
 
-  .animate-hero-enter {
-    animation: hero-enter 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-    will-change: opacity, transform;
-  }
-
-  @keyframes hero-enter {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   .hero-canvas-layer {
     opacity: 0;
-    animation: hero-canvas-reveal 0.45s ease-out 0.85s forwards;
-    will-change: opacity;
-  }
-
-  @keyframes hero-canvas-reveal {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+    clip-path: circle(0% at 0% 100%);
+    will-change: transform, opacity, clip-path;
+    animation: hero-canvas-reveal-corner 1.15s cubic-bezier(0.22, 1, 0.36, 1) 120ms forwards;
   }
 
   .hero-content-layer {
     transform: translateZ(0);
     backface-visibility: hidden;
+  }
+
+  @media (max-width: 640px) {
+    .shadow-glow {
+      box-shadow: 0 0 24px -14px hsl(160 84% 39% / 0.22);
+    }
+  }
+
+  @keyframes hero-canvas-reveal-corner {
+    0% {
+      opacity: 0;
+      clip-path: circle(0% at 0% 100%);
+    }
+    70% {
+      opacity: 0.82;
+      clip-path: circle(115% at 0% 100%);
+    }
+    100% {
+      opacity: 1;
+      clip-path: circle(160% at 0% 100%);
+    }
+  }
+
+  @supports not (clip-path: circle(50% at 0% 100%)) {
+    .hero-canvas-layer {
+      clip-path: none;
+      animation: hero-canvas-reveal 1.05s cubic-bezier(0.22, 1, 0.36, 1) 120ms forwards;
+    }
+
+    @keyframes hero-canvas-reveal {
+      0% {
+        opacity: 0;
+      }
+      70% {
+        opacity: 0.82;
+      }
+      100% {
+        opacity: 1;
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-canvas-layer {
+      animation: none;
+      opacity: 1;
+      clip-path: none;
+    }
+  }
+
+  @keyframes hero-icon-drift-0 {
+    0%,
+    100% {
+      transform: translate(0px, 0px);
+    }
+    25% {
+      transform: translate(8px, -12px);
+    }
+    50% {
+      transform: translate(-6px, -4px);
+    }
+    75% {
+      transform: translate(4px, 10px);
+    }
+  }
+
+  @keyframes hero-icon-drift-1 {
+    0%,
+    100% {
+      transform: translate(0px, 0px);
+    }
+    25% {
+      transform: translate(-10px, 6px);
+    }
+    50% {
+      transform: translate(5px, 14px);
+    }
+    75% {
+      transform: translate(-8px, -8px);
+    }
+  }
+
+  @keyframes hero-icon-drift-2 {
+    0%,
+    100% {
+      transform: translate(0px, 0px);
+    }
+    25% {
+      transform: translate(12px, 4px);
+    }
+    50% {
+      transform: translate(-4px, -10px);
+    }
+    75% {
+      transform: translate(-10px, 8px);
+    }
+  }
+
+  @keyframes hero-icon-drift-3 {
+    0%,
+    100% {
+      transform: translate(0px, 0px);
+    }
+    25% {
+      transform: translate(-6px, -14px);
+    }
+    50% {
+      transform: translate(10px, 6px);
+    }
+    75% {
+      transform: translate(6px, -10px);
+    }
   }
 }

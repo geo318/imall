@@ -1,73 +1,112 @@
 import { Button } from "@repo/ui/button";
-import { ArrowRight, ShieldCheck, Sparkles, Star, Truck } from "lucide-react";
-import type { ComponentType } from "react";
+import {
+  ArrowRight,
+  CreditCard,
+  type LucideIcon,
+  Package,
+  Search,
+  ShoppingBag,
+  Star,
+  Store,
+} from "lucide-react";
 import type { Locale } from "@/i18n/config";
 import { Link } from "@/i18n/navigation.server";
 import { getTranslations } from "@/i18n/server";
 import { HeroBackground } from "./hero-background";
-import { HERO_FEATURES, type HeroFeatureId } from "./hero-content";
-
-const FEATURE_ICON: Record<HeroFeatureId, ComponentType<{ className?: string }>> = {
-  verified: ShieldCheck,
-  shipping: Truck,
-  protection: Star,
-};
 
 type HeroSectionProps = {
   locale: Locale;
 };
 
+type TrustPillId = "multiVendorCart" | "secureCheckout" | "orderTracking" | "verifiedSellers";
+
+const TRUST_PILLS: Array<{ id: TrustPillId; icon: LucideIcon }> = [
+  { id: "multiVendorCart", icon: ShoppingBag },
+  { id: "secureCheckout", icon: CreditCard },
+  { id: "orderTracking", icon: Package },
+  { id: "verifiedSellers", icon: Star },
+];
+
 export async function HeroSection({ locale }: HeroSectionProps) {
   const t = await getTranslations(locale);
+  const isKa = locale === "ka";
+  const compactCopy = locale === "ka" || locale === "ru";
 
   return (
-    <section className="relative isolate flex min-h-[600px] items-center overflow-hidden bg-gradient-hero">
+    <section className="relative isolate -mt-16 flex min-h-[560px] items-center overflow-hidden bg-gradient-hero pt-16 sm:min-h-[620px] md:min-h-[720px] lg:min-h-[760px]">
       <HeroBackground />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-b from-transparent via-white/40 to-white/85" />
 
-      <div className="container hero-content-layer relative z-10 py-16 md:py-24 lg:py-32 pointer-events-none">
-        <div className="mx-auto max-w-3xl text-center animate-hero-enter">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary backdrop-blur-sm border border-primary/20 pointer-events-auto">
-            <Sparkles className="h-4 w-4" />
+      <div className="container hero-content-layer pointer-events-none relative z-10 py-10 sm:py-12 md:py-16 lg:py-20">
+        <div className="mx-auto max-w-3xl text-center">
+          <div className="animate-fade-in pointer-events-auto mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-5 py-2.5 text-sm font-semibold text-emerald-700 backdrop-blur-[2px] shadow-glow">
+            <Store className="h-4 w-4 text-emerald-600" />
             <span>{t("home.hero.badge")}</span>
           </div>
 
-          <h1 className="mb-6 text-4xl font-extrabold tracking-tight text-slate-900 md:text-5xl lg:text-6xl">
+          <h1
+            className={`animate-slide-up mb-5 font-black leading-[1.1] tracking-tight text-foreground ${
+              compactCopy
+                ? "text-3xl sm:text-4xl md:text-5xl lg:text-6xl"
+                : "text-4xl sm:text-5xl md:text-6xl lg:text-7xl"
+            }`}
+          >
             {t.rich("home.hero.title", {
               highlight: (chunks) => <span className="text-gradient">{chunks}</span>,
             })}
           </h1>
 
-          <p className="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground md:text-xl">
+          <p
+            className={`animate-slide-up mx-auto mb-9 max-w-2xl leading-relaxed text-muted-foreground ${
+              compactCopy ? "text-sm sm:text-base md:text-lg" : "text-base sm:text-lg md:text-xl"
+            }`}
+            style={{ animationDelay: "0.1s" }}
+          >
             {t("home.hero.description")}
           </p>
 
-          <div className="flex flex-col justify-center gap-4 sm:flex-row pointer-events-auto">
+          <div
+            className="animate-slide-up pointer-events-auto flex flex-col justify-center gap-4 sm:flex-row"
+            style={{ animationDelay: "0.2s" }}
+          >
             <Link href="/products" prefetch className="pointer-events-auto">
-              <Button variant="hero" size="lg">
+              <Button
+                variant="hero"
+                size="lg"
+                className="rounded-full border border-emerald-500/40 bg-emerald-600 px-6 py-5 md:px-8 md:py-6 flex flex-row gap-2 text-base text-white shadow-glow hover:bg-emerald-700"
+              >
+                <Search className="h-5 w-5" />
                 {t("home.hero.ctaShop")}
-                <ArrowRight className="h-5 w-5" />
+                <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
             </Link>
-            <Link href="/vendors" prefetch className="pointer-events-auto">
-              <Button variant="outline" size="lg">
+            <Link href="/sell" prefetch className="pointer-events-auto">
+              <Button
+                variant="outline"
+                size="lg"
+                className="rounded-full border-emerald-300 flex flex-row gap-2 bg-white/85 px-6 py-5 md:px-8 md:py-6 text-base text-emerald-700 hover:bg-emerald-50"
+              >
+                <Store className="h-5 w-5 text-emerald-600" />
                 {t("home.hero.ctaVendor")}
               </Button>
             </Link>
           </div>
 
-          <div className="mt-14 grid grid-cols-1 gap-6 border-t border-border/50 pt-8 sm:grid-cols-3">
-            {HERO_FEATURES.map((item) => {
-              const Icon = FEATURE_ICON[item.id];
-              return (
-                <div key={item.id} className="flex flex-col items-center gap-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                    <Icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <p className="text-sm font-semibold text-foreground">{t(item.titleKey)}</p>
-                  <p className="text-xs text-muted-foreground">{t(item.bodyKey)}</p>
-                </div>
-              );
-            })}
+          <div
+            className="animate-fade-in mt-11 flex flex-wrap justify-center gap-3"
+            style={{ animationDelay: "0.3s" }}
+          >
+            {TRUST_PILLS.map(({ id, icon: Icon }, index) => (
+              <div
+                key={id}
+                className={`${index > 1 ? "hidden sm:inline-flex" : "inline-flex"} items-center gap-2.5 rounded-full border border-border/45 bg-background/78 px-4 md:px-5 py-2.5 font-medium text-muted-foreground shadow-md backdrop-blur-[2px] ${
+                  isKa ? "text-[11px] md:text-xs" : compactCopy ? "text-xs md:text-sm" : "text-sm"
+                }`}
+              >
+                <Icon className="h-4 w-4 text-emerald-600" />
+                {t(`home.hero.pills.${id}`)}
+              </div>
+            ))}
           </div>
         </div>
       </div>
