@@ -306,7 +306,7 @@ export function Header({
               aria-controls="mobile-main-nav"
               aria-label={isMenuOpen ? t("nav.closeMenu") : t("nav.openMenu")}
             >
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6 ml-1" />}
             </button>
           </div>
         </div>
