@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
+import { HeaderServer } from "@/components/header-server";
 import { QueryProvider } from "@/context/query-provider";
 import { defaultLocale, type Locale, locales } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
@@ -40,6 +41,20 @@ const firago = localFont({
   ],
   variable: "--font-firago",
 });
+
+function HeaderSkeleton() {
+  return (
+    <div className="h-16 bg-background/95 backdrop-blur-[3px] supports-[backdrop-filter]:bg-background/60">
+      <div className="container flex h-16 items-center justify-between">
+        <div className="h-8 w-28 animate-pulse rounded-full bg-muted/70" />
+        <div className="relative h-4 w-40 overflow-hidden rounded-full bg-emerald-100/70">
+          <span className="absolute inset-0 animate-ping rounded-full bg-emerald-300/35" />
+          <span className="absolute inset-[1px] rounded-full bg-background/85" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export const metadata: Metadata = {
   title: "MyShop | Multi-tenant commerce with carts and auctions",
@@ -81,7 +96,15 @@ export default async function RootLayout({
           <ClerkProviderWrapper>
             <QueryProvider>
               <I18nProvider locale={(locale as Locale) ?? defaultLocale} messages={messages}>
-                <LayoutWrapper>{children}</LayoutWrapper>
+                <LayoutWrapper
+                  header={
+                    <Suspense fallback={<HeaderSkeleton />}>
+                      <HeaderServer />
+                    </Suspense>
+                  }
+                >
+                  {children}
+                </LayoutWrapper>
               </I18nProvider>
             </QueryProvider>
           </ClerkProviderWrapper>

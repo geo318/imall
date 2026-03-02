@@ -10,6 +10,8 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 
 ## Recent changes
 
+- Hero copy intro now uses a single composited `hero-copy-reveal` animation (replacing per-element stagger classes) to eliminate flicker/jank on initial text/button paint; reduced-motion path disables it.
+- Header auth hydration is now server-seeded via `getInitialHeaderAuth()` (`"use cache: private"`) in a dedicated server component (`HeaderServer`) streamed behind `Suspense`; fallback/header greeting uses fixed-width animated skeletons (`animate-ping`) to avoid `Hello, {username}` layout shifts.
 - Added explicit hero rerender-guard tests: `hero-background.test.js` now asserts `resolveIconNodesState` keeps the previous reference when node geometry is unchanged (and switches reference only when changed), which validates the no-rerender path after initial load.
 - Murmuration pacing was increased by ~10-20% (higher `timeStep` and speed limits across device tiers) while retaining adaptive low-end/reduced-motion profiles.
 - Mobile/low-end performance + a11y pass: hero murmuration now adapts quality by device capability (`particleCount`, `iconParticleCount`, FPS throttle), tracks mouse only on fine pointers, caps DPR, and pauses offscreen/hidden; hero icon visuals were lightened on mobile and canvas pointer events disabled to avoid touch interception; header controls gained accessible labels/ARIA (`menu`, `categories`, search clear, cart), and homepage below-the-fold sections now use `content-visibility` via `render-budget-section`.

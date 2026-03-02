@@ -38,14 +38,14 @@ export async function HeroSection({ locale }: HeroSectionProps) {
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-b from-transparent via-white/40 to-white/85" />
 
       <div className="container hero-content-layer pointer-events-none relative z-10 py-10 sm:py-12 md:py-16 lg:py-20">
-        <div className="mx-auto max-w-3xl text-center">
-          <div className="animate-fade-in pointer-events-auto mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-5 py-2.5 text-sm font-semibold text-emerald-700 backdrop-blur-[2px] shadow-glow">
+        <div className="hero-copy-reveal mx-auto max-w-3xl text-center">
+          <div className="pointer-events-auto mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/12 px-5 py-2.5 text-sm font-semibold text-emerald-700 backdrop-blur-[2px] shadow-glow">
             <Store className="h-4 w-4 text-emerald-600" />
             <span>{t("home.hero.badge")}</span>
           </div>
 
           <h1
-            className={`animate-slide-up mb-5 font-black leading-[1.1] tracking-tight text-foreground ${
+            className={`mb-5 font-black leading-[1.1] tracking-tight text-foreground ${
               compactCopy
                 ? "text-3xl sm:text-4xl md:text-5xl lg:text-6xl"
                 : "text-4xl sm:text-5xl md:text-6xl lg:text-7xl"
@@ -57,18 +57,14 @@ export async function HeroSection({ locale }: HeroSectionProps) {
           </h1>
 
           <p
-            className={`animate-slide-up mx-auto mb-9 max-w-2xl leading-relaxed text-muted-foreground ${
+            className={`mx-auto mb-9 max-w-2xl leading-relaxed text-muted-foreground ${
               compactCopy ? "text-sm sm:text-base md:text-lg" : "text-base sm:text-lg md:text-xl"
             }`}
-            style={{ animationDelay: "0.1s" }}
           >
             {t("home.hero.description")}
           </p>
 
-          <div
-            className="animate-slide-up pointer-events-auto flex flex-col justify-center gap-4 sm:flex-row"
-            style={{ animationDelay: "0.2s" }}
-          >
+          <div className="pointer-events-auto flex flex-row justify-center gap-4">
             <Link href="/products" prefetch className="pointer-events-auto">
               <Button
                 variant="hero"
@@ -92,10 +88,7 @@ export async function HeroSection({ locale }: HeroSectionProps) {
             </Link>
           </div>
 
-          <div
-            className="animate-fade-in mt-11 flex flex-wrap justify-center gap-3"
-            style={{ animationDelay: "0.3s" }}
-          >
+          <div className="mt-11 flex flex-wrap justify-center gap-3">
             {TRUST_PILLS.map(({ id, icon: Icon }, index) => (
               <div
                 key={id}

@@ -16,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { twMerge } from "tailwind-merge";
 import { getCart } from "@/actions/carts";
 import { MarketHubLogo } from "@/assets";
 import { Link, useRouter, useSearchParams } from "@/i18n/navigation.client";
@@ -31,6 +32,7 @@ type HeaderProps = {
   signOut?: () => void | Promise<void>;
   primaryShopSlug?: string | null;
   userDisplayName?: string | null;
+  isUserNameLoading?: boolean;
 };
 
 export function Header({
@@ -38,6 +40,7 @@ export function Header({
   signOut,
   primaryShopSlug,
   userDisplayName,
+  isUserNameLoading = false,
 }: HeaderProps) {
   const t = useTranslations();
   const locale = useLocale();
@@ -45,6 +48,7 @@ export function Header({
   const searchParams = useSearchParams();
   const qParam = searchParams.get("search") ?? searchParams.get("q") ?? "";
   const adminHref = primaryShopSlug ? `/admin/${primaryShopSlug}` : "/sell";
+  const greeting = userDisplayName ? `${t("nav.greeting")}, ${userDisplayName}` : t("nav.greeting");
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
@@ -52,6 +56,7 @@ export function Header({
   const [q, setQ] = useState(qParam);
   const [cartId, setCartId] = useState<string | null>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
+  const scrollLockYRef = useRef(0);
 
   useEffect(() => setQ(qParam), [qParam]);
 
@@ -70,6 +75,53 @@ export function Header({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    if (!window.matchMedia("(max-width: 767px)").matches) {
+      return;
+    }
+
+    const previousBodyPosition = document.body.style.position;
+    const previousBodyTop = document.body.style.top;
+    const previousBodyWidth = document.body.style.width;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    scrollLockYRef.current = window.scrollY;
+
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollLockYRef.current}px`;
+    document.body.style.width = "100%";
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.position = previousBodyPosition;
+      document.body.style.top = previousBodyTop;
+      document.body.style.width = previousBodyWidth;
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      window.scrollTo(0, scrollLockYRef.current);
+    };
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isMenuOpen]);
 
   const { data: cartData } = useQuery({
     queryKey: ["cart", cartId],
@@ -182,38 +234,45 @@ export function Header({
               </Button>
             </Link>
             {isSignedIn ? (
-              <>
-                <span className="text-sm text-slate-600">
-                  {userDisplayName ? `${t("nav.greeting")}, ${userDisplayName}` : t("nav.greeting")}
-                </span>
-                <Dropdown
-                  trigger={
-                    <div className="inline-flex items-center justify-center rounded-full p-2 text-sm font-medium transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
-                      <User className="h-5 w-5" />
-                    </div>
-                  }
-                  align="right"
-                >
-                  <div className="py-1">
-                    <DropdownItem asChild>
-                      <Link href={adminHref} className="flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
-                      </Link>
-                    </DropdownItem>
-                    <DropdownSeparator />
-                    <DropdownItem
-                      onClick={() => {
-                        signOut?.();
-                      }}
-                      className="text-red-600 hover:bg-red-50"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      {t("nav.signOut")}
-                    </DropdownItem>
+              <Dropdown
+                trigger={
+                  <div className="inline-flex items-center justify-center rounded-full p-2 text-sm font-medium transition-colors hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-950 focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
+                    <User className="h-5 w-7" />
                   </div>
-                </Dropdown>
-              </>
+                }
+                align="right"
+              >
+                <div className="min-w-[220px] py-1">
+                  <div className="px-4 py-2">
+                    {isUserNameLoading ? (
+                      <span className="relative inline-flex h-4 w-36 overflow-hidden rounded-full bg-emerald-100/70">
+                        <span className="absolute inset-0 animate-ping rounded-full bg-emerald-300/40" />
+                        <span className="absolute inset-[1px] rounded-full bg-background/90" />
+                      </span>
+                    ) : (
+                      <p className="truncate text-sm font-medium text-slate-700" title={greeting}>
+                        👋 &nbsp; {greeting}
+                      </p>
+                    )}
+                  </div>
+                  <DropdownItem asChild>
+                    <Link href={adminHref} className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
+                    </Link>
+                  </DropdownItem>
+                  <DropdownSeparator />
+                  <DropdownItem
+                    onClick={() => {
+                      signOut?.();
+                    }}
+                    className="text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {t("nav.signOut")}
+                  </DropdownItem>
+                </div>
+              </Dropdown>
             ) : (
               <Link href="/sign-in" prefetch>
                 <Button
@@ -292,99 +351,129 @@ export function Header({
       </div>
 
       {/* Mobile Menu */}
-      {isMenuOpen && (
-        <div className="md:hidden border-t bg-background max-h-[80vh] overflow-y-auto">
-          <nav id="mobile-main-nav" className="container py-4 flex flex-col space-y-1">
-            <span className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div
+        className={`fixed inset-0 z-[70] bg-background/96 backdrop-blur-[2px] transition-[opacity,visibility] duration-300 ease-out md:hidden ${
+          isMenuOpen
+            ? "visible opacity-100 pointer-events-auto"
+            : "invisible opacity-0 pointer-events-none"
+        }`}
+        aria-hidden={!isMenuOpen}
+      >
+        <div className="absolute inset-x-0 top-0 z-10 border-b border-border/70 bg-background/90 backdrop-blur-[3px]">
+          <div className="container flex h-16 items-center justify-between">
+            <span className="text-sm font-semibold text-muted-foreground">
               {t("nav.categories")}
             </span>
+            <button
+              onClick={() => setIsMenuOpen(false)}
+              className="p-2"
+              type="button"
+              aria-label={t("nav.closeMenu")}
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+        </div>
+        <nav
+          id="mobile-main-nav"
+          className={twMerge(
+            "container h-[100dvh] bg-white overflow-y-auto pt-20 pb-6 flex flex-col space-y-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+            isMenuOpen ? "translate-y-0" : "-translate-y-4",
+          )}
+        >
+          <section className="grow overflow-auto">
             {categories.length === 0 ? (
               <p className="px-2 py-2 text-sm text-muted-foreground">{t("nav.noCategories")}</p>
             ) : null}
-            {categories.map((category) => (
-              <div key={category.id}>
-                <button
-                  onClick={() =>
-                    setExpandedMobileCat(expandedMobileCat === category.id ? null : category.id)
-                  }
-                  className="w-full flex items-center justify-between px-2 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 rounded-md transition-colors"
-                  type="button"
-                >
-                  <span className="flex items-center gap-3">
-                    <span>{category.icon || "📦"}</span>
-                    {category.name}
-                  </span>
-                  <ChevronRight
-                    className={`h-4 w-4 text-muted-foreground transition-transform ${
-                      expandedMobileCat === category.id ? "rotate-90" : ""
-                    }`}
-                  />
-                </button>
-                {expandedMobileCat === category.id && (
-                  <div className="pl-10 pb-2 space-y-1">
-                    <Link
-                      href={`/products?category=${encodeURIComponent(category.key)}`}
-                      onClick={() => setIsMenuOpen(false)}
-                      className="block py-1.5 text-sm font-medium text-primary"
+            <div className="grid grid-rows-[0fr] h-0 overflow-visible">
+              <span className="px-2 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t("nav.categories")}
+              </span>
+              <div className="overflow-visible">
+                {categories.map((category) => (
+                  <div key={category.id}>
+                    <button
+                      onClick={() =>
+                        setExpandedMobileCat(expandedMobileCat === category.id ? null : category.id)
+                      }
+                      className="w-full flex items-center justify-between px-2 py-2.5 text-sm font-medium text-foreground hover:bg-muted/50 rounded-md transition-colors"
+                      type="button"
                     >
-                      {t("nav.allIn", { category: category.name })}
-                    </Link>
-                    {category.children.map((subcategory) => (
-                      <Link
-                        key={subcategory.id}
-                        href={`/products?category=${encodeURIComponent(category.key)}&sub=${encodeURIComponent(subcategory.key)}`}
-                        onClick={() => setIsMenuOpen(false)}
-                        className="block py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <span className="mr-2">{subcategory.icon || "📦"}</span>
-                        {subcategory.name}
-                      </Link>
-                    ))}
+                      <span className="flex items-center gap-3">
+                        <span>{category.icon || "📦"}</span>
+                        {category.name}
+                      </span>
+                      <ChevronRight
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${
+                          expandedMobileCat === category.id ? "rotate-90" : ""
+                        }`}
+                      />
+                    </button>
+                    {expandedMobileCat === category.id && (
+                      <div className="pl-10 pb-2 space-y-1">
+                        <Link
+                          href={`/products?category=${encodeURIComponent(category.key)}`}
+                          onClick={() => setIsMenuOpen(false)}
+                          className="block py-1.5 text-sm font-medium text-primary"
+                        >
+                          {t("nav.allIn", { category: category.name })}
+                        </Link>
+                        {category.children.map((subcategory) => (
+                          <Link
+                            key={subcategory.id}
+                            href={`/products?category=${encodeURIComponent(category.key)}&sub=${encodeURIComponent(subcategory.key)}`}
+                            onClick={() => setIsMenuOpen(false)}
+                            className="block py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <span className="mr-2">{subcategory.icon || "📦"}</span>
+                            {subcategory.name}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            ))}
-
-            <div className="my-2 border-t" />
-            <div className="px-2 pt-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                {t("common.language")}
-              </p>
-              <LanguageSwitcher className="w-full justify-center" />
             </div>
+          </section>
+          <div className="my-2 border-t mt-auto" />
+          <div className="px-2 pt-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("common.language")}
+            </p>
+            <LanguageSwitcher className="w-full justify-center" />
+          </div>
 
-            <div className="my-2 border-t" />
-            <div className="pt-4 border-t border-border flex flex-col space-y-2">
-              {isSignedIn ? (
-                <>
-                  <Link href={adminHref} className="w-full">
-                    <Button variant="outline" className="w-full">
-                      <Settings className="h-4 w-4 mr-2" />
-                      {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
-                    </Button>
-                  </Link>
-                  <Button
-                    className="w-full bg-red-600 text-white hover:bg-red-700"
-                    onClick={() => {
-                      signOut?.();
-                      setIsMenuOpen(false);
-                    }}
-                  >
-                    <LogOut className="h-4 w-4 mr-2" />
-                    {t("nav.signOut")}
-                  </Button>
-                </>
-              ) : (
-                <Link href="/sign-in" className="w-full">
-                  <Button className="w-full rounded-full border border-emerald-500/40 bg-emerald-600 text-white hover:bg-emerald-700">
-                    {t("nav.signIn")}
+          <div className="pt-4 flex flex-col space-y-2">
+            {isSignedIn ? (
+              <>
+                <Link href={adminHref} onClick={() => setIsMenuOpen(false)} className="w-full">
+                  <Button variant="outline" className="w-full">
+                    <Settings className="h-4 w-4 mr-2" />
+                    {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
                   </Button>
                 </Link>
-              )}
-            </div>
-          </nav>
-        </div>
-      )}
+                <Button
+                  className="w-full bg-red-600 text-white hover:bg-red-700"
+                  onClick={() => {
+                    signOut?.();
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  {t("nav.signOut")}
+                </Button>
+              </>
+            ) : (
+              <Link href="/sign-in" onClick={() => setIsMenuOpen(false)} className="w-full">
+                <Button className="w-full rounded-full border border-emerald-500/40 bg-emerald-600 text-white hover:bg-emerald-700">
+                  {t("nav.signIn")}
+                </Button>
+              </Link>
+            )}
+          </div>
+        </nav>
+      </div>
     </header>
   );
 }
