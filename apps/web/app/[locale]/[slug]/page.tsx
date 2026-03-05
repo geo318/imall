@@ -2,13 +2,18 @@ import { env } from "@repo/shared";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { getShopProfile } from "@/app/actions/shops";
+import type { Locale } from "@/i18n/config";
 import { isProductIdentifier, isReservedRoute } from "@/lib/utils";
 import { ProductServer } from "./_components/product/product-server";
 import { ShopProfileClient } from "./_components/shop/shop-profile-client";
 
 // PPR: Dynamic route with conditional rendering based on slug type
-export default async function SlugPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function SlugPage({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { slug, locale } = await params;
 
   // Check if it's a reserved route name
   if (isReservedRoute(slug)) {
@@ -17,7 +22,7 @@ export default async function SlugPage({ params }: { params: Promise<{ slug: str
 
   // Check if it's a product identifier (format: slug-abc12345)
   if (isProductIdentifier(slug)) {
-    return <ProductServer productIdentifier={slug} />;
+    return <ProductServer productIdentifier={slug} locale={locale as Locale} />;
   }
 
   // Otherwise treat it as a shop slug

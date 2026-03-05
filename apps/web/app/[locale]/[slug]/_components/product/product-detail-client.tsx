@@ -14,9 +14,11 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import LazyImage from "@/components/shared/lazy-image";
+import { MarkdownContent } from "@/components/shared/markdown-content";
 import { Link } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
+import { formatCurrencyAmount } from "@/lib/utils/currency";
 import { cn } from "@/lib/utils";
 import {
   ProductActionsSlot,
@@ -45,6 +47,7 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
 
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
   const auction = selectedVariant?.auction ?? null;
+  const selectedVariantOptionPairs = selectedVariant?.optionPairs ?? [];
   const shopSlug = product.tenantSlug ?? "demo-shop";
   const shopName = product.tenantName ?? shopSlug;
   const hasSellerInfo = Boolean(product.sellerEmail || product.sellerPhone || product.sellerRules);
@@ -153,20 +156,56 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
             <div className="space-y-2">
               <p className="text-sm font-semibold text-slate-800">{t("productDetail.variants")}</p>
               <div className="flex flex-wrap gap-2">
-                {product.variants.map((v) => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setSelectedVariantId(v.id)}
-                    className={cn(
-                      "rounded-lg border px-3 py-2 text-sm transition-colors",
-                      selectedVariantId === v.id
-                        ? "border-emerald-600 bg-emerald-50 text-emerald-700"
-                        : "border-slate-200 hover:border-slate-300",
-                    )}
-                  >
-                    {v.sku ?? t("productDetail.defaultVariant")} • {v.price} {v.currency}
-                  </button>
+                {product.variants.map((v) => {
+                  const variantThumb = v.optionPairs?.find((pair) => pair.optionThumbnail);
+                  const variantLabel =
+                    v.optionPairs?.map((pair) => pair.optionValue).join(" / ") ||
+                    v.sku ||
+                    t("productDetail.defaultVariant");
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSelectedVariantId(v.id)}
+                      className={cn(
+                        "rounded-lg border px-3 py-2 text-sm transition-colors",
+                        selectedVariantId === v.id
+                          ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                          : "border-slate-200 hover:border-slate-300",
+                      )}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        {variantThumb?.optionThumbnail ? (
+                          <img
+                            src={variantThumb.optionThumbnail}
+                            alt={variantThumb.optionValue || t("productDetail.variantFallback")}
+                            className="h-4 w-4 rounded object-cover border border-slate-200"
+                          />
+                        ) : null}
+                        {`${variantLabel} • ${formatCurrencyAmount(v.price, v.currency)}`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {selectedVariantOptionPairs.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-slate-800">{t("productDetail.options")}</p>
+              <div className="flex flex-wrap gap-2">
+                {selectedVariantOptionPairs.map((pair) => (
+                  <Badge key={`${pair.optionKey}-${pair.optionValue}`} variant="outline">
+                    {pair.optionThumbnail ? (
+                      <img
+                        src={pair.optionThumbnail}
+                        alt={pair.optionValue}
+                        className="mr-1 h-3 w-3 rounded object-cover"
+                      />
+                    ) : null}
+                    {pair.optionName}: {pair.optionValue}
+                  </Badge>
                 ))}
               </div>
             </div>
@@ -197,7 +236,7 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
           {product.description && (
             <div className="space-y-2">
               <h3 className="font-semibold">{t("productDetail.description")}</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap">{product.description}</p>
+              <MarkdownContent content={product.description} className="prose-sm" />
             </div>
           )}
 

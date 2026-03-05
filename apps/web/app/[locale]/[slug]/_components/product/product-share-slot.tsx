@@ -16,6 +16,7 @@ import {
   WhatsappShareButton,
 } from "react-share";
 import { toast } from "sonner";
+import { useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
 
 type Props = {
@@ -27,28 +28,30 @@ type Props = {
  * Product share component with social media and copy link options
  */
 export function ProductShareSlot({ product, productIdentifier }: Props) {
+  const t = useTranslations();
   const [copied, setCopied] = useState(false);
 
   // Get the current URL
   const url = typeof window !== "undefined" ? `${window.location.origin}/${productIdentifier}` : "";
 
   const title = product.title;
-  const description = product.description || `Check out ${product.title}`;
+  const description =
+    product.description || t("productShare.defaultDescription", { title: product.title });
 
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      toast.success("Link copied to clipboard!");
+      toast.success(t("productShare.toasts.copied"));
       setTimeout(() => setCopied(false), 2000);
     } catch (_error) {
-      toast.error("Failed to copy link");
+      toast.error(t("productShare.toasts.copyFailed"));
     }
   };
 
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 rounded-xl border border-border bg-card">
-      <span className="text-sm font-semibold text-slate-700">Share:</span>
+      <span className="text-sm font-semibold text-slate-700">{t("productShare.label")}</span>
 
       <div className="flex items-center gap-2">
         {/* WhatsApp */}
@@ -96,7 +99,7 @@ export function ProductShareSlot({ product, productIdentifier }: Props) {
           size="sm"
           onClick={handleCopyLink}
           className="h-8 w-8 p-0 rounded-full"
-          title="Copy link"
+          title={t("productShare.copy")}
         >
           {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
         </Button>

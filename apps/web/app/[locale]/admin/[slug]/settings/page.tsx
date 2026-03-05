@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { Locale } from "@/i18n/config";
 import { getTranslations } from "@/i18n/server";
 import { getRequestOrigin } from "@/lib/server/request-origin";
-import { getSuperadminCookieHeader } from "@/lib/superadmin";
+import { getServerAuthCookieHeader } from "@/lib/superadmin";
 import { ShopSettingsForm } from "./shop-settings-form";
 
 export const metadata: Metadata = {
@@ -13,11 +13,12 @@ async function fetchSettings(slug: string) {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/settings`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
 
   if (!response.ok) {
-    throw new Error("Failed to load shop settings");
+    const message = await response.text();
+    throw new Error(`Failed to load shop settings (${response.status}): ${message}`);
   }
 
   return response.json();

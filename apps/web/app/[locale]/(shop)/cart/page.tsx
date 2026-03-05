@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 import { CartSkeleton } from "@/components/skeletons/cart-skeleton";
+import type { Locale } from "@/i18n/config";
+import { getTranslations } from "@/i18n/server";
 import { CartContent } from "./_components/cart-content";
 
 export const metadata = {
@@ -8,10 +10,17 @@ export const metadata = {
 };
 
 // PPR: Static shell with dynamic cart content slot
-export default function CartPage() {
+export default async function CartPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale } = await params;
+  const t = await getTranslations(locale as Locale);
+
   return (
     <div className="container py-8 md:py-12">
-      <h1 className="text-3xl md:text-4xl font-bold mb-8">Shopping Cart</h1>
+      <h1 className="text-3xl md:text-4xl font-bold mb-8">{t("cart.title")}</h1>
       {/* Dynamic slot: Cart content with Suspense boundary */}
       <Suspense
         fallback={

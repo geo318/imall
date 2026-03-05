@@ -30,3 +30,10 @@ export async function getSuperadminCookieHeader(): Promise<Record<string, string
   if (!value) return {};
   return { Cookie: `${COOKIE_NAME}=${value}` };
 }
+
+export async function getServerAuthCookieHeader(): Promise<Record<string, string>> {
+  const store = await cookies();
+  const header = store.toString();
+  if (!header) return {};
+  return { Cookie: header };
+}

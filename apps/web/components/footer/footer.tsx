@@ -1,6 +1,5 @@
 "use client";
 
-import { Instagram, Twitter, Youtube } from "lucide-react";
 import { Suspense } from "react";
 import { MarketHubLogo } from "@/assets";
 import { Link } from "@/i18n/navigation.client";
@@ -44,29 +43,7 @@ export function Footer() {
               <span className="font-bold text-xl -ml-1">Mall</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">{t("footer.tagline")}</p>
-            <div className="flex gap-3">
-              <Link
-                href="#"
-                className="p-2 rounded-full bg-secondary hover:bg-emerald-600 hover:text-white transition-colors"
-                aria-label="Twitter"
-              >
-                <Twitter className="h-4 w-4" />
-              </Link>
-              <Link
-                href="#"
-                className="p-2 rounded-full bg-secondary hover:bg-emerald-600 hover:text-white transition-colors"
-                aria-label="Instagram"
-              >
-                <Instagram className="h-4 w-4" />
-              </Link>
-              <Link
-                href="#"
-                className="p-2 rounded-full bg-secondary hover:bg-emerald-600 hover:text-white transition-colors"
-                aria-label="YouTube"
-              >
-                <Youtube className="h-4 w-4" />
-              </Link>
-            </div>
+            <LanguageSwitcher />
           </div>
 
           {/* Product Links */}
@@ -129,7 +106,6 @@ export function Footer() {
           >
             <Copyright />
           </Suspense>
-          <LanguageSwitcher />
           <p className="text-sm text-muted-foreground">{t("footer.madeWithCare")}</p>
         </div>
       </div>

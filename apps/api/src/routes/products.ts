@@ -1,4 +1,16 @@
-import { auctions, bids, db, products, shopSettings, tenants, users, variants } from "@repo/db";
+import {
+  auctions,
+  bids,
+  db,
+  productOptionDefinitions,
+  products,
+  shopSettings,
+  tenants,
+  tenantVariantOptions,
+  users,
+  variantOptionValues,
+  variants,
+} from "@repo/db";
 import {
   and,
   asc,
@@ -18,6 +30,8 @@ import { z } from "zod";
 import { getAvailableStockMap, listQuerySchema } from "../context";
 import { logger } from "../utils/logger";
 import { withCachedResponse } from "../utils/response-cache";
+
+const DEFAULT_CURRENCY = "GEL";
 
 const shopProductsQuerySchema = z.object({
   limit: z
@@ -54,6 +68,79 @@ const shopProductsQuerySchema = z.object({
         : [],
     ),
 });
+
+type VariantOptionPair = {
+  optionKey: string;
+  optionName: string;
+  optionValue: string;
+  valueKey: string;
+  optionThumbnail?: string;
+};
+
+async function loadVariantOptionDataForProduct(productId: string, variantIds: string[]) {
+  const [optionDefinitionRows, variantOptionRows] = await Promise.all([
+    db
+      .select({
+        optionKey: tenantVariantOptions.optionKey,
+        optionName: tenantVariantOptions.name,
+        sortOrder: productOptionDefinitions.sortOrder,
+      })
+      .from(productOptionDefinitions)
+      .innerJoin(
+        tenantVariantOptions,
+        eq(productOptionDefinitions.tenantOptionId, tenantVariantOptions.id),
+      )
+      .where(eq(productOptionDefinitions.productId, productId))
+      .orderBy(asc(productOptionDefinitions.sortOrder)),
+    variantIds.length > 0
+      ? db
+          .select({
+            variantId: variantOptionValues.variantId,
+            optionKey: tenantVariantOptions.optionKey,
+            optionName: tenantVariantOptions.name,
+            optionValue: variantOptionValues.value,
+            valueKey: variantOptionValues.valueKey,
+            optionThumbnail: variantOptionValues.thumbnailUrl,
+            sortOrder: productOptionDefinitions.sortOrder,
+          })
+          .from(variantOptionValues)
+          .innerJoin(
+            productOptionDefinitions,
+            eq(variantOptionValues.productOptionId, productOptionDefinitions.id),
+          )
+          .innerJoin(
+            tenantVariantOptions,
+            eq(productOptionDefinitions.tenantOptionId, tenantVariantOptions.id),
+          )
+          .where(inArray(variantOptionValues.variantId, variantIds))
+          .orderBy(asc(productOptionDefinitions.sortOrder))
+      : Promise.resolve([]),
+  ]);
+
+  const optionDefinitions = optionDefinitionRows.map((row) => ({
+    optionKey: row.optionKey,
+    optionName: row.optionName,
+    sortOrder: row.sortOrder,
+  }));
+
+  const optionPairsByVariantId = new Map<string, VariantOptionPair[]>();
+  for (const row of variantOptionRows) {
+    const existing = optionPairsByVariantId.get(row.variantId) ?? [];
+    existing.push({
+      optionKey: row.optionKey,
+      optionName: row.optionName,
+      optionValue: row.optionValue,
+      valueKey: row.valueKey,
+      optionThumbnail: row.optionThumbnail ?? undefined,
+    });
+    optionPairsByVariantId.set(row.variantId, existing);
+  }
+
+  return {
+    optionDefinitions,
+    optionPairsByVariantId,
+  };
+}
 
 function mulberry32(seed: number) {
   let value = seed;
@@ -325,6 +412,10 @@ export const productsRoutes = new Elysia({
         .where(eq(variants.productId, product.id));
 
       const variantIds = productVariants.map((v) => v.id);
+      const { optionDefinitions, optionPairsByVariantId } = await loadVariantOptionDataForProduct(
+        product.id,
+        variantIds,
+      );
 
       // Fetch auctions for these variants with highest bidder info
       // Use left join to get highestBidderId from the highest bid's user
@@ -349,7 +440,9 @@ export const productsRoutes = new Elysia({
               .leftJoin(bids, eq(auctions.highestBidId, bids.id))
               .leftJoin(users, eq(bids.bidderId, users.id))
               .where(inArray(auctions.variantId, variantIds));
-      const auctionByVariantId = new Map(variantAuctions.map((auction) => [auction.variantId, auction]));
+      const auctionByVariantId = new Map(
+        variantAuctions.map((auction) => [auction.variantId, auction]),
+      );
 
       const availableStockByVariant = await getAvailableStockMap(tenantId, variantIds);
 
@@ -361,6 +454,7 @@ export const productsRoutes = new Elysia({
         if (!auction) {
           return {
             ...variant,
+            optionPairs: optionPairsByVariantId.get(variant.id) ?? [],
             auction: null,
             availableQty,
           };
@@ -377,7 +471,9 @@ export const productsRoutes = new Elysia({
           highestBidId: auction.highestBidId,
           highestBidderId: auction.highestBidderId ?? null, // Explicitly include even if null
           startsAt:
-            auction.startsAt instanceof Date ? auction.startsAt.toISOString() : String(auction.startsAt),
+            auction.startsAt instanceof Date
+              ? auction.startsAt.toISOString()
+              : String(auction.startsAt),
           endsAt:
             auction.endsAt instanceof Date ? auction.endsAt.toISOString() : String(auction.endsAt),
           startingBid: auction.startingBid,
@@ -387,6 +483,7 @@ export const productsRoutes = new Elysia({
 
         return {
           ...variant,
+          optionPairs: optionPairsByVariantId.get(variant.id) ?? [],
           auction: serializedAuction,
           availableQty,
         };
@@ -409,6 +506,7 @@ export const productsRoutes = new Elysia({
       return {
         ...product,
         variants: serializedVariants,
+        optionDefinitions,
         images,
         sellerEmail: sellerProfile?.sellerEmail ?? null,
         sellerPhone: sellerProfile?.sellerPhone ?? null,
@@ -666,8 +764,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
       const { limit, offset, q, type, sort, minPrice, maxPrice, categories } =
         searchSchema.parse(query);
       const randomSeed = sort === "random" ? timeBucketSeed() : 0;
-      const cacheKey =
-        `products:search:${limit}:${offset}:${type}:${sort}:${q ?? ""}:${minPrice ?? ""}:${maxPrice ?? ""}:${categories.join("|")}:${randomSeed}`;
+      const cacheKey = `products:search:${limit}:${offset}:${type}:${sort}:${q ?? ""}:${minPrice ?? ""}:${maxPrice ?? ""}:${categories.join("|")}:${randomSeed}`;
       const loadSearch = async () => {
         const qLike = q ? `%${q}%` : undefined;
         const hasAuctionSql = sql<boolean>`
@@ -775,7 +872,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
               id: "summary",
               sku: null,
               price: String(row.price ?? "0"),
-              currency: row.currency ?? "USD",
+              currency: row.currency ?? DEFAULT_CURRENCY,
               auction: null,
             },
           ],
@@ -917,6 +1014,10 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         .where(eq(variants.productId, product.id));
 
       const variantIds = productVariants.map((v) => v.id);
+      const { optionDefinitions, optionPairsByVariantId } = await loadVariantOptionDataForProduct(
+        product.id,
+        variantIds,
+      );
 
       // Fetch auctions for these variants with highest bidder info
       // Use left join to get highestBidderId from the highest bid's user
@@ -941,7 +1042,9 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
               .leftJoin(bids, eq(auctions.highestBidId, bids.id))
               .leftJoin(users, eq(bids.bidderId, users.id))
               .where(inArray(auctions.variantId, variantIds));
-      const auctionByVariantId = new Map(variantAuctions.map((auction) => [auction.variantId, auction]));
+      const auctionByVariantId = new Map(
+        variantAuctions.map((auction) => [auction.variantId, auction]),
+      );
 
       // Serialize dates to ISO strings for JSON response
       const serializedVariants = productVariants.map((variant) => {
@@ -950,6 +1053,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         if (!auction) {
           return {
             ...variant,
+            optionPairs: optionPairsByVariantId.get(variant.id) ?? [],
             auction: null,
           };
         }
@@ -977,6 +1081,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
 
         return {
           ...variant,
+          optionPairs: optionPairsByVariantId.get(variant.id) ?? [],
           auction: serializedAuction,
         };
       });
@@ -998,6 +1103,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
       return {
         ...product,
         variants: serializedVariants,
+        optionDefinitions,
         images,
         sellerEmail: sellerProfile?.sellerEmail ?? null,
         sellerPhone: sellerProfile?.sellerPhone ?? null,

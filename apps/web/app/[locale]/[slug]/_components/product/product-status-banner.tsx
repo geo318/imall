@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertCircle, FileText } from "lucide-react";
+import { useTranslations } from "@/i18n/provider";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -9,6 +10,8 @@ type Props = {
 };
 
 export function ProductStatusBanner({ deletedAt, draft }: Props) {
+  const t = useTranslations();
+
   if (!deletedAt && !draft) {
     return null;
   }
@@ -25,10 +28,8 @@ export function ProductStatusBanner({ deletedAt, draft }: Props) {
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
-            <h3 className="font-semibold text-base mb-1">This product has been deleted</h3>
-            <p className="text-sm opacity-90">
-              This product is no longer available to the public. Only you (the owner) can view it.
-            </p>
+            <h3 className="font-semibold text-base mb-1">{t("productStatus.deletedTitle")}</h3>
+            <p className="text-sm opacity-90">{t("productStatus.deletedDescription")}</p>
           </div>
         </div>
       </div>
@@ -47,10 +48,8 @@ export function ProductStatusBanner({ deletedAt, draft }: Props) {
         <div className="flex items-start gap-3">
           <FileText className="h-5 w-5 mt-0.5 flex-shrink-0" />
           <div className="flex-1">
-            <h3 className="font-semibold text-base mb-1">This product is a draft</h3>
-            <p className="text-sm opacity-90">
-              This product is not published yet. Only you (the owner) can view it.
-            </p>
+            <h3 className="font-semibold text-base mb-1">{t("productStatus.draftTitle")}</h3>
+            <p className="text-sm opacity-90">{t("productStatus.draftDescription")}</p>
           </div>
         </div>
       </div>

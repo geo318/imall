@@ -5,6 +5,7 @@ import { Gavel } from "lucide-react";
 import LazyImage from "@/components/shared/lazy-image";
 import { Link } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
+import { formatCurrencyAmount } from "@/lib/utils/currency";
 import { AuctionTimer } from "./auction-timer";
 
 export type MarketingProduct = {
@@ -64,7 +65,10 @@ export function ProductCard({
         {/* Content */}
         <div className="p-4">
           <p className="text-xs text-muted-foreground mb-1">{vendor}</p>
-          <h3 className="font-semibold text-sm line-clamp-2 mb-2 group-hover:text-emerald-700 transition-colors">
+          <h3
+            className="font-semibold text-sm line-clamp-2 mb-2 group-hover:text-emerald-700 transition-colors truncate"
+            title={title}
+          >
             {title}
           </h3>
           {isAuction ? (
@@ -73,7 +77,7 @@ export function ProductCard({
                 <span className="text-xs text-muted-foreground">{t("productCard.currentBid")}</span>
                 <span className="font-bold text-emerald-700">
                   {currentBid !== undefined && currentBid !== null
-                    ? `$${currentBid.toFixed(2)}`
+                    ? formatCurrencyAmount(currentBid, currency)
                     : t("productCard.view")}
                 </span>
               </div>
@@ -82,11 +86,8 @@ export function ProductCard({
           ) : (
             <p className="font-bold text-lg">
               {price !== undefined && price !== null
-                ? `$${price.toFixed(2)}`
+                ? formatCurrencyAmount(price, currency)
                 : t("productCard.viewProduct")}
-              {currency ? (
-                <span className="ml-1 text-sm text-muted-foreground">{currency}</span>
-              ) : null}
             </p>
           )}
         </div>

@@ -13,12 +13,27 @@ const auctionSchema = z.object({
   highestBidderId: z.string().nullable().optional(),
 });
 
+const variantOptionPairSchema = z.object({
+  optionKey: z.string(),
+  optionName: z.string(),
+  optionValue: z.string(),
+  valueKey: z.string().optional(),
+  optionThumbnail: z.string().optional(),
+});
+
+const optionDefinitionSchema = z.object({
+  optionKey: z.string(),
+  optionName: z.string(),
+  sortOrder: z.number(),
+});
+
 const variantSchema = z.object({
   id: z.string(),
   sku: z.string().nullable(),
   price: z.string(),
   currency: z.string(),
   availableQty: z.number().optional(),
+  optionPairs: z.array(variantOptionPairSchema).optional(),
   auction: auctionSchema.nullable().optional(),
 });
 
@@ -53,6 +68,7 @@ export const productSchema = z.object({
   auctionCurrentPrice: z.number().nullable().optional(),
   imageUrls: z.string().nullable().optional(),
   images: z.array(imageSchema).optional(),
+  optionDefinitions: z.array(optionDefinitionSchema).optional(),
   variants: z.array(variantSchema),
 });
 

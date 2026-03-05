@@ -4,16 +4,18 @@ import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@repo/ui/tabs";
 import { Plus } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/navigation.client";
+import { useTranslations } from "@/i18n/provider";
 import { ProductForm } from "./product-form";
 import { ProductList } from "./product-list";
-import { useSearchParams } from "next/navigation";
 
 type Props = {
   slug: string;
 };
 
 export function CatalogClient({ slug }: Props) {
+  const t = useTranslations();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -77,24 +79,29 @@ export function CatalogClient({ slug }: Props) {
         <Card>
           <CardHeader className="flex flex-row items-start justify-between">
             <div className="space-y-1">
-              <CardTitle>Product Catalog</CardTitle>
-              <CardDescription>Manage your products, variants, and images</CardDescription>
+              <CardTitle>{t("adminCatalog.title")}</CardTitle>
+              <CardDescription>{t("adminCatalog.description")}</CardDescription>
             </div>
             <div className="flex gap-2">
               <Link href={`/admin/${slug}`}>
                 <Button variant="outline" size="sm">
-                  Back
+                  {t("adminCatalog.actions.back")}
+                </Button>
+              </Link>
+              <Link href={`/admin/${slug}/catalog/options`}>
+                <Button variant="outline" size="sm">
+                  {t("adminCatalog.actions.variantOptions")}
                 </Button>
               </Link>
               {!showForm && (
                 <Button size="sm" onClick={handleAddProduct}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Product
+                  {t("adminCatalog.actions.addProduct")}
                 </Button>
               )}
               {showForm && (
                 <Button size="sm" variant="outline" onClick={handleCancel}>
-                  Cancel
+                  {t("adminCatalog.actions.cancel")}
                 </Button>
               )}
             </div>
@@ -111,9 +118,9 @@ export function CatalogClient({ slug }: Props) {
             ) : (
               <Tabs value={currentStatus} onValueChange={handleStatusChange} className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="active">Active</TabsTrigger>
-                  <TabsTrigger value="draft">Draft</TabsTrigger>
-                  <TabsTrigger value="deleted">Deleted</TabsTrigger>
+                  <TabsTrigger value="active">{t("adminCatalog.status.active")}</TabsTrigger>
+                  <TabsTrigger value="draft">{t("adminCatalog.status.draft")}</TabsTrigger>
+                  <TabsTrigger value="deleted">{t("adminCatalog.status.deleted")}</TabsTrigger>
                 </TabsList>
                 <TabsContent value="active" className="mt-4">
                   <ProductList shopSlug={slug} onEdit={handleEdit} statusFilter="active" />

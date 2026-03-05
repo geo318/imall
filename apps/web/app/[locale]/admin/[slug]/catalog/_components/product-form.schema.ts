@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_CURRENCY_CODE } from "@/lib/utils/currency";
 
 // File validation schema for images
 // Note: z.file() with .min(), .max(), .mime() is available in Zod 4+
@@ -44,11 +45,38 @@ const optionalDateTimeString = z.preprocess((value) => {
   return trimmed === "" ? undefined : trimmed;
 }, z.string().optional());
 
+const optionalString = z.preprocess((value) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}, z.string().optional());
+
+const variantOptionPairSchema = z.object({
+  optionName: z
+    .string()
+    .trim()
+    .min(1, "Option name is required")
+    .max(64, "Option name must be less than 64 characters"),
+  optionKey: optionalString,
+  optionValue: z
+    .string()
+    .trim()
+    .min(1, "Option value is required")
+    .max(128, "Option value must be less than 128 characters"),
+  optionThumbnail: z.preprocess((value) => {
+    if (value === null || value === undefined) return undefined;
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? undefined : trimmed;
+  }, z.string().max(1024, "Thumbnail URL must be less than 1024 characters").optional()),
+});
+
 // Variant schema
 export const variantSchema = z.object({
-  sku: z.string().optional(),
+  sku: optionalString,
   price: optionalNumberString,
-  currency: z.string().default("USD"),
+  currency: z.string().default(DEFAULT_CURRENCY_CODE),
   isAuction: z.boolean().optional(),
   stock: optionalIntegerString,
   auctionStartBid: optionalNumberString,
@@ -56,6 +84,7 @@ export const variantSchema = z.object({
   auctionBuyNow: optionalNumberString,
   auctionStartsAt: optionalDateTimeString,
   auctionEndsAt: optionalDateTimeString,
+  optionPairs: z.array(variantOptionPairSchema).optional().default([]),
 });
 
 // Image item schema (for form state)
@@ -119,4 +148,5 @@ export const productFormSchema = z
 // Type inference from schema
 export type ProductFormData = z.infer<typeof productFormSchema>;
 export type VariantFormData = z.infer<typeof variantSchema>;
+export type VariantOptionPairFormData = z.infer<typeof variantOptionPairSchema>;
 export type ImageItem = z.infer<typeof imageItemSchema>;

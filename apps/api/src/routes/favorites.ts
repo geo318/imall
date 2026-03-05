@@ -5,6 +5,8 @@ import { authPlugin } from "../context";
 import { getStorage } from "../storage";
 import { ensureAuth, requireAuth } from "../utils/auth";
 
+const DEFAULT_CURRENCY = "GEL";
+
 type FavoriteRow = {
   productId: string;
   createdAt: Date;
@@ -142,7 +144,7 @@ export const favoritesRoutes = new Elysia({
             tenantSlug: product.tenantSlug || "",
             tenantName: product.tenantName || "",
             price: productVariants[0]?.price || "0.00",
-            currency: productVariants[0]?.currency || "USD",
+            currency: productVariants[0]?.currency || DEFAULT_CURRENCY,
             imageUrl: imageUrl || null,
             favoritedAt: favorite?.createdAt
               ? favorite.createdAt instanceof Date

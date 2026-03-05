@@ -3,7 +3,7 @@
 import { Button } from "@repo/ui/button";
 import { Textarea } from "@repo/ui/textarea";
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { MarkdownContent } from "@/components/shared/markdown-content";
 
 type Props = {
   value: string;
@@ -47,9 +47,9 @@ export function MarkdownEditor({ value, onChange }: Props) {
           </p>
         </>
       ) : (
-        <div className="min-h-[200px] p-4 border rounded-lg bg-slate-50 prose prose-sm max-w-none">
+        <div className="min-h-[200px] p-4 border rounded-lg bg-slate-50">
           {value ? (
-            <ReactMarkdown>{value}</ReactMarkdown>
+            <MarkdownContent content={value} className="prose-sm" />
           ) : (
             <p className="text-slate-400 italic">No content to preview</p>
           )}

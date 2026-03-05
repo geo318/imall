@@ -3,6 +3,7 @@
 import { Button } from "@repo/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@/i18n/navigation.client";
+import { useTranslations } from "@/i18n/provider";
 import { toast } from "sonner";
 import { addToCart, createCart } from "@/actions/carts";
 import { revalidateCartClient } from "@/lib/revalidate-client";
@@ -17,6 +18,7 @@ type Props = {
  * Product action buttons (Add to Cart, Buy Now)
  */
 export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Props) {
+  const t = useTranslations();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -59,12 +61,12 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
       // Also invalidate server-side cache
       await revalidateCartClient();
-      toast.success("Added to cart!");
+      toast.success(t("productButtons.toasts.added"));
       router.push("/cart");
     },
     onError: (err) => {
-      toast.error("Failed to add to cart", {
-        description: err instanceof Error ? err.message : "Failed to add to cart",
+      toast.error(t("productButtons.toasts.addFailed"), {
+        description: err instanceof Error ? err.message : t("productButtons.toasts.addFailed"),
       });
     },
   });
@@ -81,10 +83,10 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
           }
         }}
       >
-        {isSoldOut ? "Sold Out" : "Add to Cart"}
+        {isSoldOut ? t("productButtons.soldOut") : t("productButtons.addToCart")}
       </Button>
       <Button className="w-full" size="lg" variant="outline" disabled={isDisabled}>
-        Buy Now
+        {t("productButtons.buyNow")}
       </Button>
     </div>
   );

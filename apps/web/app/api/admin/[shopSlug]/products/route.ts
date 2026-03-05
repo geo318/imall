@@ -1,67 +1,6 @@
-import { auth } from "@clerk/nextjs/server";
 import { type NextRequest, NextResponse } from "next/server";
 import { revalidateAllProducts, revalidateShop } from "@/lib/server/revalidate";
-import { resolveBackendBase } from "../../../_utils/backend";
-
-const API_BASE = resolveBackendBase();
-
-async function getAuthToken(): Promise<string | null> {
-  try {
-    const authResult = await auth();
-
-    if (!authResult.userId) {
-      return null;
-    }
-
-    // Try to get the session token
-    let token = await authResult.getToken();
-
-    // Fallback to integration_fallback template if session token not available
-    if (!token) {
-      try {
-        token = await authResult.getToken({
-          template: "integration_fallback",
-        });
-      } catch {
-        // Silently fail - will return null
-      }
-    }
-
-    return token;
-  } catch {
-    return null;
-  }
-}
-
-async function backendRequest(
-  path: string,
-  options: {
-    method?: "GET" | "POST" | "PUT" | "DELETE";
-    body?: unknown;
-  } = {},
-) {
-  const token = await getAuthToken();
-
-  // Admin routes require authentication
-  if (!token) {
-    throw new Error("Unauthorized: Authentication required");
-  }
-
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-
-  const url = `${API_BASE}/api${path}`;
-
-  const response = await fetch(url, {
-    method: options.method || "GET",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
-
-  return response;
-}
+import { backendRequest } from "@/app/api/admin/utils";
 
 export async function GET(
   request: NextRequest,

@@ -69,7 +69,7 @@ export function MegaMenu({ isOpen, onClose, categories }: MegaMenuProps) {
                   }`}
                 >
                   <span className="flex items-center justify-between gap-3">
-                    <span className="flex items-center gap-3">
+                    <span className="flex items-center gap-3 text-left">
                       <span className="text-base">{category.icon || "📦"}</span>
                       {category.name}
                     </span>

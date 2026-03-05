@@ -1,6 +1,6 @@
-import { db, memberships, shopSettings, tenants, users } from "@repo/db";
+import { db, memberships, orderItems, products, shopSettings, tenants, users } from "@repo/db";
 import { slugify } from "@repo/shared";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { authPlugin, listQuerySchema } from "../context";
@@ -9,6 +9,14 @@ import { ensureAuth, requireAuth } from "../utils/auth";
 
 const createShopSchema = z.object({
   name: z.string().trim().min(1).max(256),
+});
+
+const spotlightQuerySchema = z.object({
+  limit: z
+    .string()
+    .optional()
+    .transform((value) => (value ? Number(value) : 4))
+    .refine((value) => Number.isFinite(value) && value > 0 && value <= 12, "Limit invalid"),
 });
 
 async function slugExists(slug: string) {
@@ -54,6 +62,87 @@ export const shopsRoutes = new Elysia({ prefix: "/shops" })
       if (err instanceof Response) return err;
       set.status = 500;
       return "Failed to list shops";
+    }
+  })
+  .get("/spotlight", async ({ query, set }) => {
+    try {
+      const { limit } = spotlightQuerySchema.parse(query);
+
+      const rows = await withCachedResponse(`shops:spotlight:${limit}`, 60_000, async () => {
+        const productCounts = db
+          .select({
+            tenantId: products.tenantId,
+            productCount: sql<number>`count(*)::int`,
+          })
+          .from(products)
+          .where(isNull(products.deletedAt))
+          .groupBy(products.tenantId)
+          .as("product_counts");
+
+        const salesCounts = db
+          .select({
+            tenantId: orderItems.tenantId,
+            salesCount: sql<number>`coalesce(sum(${orderItems.qty}), 0)::int`,
+          })
+          .from(orderItems)
+          .groupBy(orderItems.tenantId)
+          .as("sales_counts");
+
+        const spotlightRows = await db
+          .select({
+            id: tenants.id,
+            slug: tenants.shopSlug,
+            name: tenants.name,
+            productCount: sql<number>`coalesce(${productCounts.productCount}, 0)::int`,
+            salesCount: sql<number>`coalesce(${salesCounts.salesCount}, 0)::int`,
+          })
+          .from(tenants)
+          .leftJoin(productCounts, eq(productCounts.tenantId, tenants.id))
+          .leftJoin(salesCounts, eq(salesCounts.tenantId, tenants.id))
+          .where(eq(tenants.canSell, true))
+          .orderBy(
+            desc(sql<number>`coalesce(${salesCounts.salesCount}, 0)`),
+            desc(sql<number>`coalesce(${productCounts.productCount}, 0)`),
+            desc(tenants.createdAt),
+          )
+          .limit(limit);
+
+        if (spotlightRows.length === 0) {
+          return [];
+        }
+
+        const tenantIds = spotlightRows.map((row) => row.id);
+
+        const categoryRows = await db
+          .select({
+            tenantId: products.tenantId,
+            category: products.category,
+            itemCount: sql<number>`count(*)::int`,
+          })
+          .from(products)
+          .where(and(inArray(products.tenantId, tenantIds), isNull(products.deletedAt)))
+          .groupBy(products.tenantId, products.category)
+          .orderBy(desc(sql<number>`count(*)`));
+
+        const topCategoryByTenant = new Map<string, string>();
+        for (const row of categoryRows) {
+          if (!topCategoryByTenant.has(row.tenantId) && row.category) {
+            topCategoryByTenant.set(row.tenantId, row.category);
+          }
+        }
+
+        return spotlightRows.map((row) => ({
+          ...row,
+          primaryCategory: topCategoryByTenant.get(row.id) ?? null,
+        }));
+      });
+
+      set.headers["Cache-Control"] = "public, max-age=120, s-maxage=120, stale-while-revalidate=600";
+      return rows;
+    } catch (err) {
+      if (err instanceof Response) return err;
+      set.status = 500;
+      return { error: err instanceof Error ? err.message : "Failed to load spotlight shops" };
     }
   })
   .get("/mine", async ({ auth, request, set }) => {

@@ -12,8 +12,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, type Resolver, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { Link } from "@/i18n/navigation.client";
 import { useLocale } from "@/i18n/provider";
 import { fetchCategoryTree, flattenCategoryOptions } from "@/lib/api/categories";
+import { normalizeMarkdownInput } from "@/lib/markdown";
+import { DEFAULT_CURRENCY_CODE } from "@/lib/utils/currency";
 import { getImage } from "@/lib/utils/images";
 import { ImageGalleryUpload } from "./image-gallery-upload";
 import { MarkdownEditor } from "./markdown-editor";
@@ -37,10 +40,22 @@ type ProductFormResponse = ProductFormData & {
   images?: Array<{ url?: string | null }>;
   isAuction?: boolean;
   hasAuction?: boolean;
+  optionDefinitions?: Array<{
+    optionKey: string;
+    optionName: string;
+    sortOrder: number;
+  }>;
 };
 
 type VariantWithExtras = ProductFormData["variants"][number] & {
   availableQty?: number;
+  optionPairs?: Array<{
+    optionName: string;
+    optionKey?: string | null;
+    optionValue: string;
+    valueKey?: string | null;
+    optionThumbnail?: string | null;
+  }>;
   auction?: {
     startingBid?: string | null;
     minIncrement?: string | null;
@@ -48,6 +63,88 @@ type VariantWithExtras = ProductFormData["variants"][number] & {
     startsAt?: string | null;
     endsAt?: string | null;
   };
+};
+
+type TenantVariantOptionItem = {
+  id: string;
+  optionKey: string;
+  optionName: string;
+  values: string[];
+  valueItems?: Array<{
+    value: string;
+    thumbnailUrl?: string;
+  }>;
+};
+
+type FlatCategoryOption = {
+  key: string;
+  label: string;
+  fallbackName: string;
+};
+
+const VARIANT_FIELDS: Array<keyof VariantFormData> = [
+  "sku",
+  "price",
+  "currency",
+  "stock",
+  "auctionStartBid",
+  "auctionMinIncrement",
+  "auctionBuyNow",
+  "auctionStartsAt",
+  "auctionEndsAt",
+  "optionPairs",
+];
+
+const collectErrorMessages = (value: unknown, sink: Set<string>) => {
+  if (!value) {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry) => {
+      collectErrorMessages(entry, sink);
+    });
+    return;
+  }
+
+  if (typeof value !== "object") {
+    return;
+  }
+
+  const maybeMessage = (value as { message?: unknown }).message;
+  if (typeof maybeMessage === "string" && maybeMessage.trim().length > 0) {
+    sink.add(maybeMessage);
+  }
+
+  Object.values(value as Record<string, unknown>).forEach((entry) => {
+    collectErrorMessages(entry, sink);
+  });
+};
+
+const resolveCategoryValue = (
+  rawValue: string | null | undefined,
+  options: FlatCategoryOption[],
+): string => {
+  const normalized = rawValue?.trim();
+  if (!normalized) {
+    return "";
+  }
+
+  const match = options.find((option) => {
+    const key = option.key.trim();
+    const fallback = option.fallbackName.trim();
+    const label = option.label.trim();
+    return (
+      key === normalized ||
+      fallback === normalized ||
+      label === normalized ||
+      key.toLowerCase() === normalized.toLowerCase() ||
+      fallback.toLowerCase() === normalized.toLowerCase() ||
+      label.toLowerCase() === normalized.toLowerCase()
+    );
+  });
+
+  return match?.key ?? normalized;
 };
 
 const toDateTimeLocal = (value?: string | null) => {
@@ -83,7 +180,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       category: "",
       draft: false,
       isAuction: false,
-      variants: [{ price: "", currency: "USD", stock: "" }],
+      variants: [{ price: "", currency: DEFAULT_CURRENCY_CODE, stock: "", optionPairs: [] }],
     },
     mode: "onChange",
   });
@@ -116,17 +213,88 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     retry: false,
   });
 
+  const { data: variantOptionLibrary = [] } = useQuery<TenantVariantOptionItem[]>({
+    queryKey: ["tenant-variant-options", shopSlug],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/${shopSlug}/variant-options`);
+      if (!response.ok) {
+        throw new Error("Failed to load variant options");
+      }
+      const json = (await response.json()) as { items?: TenantVariantOptionItem[] };
+      return json.items ?? [];
+    },
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const flatCategoryOptions = useMemo(() => flattenCategoryOptions(categoryTree), [categoryTree]);
+
   const categoryOptions = useMemo(() => {
-    const options = flattenCategoryOptions(categoryTree).map((category) => ({
-      value: category.fallbackName,
+    const options = flatCategoryOptions.map((category) => ({
+      value: category.key,
       label: category.label,
     }));
-    const currentCategory = productData?.category;
-    if (currentCategory && !options.some((category) => category.value === currentCategory)) {
-      options.push({ value: currentCategory, label: currentCategory });
+    const resolvedCurrentCategory = resolveCategoryValue(
+      productData?.category,
+      flatCategoryOptions,
+    );
+    if (
+      resolvedCurrentCategory &&
+      !options.some((category) => category.value === resolvedCurrentCategory)
+    ) {
+      options.push({ value: resolvedCurrentCategory, label: resolvedCurrentCategory });
     }
     return options;
-  }, [categoryTree, productData?.category]);
+  }, [flatCategoryOptions, productData?.category]);
+
+  const variantErrors = useMemo(() => {
+    const source = errors.variants;
+    if (!Array.isArray(source)) {
+      return [];
+    }
+
+    return source.map((entry) => {
+      const mapped: Partial<Record<keyof VariantFormData, string>> = {};
+      if (!entry || typeof entry !== "object") {
+        return mapped;
+      }
+
+      VARIANT_FIELDS.forEach((field) => {
+        if (field === "optionPairs") {
+          const optionPairsError = (entry as Record<string, unknown>).optionPairs;
+          const collected = new Set<string>();
+          collectErrorMessages(optionPairsError, collected);
+          const firstMessage = Array.from(collected)[0];
+          if (firstMessage) {
+            mapped.optionPairs = firstMessage;
+          }
+          return;
+        }
+
+        const message = (entry as Record<string, { message?: string } | undefined>)[field]?.message;
+        if (message) {
+          mapped[field] = message;
+        }
+      });
+
+      return mapped;
+    });
+  }, [errors.variants]);
+
+  const variantErrorMessage = useMemo(() => {
+    const variantsError = errors.variants;
+    if (!variantsError || Array.isArray(variantsError)) {
+      return null;
+    }
+
+    const direct = (variantsError as { message?: string }).message;
+    if (direct) {
+      return direct;
+    }
+
+    const root = (variantsError as { root?: { message?: string } }).root?.message;
+    return root ?? null;
+  }, [errors.variants]);
 
   useEffect(() => {
     if (!productId && !isSlugDirty) {
@@ -143,24 +311,31 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
   // Reset form when productId changes (switching between new/edit or canceling)
   useEffect(() => {
     let isActive = true;
-    const blobUrls: string[] = [];
 
-    const resetFormState = async () => {
+    const resetFormState = () => {
       const hasProduct = Boolean(productId && productData);
-      const normalizedCategory = productData?.category?.trim() || "";
+      const normalizedCategory = resolveCategoryValue(productData?.category, flatCategoryOptions);
       const normalizedVariants = (productData?.variants as VariantWithExtras[] | undefined)?.map(
         (variant) => {
           const auction = variant.auction;
           return {
             ...variant,
+            sku: variant.sku ?? undefined,
             price: variant.price ?? "",
-            currency: variant.currency || "USD",
+            currency: variant.currency || DEFAULT_CURRENCY_CODE,
             stock: typeof variant.availableQty === "number" ? String(variant.availableQty) : "",
             auctionStartBid: auction?.startingBid ?? "",
             auctionMinIncrement: auction?.minIncrement ?? "",
             auctionBuyNow: auction?.buyNowPrice ?? "",
             auctionStartsAt: toDateTimeLocal(auction?.startsAt),
             auctionEndsAt: toDateTimeLocal(auction?.endsAt),
+            optionPairs:
+              variant.optionPairs?.map((pair) => ({
+                optionName: pair.optionName ?? "",
+                optionKey: pair.optionKey ?? undefined,
+                optionValue: pair.optionValue ?? "",
+                optionThumbnail: pair.optionThumbnail ?? "",
+              })) ?? [],
           };
         },
       );
@@ -174,7 +349,9 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         category: normalizedCategory || "",
         draft: false,
         isAuction: isAuctionValue,
-        variants: normalizedVariants ?? [{ price: "", currency: "USD", stock: "" }],
+        variants: normalizedVariants ?? [
+          { price: "", currency: DEFAULT_CURRENCY_CODE, stock: "", optionPairs: [] },
+        ],
       };
 
       reset(formValues);
@@ -196,46 +373,14 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         return;
       }
 
-      try {
-        const resolvedImages = await Promise.all(
-          imageUrls.map(async (url, index) => {
-            const resolvedUrl = getImage(url);
-            const response = await fetch(resolvedUrl);
-            if (!response.ok) {
-              return {
-                id: `image-${index}`,
-                url: resolvedUrl,
-                isPrimary: index === 0,
-                assetId: `${url}-${index}`,
-              };
-            }
-            const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
-            blobUrls.push(blobUrl);
-
-            return {
-              id: `image-${index}`,
-              url: blobUrl,
-              isPrimary: index === 0,
-              assetId: `${url}-${index}`,
-            };
-          }),
+      if (isActive) {
+        setImages(
+          imageUrls.map((url, index) => ({
+            id: `image-${index}`,
+            url: getImage(url),
+            isPrimary: index === 0,
+          })),
         );
-
-        if (isActive) {
-          setImages(resolvedImages);
-        }
-      } catch {
-        if (isActive) {
-          setImages(
-            imageUrls.map((url, index) => ({
-              id: `image-${index}`,
-              url: getImage(url),
-              isPrimary: index === 0,
-              assetId: `${url}-${index}`,
-            })),
-          );
-        }
       }
     };
 
@@ -243,11 +388,8 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
 
     return () => {
       isActive = false;
-      blobUrls.forEach((url) => {
-        URL.revokeObjectURL(url);
-      });
     };
-  }, [productData, productId, reset]);
+  }, [flatCategoryOptions, productData, productId, reset]);
 
   const isNewProduct = !productId;
 
@@ -260,13 +402,13 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     const currentVariants = getValues("variants") ?? [];
     if (isAuction) {
       const [first] = currentVariants;
-      const normalized = first ?? { price: "", currency: "USD", stock: "" };
+      const normalized = first ?? { price: "", currency: DEFAULT_CURRENCY_CODE, stock: "", optionPairs: [] };
       const nextVariant = { ...normalized, stock: "" };
       if (currentVariants.length !== 1 || normalized.stock) {
         setValue("variants", [nextVariant], { shouldValidate: true });
       }
     } else if (currentVariants.length === 0) {
-      setValue("variants", [{ price: "", currency: "USD", stock: "" }], {
+      setValue("variants", [{ price: "", currency: DEFAULT_CURRENCY_CODE, stock: "", optionPairs: [] }], {
         shouldValidate: true,
       });
     }
@@ -280,13 +422,22 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     ) => {
       const normalizedVariants = (data.variants ?? []).map((variant) => ({
         ...variant,
+        sku: variant.sku?.trim() ? variant.sku.trim() : undefined,
         stock: data.isAuction ? undefined : variant.stock,
+        optionPairs: (variant.optionPairs ?? [])
+          .map((pair) => ({
+            optionName: pair.optionName?.trim() ?? "",
+            optionKey: pair.optionKey?.trim() || undefined,
+            optionValue: pair.optionValue?.trim() ?? "",
+            optionThumbnail: pair.optionThumbnail?.trim() || undefined,
+          }))
+          .filter((pair) => pair.optionName.length > 0 && pair.optionValue.length > 0),
       }));
 
       // Data is already validated by Zod, just ensure it's serializable
       const payload = {
         title: data.title,
-        description: data.description || undefined,
+        description: data.description ? normalizeMarkdownInput(data.description) : undefined,
         category: data.category,
         slug: data.slug || undefined,
         draft: data.draft ?? undefined,
@@ -320,6 +471,9 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products", shopSlug] });
+      queryClient.invalidateQueries({ queryKey: ["tenant-variant-options", shopSlug] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["shop-products", shopSlug] });
       toast.success(productId ? "Product updated successfully" : "Product created successfully");
       onSuccess();
     },
@@ -363,8 +517,8 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
             }
           } else {
             return {
-              id: img.assetId || img.id,
-              url: img.assetId || img.url,
+              id: img.id,
+              url: img.url,
               isPrimary: img.isPrimary,
             };
           }
@@ -412,16 +566,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         console.error("Form validation errors:", errors);
       }
       const collected = new Set<string>();
-      for (const error of Object.values(errors)) {
-        if (!error) continue;
-        if (Array.isArray(error)) {
-          error.forEach((entry) => {
-            if (entry?.message) collected.add(entry.message);
-          });
-        } else if (error.message) {
-          collected.add(error.message);
-        }
-      }
+      collectErrorMessages(errors, collected);
 
       const filteredMessages = Array.from(collected).filter((message, _, list) => {
         if (message.includes("At least one variant") && list.length > 1) {
@@ -553,18 +698,27 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
 
       {/* Variants */}
       <Card>
-        <CardHeader>
-          <CardTitle>Variants</CardTitle>
-          <CardDescription>Product variants (sizes, colors, etc.)</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-3">
+          <div>
+            <CardTitle>Variants</CardTitle>
+            <CardDescription>Product variants (sizes, colors, etc.)</CardDescription>
+          </div>
+          <Link href={`/admin/${shopSlug}/catalog/options`}>
+            <Button variant="outline" size="sm" type="button">
+              Manage options
+            </Button>
+          </Link>
         </CardHeader>
         <CardContent>
           <VariantForm
             variants={watch("variants")}
             onVariantsChange={(variants) => setValue("variants", variants as VariantFormData[])}
             isAuction={!!isAuction}
+            optionLibrary={variantOptionLibrary}
+            variantErrors={variantErrors}
           />
-          {errors.variants && (
-            <p className="text-sm text-destructive mt-2">{errors.variants.message}</p>
+          {variantErrorMessage && (
+            <p className="text-sm text-destructive mt-2">{variantErrorMessage}</p>
           )}
           {errors.isAuction && (
             <p className="text-sm text-destructive mt-2">{errors.isAuction.message}</p>

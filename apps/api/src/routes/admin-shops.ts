@@ -10,15 +10,18 @@ import {
   orders,
   payoutLedger,
   payouts,
+  productOptionDefinitions,
   returnItems,
   returns,
   shippingProfiles,
   shopSettings,
   tenants,
+  tenantVariantOptions,
+  variantOptionValues,
   variants,
 } from "@repo/db";
 import { slugify } from "@repo/shared";
-import { and, desc, eq, inArray, ne, sql, sum } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, sql, sum } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { adminOrSuperadminGuard, getTenantIdBySlug } from "../context";
@@ -34,6 +37,15 @@ const settingsSchema = z.object({
   sellerPhone: z.string().optional(),
   sellerRules: z.string().optional(),
 });
+
+const variantOptionSchema = z.object({
+  optionName: z.string().trim().min(1).max(64),
+  optionKey: z.string().trim().max(64).optional(),
+});
+
+function normalizeVariantOptionKey(optionName: string, optionKey?: string) {
+  return slugify(optionKey?.trim() || optionName.trim());
+}
 
 function extractSlugSuffix(slug: string | null | undefined) {
   if (!slug) return null;
@@ -379,6 +391,190 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       sellerPhone: refreshed[0]?.sellerPhone ?? null,
       sellerRules: refreshed[0]?.sellerRules ?? null,
     };
+  })
+  .get("/variant-options", async ({ params }) => {
+    const { shopSlug } = params as { shopSlug: string };
+    const tenantId = await getTenantIdBySlug(shopSlug);
+
+    const [options, valueRows] = await Promise.all([
+      db
+        .select({
+          id: tenantVariantOptions.id,
+          optionKey: tenantVariantOptions.optionKey,
+          optionName: tenantVariantOptions.name,
+        })
+        .from(tenantVariantOptions)
+        .where(eq(tenantVariantOptions.tenantId, tenantId))
+        .orderBy(asc(tenantVariantOptions.name)),
+      db
+        .select({
+          optionId: productOptionDefinitions.tenantOptionId,
+          value: variantOptionValues.value,
+          thumbnailUrl: variantOptionValues.thumbnailUrl,
+        })
+        .from(variantOptionValues)
+        .innerJoin(
+          productOptionDefinitions,
+          eq(variantOptionValues.productOptionId, productOptionDefinitions.id),
+        )
+        .where(eq(variantOptionValues.tenantId, tenantId))
+        .groupBy(
+          productOptionDefinitions.tenantOptionId,
+          variantOptionValues.value,
+          variantOptionValues.thumbnailUrl,
+        )
+        .orderBy(
+          asc(productOptionDefinitions.tenantOptionId),
+          asc(variantOptionValues.value),
+          asc(variantOptionValues.thumbnailUrl),
+        ),
+    ]);
+
+    const valuesByOptionId = new Map<string, string[]>();
+    const valueItemsByOptionId = new Map<
+      string,
+      Array<{ value: string; thumbnailUrl?: string }>
+    >();
+    for (const row of valueRows) {
+      const existing = valuesByOptionId.get(row.optionId) ?? [];
+      if (!existing.includes(row.value)) {
+        existing.push(row.value);
+        valuesByOptionId.set(row.optionId, existing);
+      }
+
+      const items = valueItemsByOptionId.get(row.optionId) ?? [];
+      const hasItem = items.some(
+        (item) => item.value === row.value && item.thumbnailUrl === (row.thumbnailUrl ?? undefined),
+      );
+      if (!hasItem) {
+        items.push({
+          value: row.value,
+          thumbnailUrl: row.thumbnailUrl ?? undefined,
+        });
+        valueItemsByOptionId.set(row.optionId, items);
+      }
+    }
+
+    return {
+      items: options.map((row) => ({
+        id: row.id,
+        optionKey: row.optionKey,
+        optionName: row.optionName,
+        values: valuesByOptionId.get(row.id) ?? [],
+        valueItems: valueItemsByOptionId.get(row.id) ?? [],
+      })),
+    };
+  })
+  .post("/variant-options", async ({ params, body }) => {
+    const { shopSlug } = params as { shopSlug: string };
+    const tenantId = await getTenantIdBySlug(shopSlug);
+    const payload = variantOptionSchema.parse(body);
+    const normalizedKey = normalizeVariantOptionKey(payload.optionName, payload.optionKey);
+
+    if (!normalizedKey) {
+      return new Response("Invalid option key", { status: 400 });
+    }
+
+    const [row] = await db
+      .insert(tenantVariantOptions)
+      .values({
+        tenantId,
+        optionKey: normalizedKey,
+        name: payload.optionName.trim(),
+      })
+      .onConflictDoUpdate({
+        target: [tenantVariantOptions.tenantId, tenantVariantOptions.optionKey],
+        set: {
+          name: payload.optionName.trim(),
+          updatedAt: new Date(),
+        },
+      })
+      .returning({
+        id: tenantVariantOptions.id,
+        optionKey: tenantVariantOptions.optionKey,
+        optionName: tenantVariantOptions.name,
+      });
+
+    if (!row) {
+      return new Response("Failed to save option", { status: 500 });
+    }
+
+    return {
+      item: {
+        ...row,
+        values: [],
+      },
+    };
+  })
+  .put("/variant-options/:optionId", async ({ params, body }) => {
+    const { shopSlug, optionId } = params as { shopSlug: string; optionId: string };
+    const tenantId = await getTenantIdBySlug(shopSlug);
+    const payload = variantOptionSchema.parse(body);
+    const normalizedKey = normalizeVariantOptionKey(payload.optionName, payload.optionKey);
+
+    if (!normalizedKey) {
+      return new Response("Invalid option key", { status: 400 });
+    }
+
+    try {
+      const [row] = await db
+        .update(tenantVariantOptions)
+        .set({
+          optionKey: normalizedKey,
+          name: payload.optionName.trim(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(eq(tenantVariantOptions.id, optionId), eq(tenantVariantOptions.tenantId, tenantId)),
+        )
+        .returning({
+          id: tenantVariantOptions.id,
+          optionKey: tenantVariantOptions.optionKey,
+          optionName: tenantVariantOptions.name,
+        });
+
+      if (!row) {
+        return new Response("Option not found", { status: 404 });
+      }
+
+      return {
+        item: {
+          ...row,
+          values: [],
+        },
+      };
+    } catch {
+      return new Response("Option with this key already exists", { status: 409 });
+    }
+  })
+  .delete("/variant-options/:optionId", async ({ params }) => {
+    const { shopSlug, optionId } = params as { shopSlug: string; optionId: string };
+    const tenantId = await getTenantIdBySlug(shopSlug);
+
+    const [used] = await db
+      .select({ id: productOptionDefinitions.id })
+      .from(productOptionDefinitions)
+      .where(eq(productOptionDefinitions.tenantOptionId, optionId))
+      .limit(1);
+
+    if (used) {
+      return new Response("Option is already used by products and cannot be deleted", {
+        status: 409,
+      });
+    }
+
+    const [removed] = await db
+      .delete(tenantVariantOptions)
+      .where(
+        and(eq(tenantVariantOptions.id, optionId), eq(tenantVariantOptions.tenantId, tenantId)),
+      )
+      .returning({ id: tenantVariantOptions.id });
+
+    if (!removed) {
+      return new Response("Option not found", { status: 404 });
+    }
+
+    return { success: true };
   })
   .get("/inventory", async ({ params }) => {
     const { shopSlug } = params as { shopSlug: string };

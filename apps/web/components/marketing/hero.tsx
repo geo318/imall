@@ -33,7 +33,7 @@ export async function HeroSection({ locale }: HeroSectionProps) {
   const compactCopy = locale === "ka" || locale === "ru";
 
   return (
-    <section className="relative isolate -mt-16 max-sm:-mt-28 flex min-h-[600px] items-center overflow-hidden bg-gradient-hero pt-16 sm:min-h-[620px] md:min-h-[720px] lg:min-h-[760px]">
+    <section className="relative isolate -mt-16 max-sm:-mt-28 flex min-h-[100dvh] items-center overflow-hidden bg-gradient-hero pt-16 md:min-h-[720px] lg:min-h-[760px]">
       <HeroBackground />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-36 bg-gradient-to-b from-transparent via-white/40 to-white/85" />
 

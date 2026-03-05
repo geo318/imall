@@ -1,27 +1,13 @@
 import { promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
 import { Elysia } from "elysia";
+import { resolveUploadsDir } from "../storage/uploads-dir";
 
 /**
  * Get the uploads directory path
  */
 function getUploadsDir(): string {
-  const currentDir = process.cwd();
-  let apiSrcDir: string;
-
-  // Find API src directory
-  if (currentDir.includes("apps/api")) {
-    // We're in apps/api, resolve to src/uploads
-    apiSrcDir = resolve(currentDir, "src");
-  } else if (currentDir.includes("apps/web")) {
-    // We're in apps/web, go up and into api/src
-    apiSrcDir = resolve(currentDir, "..", "api", "src");
-  } else {
-    // Assume we're at workspace root
-    apiSrcDir = resolve(currentDir, "apps", "api", "src");
-  }
-
-  return resolve(apiSrcDir, "uploads");
+  return resolveUploadsDir();
 }
 
 /**

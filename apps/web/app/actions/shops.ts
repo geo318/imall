@@ -109,6 +109,12 @@ export type Shop = {
   name: string;
 };
 
+export type SpotlightShop = Shop & {
+  salesCount: number;
+  productCount: number;
+  primaryCategory: string | null;
+};
+
 export type MyShop = Shop & {
   canSell?: boolean;
   role?: string | null;
@@ -139,6 +145,65 @@ export async function getShops(limit = 50): Promise<Shop[]> {
   }
 
   return response.json();
+}
+
+/**
+ * Get spotlight shops for homepage vendor section
+ * Cached for PPR - public data, no auth required
+ */
+export async function getSpotlightShops(limit = 4): Promise<SpotlightShop[]> {
+  "use cache";
+  cacheLife({ stale: 120, expire: 1800 }); // 2m stale, 30m expire
+  cacheTag(CACHE_TAGS.SHOPS);
+
+  try {
+    const response = await publicBackendRequest("/shops/spotlight", {
+      params: { limit },
+    });
+
+    if (!response.ok) {
+      const fallbackShops = await getShops(limit);
+      return fallbackShops.map((shop) => ({
+        ...shop,
+        salesCount: 0,
+        productCount: 0,
+        primaryCategory: null,
+      }));
+    }
+
+    const payload = (await response.json()) as Array<{
+      id: string;
+      slug: string;
+      name: string;
+      salesCount?: number | string | null;
+      productCount?: number | string | null;
+      primaryCategory?: string | null;
+    }>;
+
+    return payload.map((shop) => ({
+      id: shop.id,
+      slug: shop.slug,
+      name: shop.name,
+      salesCount: Number(shop.salesCount ?? 0),
+      productCount: Number(shop.productCount ?? 0),
+      primaryCategory:
+        typeof shop.primaryCategory === "string" && shop.primaryCategory.trim().length > 0
+          ? shop.primaryCategory
+          : null,
+    }));
+  } catch {
+    try {
+      const fallbackShops = await getShops(limit);
+      return fallbackShops.map((shop) => ({
+        ...shop,
+        salesCount: 0,
+        productCount: 0,
+        primaryCategory: null,
+      }));
+    } catch {
+      return [];
+    }
+  }
 }
 
 /**

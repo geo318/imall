@@ -169,7 +169,7 @@ export function HeroBackground() {
       <canvas
         ref={canvasRef}
         aria-hidden
-        className="hero-canvas-layer absolute inset-x-0 -top-[100px] h-[calc(115dvh+100px)] w-full"
+        className="hero-canvas-layer absolute inset-x-0 top-0 h-[100dvh] w-full md:-top-[100px] md:h-[calc(115dvh+100px)]"
         style={{ pointerEvents: "none" }}
       />
 

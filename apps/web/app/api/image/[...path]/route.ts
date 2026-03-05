@@ -1,0 +1,91 @@
+import { resolveBackendBase } from "@/app/api/_utils/backend";
+
+type Params = {
+  path?: string[];
+};
+
+function forwardImageHeaders(source: Headers) {
+  const headers = new Headers();
+  const passThrough = [
+    "content-type",
+    "content-length",
+    "cache-control",
+    "etag",
+    "last-modified",
+    "accept-ranges",
+    "content-range",
+  ];
+
+  for (const name of passThrough) {
+    const value = source.get(name);
+    if (value) {
+      headers.set(name, value);
+    }
+  }
+
+  return headers;
+}
+
+function buildBackendImageUrl(path: string[], search: string) {
+  const backendBase = resolveBackendBase().replace(/\/+$/, "");
+  const joinedPath = path.map((segment) => encodeURIComponent(segment)).join("/");
+  return `${backendBase}/api/image/${joinedPath}${search}`;
+}
+
+async function proxyImageRequest(
+  request: Request,
+  { params }: { params: Promise<Params> },
+  method: "GET" | "HEAD",
+) {
+  const resolved = await params;
+  const path = resolved.path ?? [];
+
+  if (path.length === 0) {
+    return new Response("NOT_FOUND", { status: 404 });
+  }
+
+  const url = new URL(request.url);
+  const backendUrl = buildBackendImageUrl(path, url.search);
+  const requestHeaders = new Headers();
+
+  const accept = request.headers.get("accept");
+  if (accept) {
+    requestHeaders.set("accept", accept);
+  }
+  const acceptEncoding = request.headers.get("accept-encoding");
+  if (acceptEncoding) {
+    requestHeaders.set("accept-encoding", acceptEncoding);
+  }
+  const range = request.headers.get("range");
+  if (range) {
+    requestHeaders.set("range", range);
+  }
+  const ifNoneMatch = request.headers.get("if-none-match");
+  if (ifNoneMatch) {
+    requestHeaders.set("if-none-match", ifNoneMatch);
+  }
+  const ifModifiedSince = request.headers.get("if-modified-since");
+  if (ifModifiedSince) {
+    requestHeaders.set("if-modified-since", ifModifiedSince);
+  }
+
+  const upstream = await fetch(backendUrl, {
+    method,
+    headers: requestHeaders,
+    cache: "force-cache",
+  });
+
+  const headers = forwardImageHeaders(upstream.headers);
+  return new Response(method === "HEAD" ? null : upstream.body, {
+    status: upstream.status,
+    headers,
+  });
+}
+
+export async function GET(request: Request, context: { params: Promise<Params> }) {
+  return proxyImageRequest(request, context, "GET");
+}
+
+export async function HEAD(request: Request, context: { params: Promise<Params> }) {
+  return proxyImageRequest(request, context, "HEAD");
+}

@@ -33,7 +33,10 @@ export const tenants = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    canSellCreatedAtIdx: index("tenants_can_sell_created_at_idx").on(table.canSell, table.createdAt),
+    canSellCreatedAtIdx: index("tenants_can_sell_created_at_idx").on(
+      table.canSell,
+      table.createdAt,
+    ),
   }),
 );
 
@@ -191,6 +194,89 @@ export const variants = pgTable(
   }),
 );
 
+// Tenant variant options define reusable option names (e.g. Size, Color)
+// available for products under a tenant.
+export const tenantVariantOptions = pgTable(
+  "tenant_variant_options",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    optionKey: varchar("option_key", { length: 64 }).notNull(),
+    name: varchar("name", { length: 128 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    tenantOptionKeyIdx: uniqueIndex("tenant_variant_options_tenant_option_key_unique").on(
+      table.tenantId,
+      table.optionKey,
+    ),
+    tenantNameIdx: index("tenant_variant_options_tenant_name_idx").on(table.tenantId, table.name),
+  }),
+);
+
+// Product option definitions attach tenant option names to a concrete product
+// and preserve display order.
+export const productOptionDefinitions = pgTable(
+  "product_option_definitions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    productId: uuid("product_id")
+      .references(() => products.id, { onDelete: "cascade" })
+      .notNull(),
+    tenantOptionId: uuid("tenant_option_id")
+      .references(() => tenantVariantOptions.id)
+      .notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    productOptionUniqueIdx: uniqueIndex("product_option_definitions_product_option_unique").on(
+      table.productId,
+      table.tenantOptionId,
+    ),
+    productSortIdx: index("product_option_definitions_product_sort_idx").on(
+      table.productId,
+      table.sortOrder,
+    ),
+  }),
+);
+
+// Variant option values store selected values for each variant and product
+// option definition (e.g. variant A -> Size = M).
+export const variantOptionValues = pgTable(
+  "variant_option_values",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    variantId: uuid("variant_id")
+      .references(() => variants.id, { onDelete: "cascade" })
+      .notNull(),
+    productOptionId: uuid("product_option_id")
+      .references(() => productOptionDefinitions.id, { onDelete: "cascade" })
+      .notNull(),
+    value: varchar("value", { length: 128 }).notNull(),
+    valueKey: varchar("value_key", { length: 128 }).notNull(),
+    thumbnailUrl: varchar("thumbnail_url", { length: 1024 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    variantOptionUniqueIdx: uniqueIndex("variant_option_values_variant_option_unique").on(
+      table.variantId,
+      table.productOptionId,
+    ),
+    variantIdx: index("variant_option_values_variant_idx").on(table.variantId),
+    productOptionIdx: index("variant_option_values_product_option_idx").on(table.productOptionId),
+  }),
+);
+
 // Product images link uploaded assets to products. Sorting is stored on
 // the integer `sortOrder` field.
 export const productImages = pgTable(
@@ -248,7 +334,10 @@ export const inventoryLedger = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
-    tenantVariantIdx: index("inventory_ledger_tenant_variant_idx").on(table.tenantId, table.variantId),
+    tenantVariantIdx: index("inventory_ledger_tenant_variant_idx").on(
+      table.tenantId,
+      table.variantId,
+    ),
     variantCreatedAtIdx: index("inventory_ledger_variant_created_at_idx").on(
       table.variantId,
       table.createdAt,
@@ -514,33 +603,37 @@ export const customerMessages = pgTable("customer_messages", {
 // per auction in this simplified model. `currentPrice` caches the
 // highest bid. `highestBidId` references the current highest bid.
 // `highestBidderId` stores the Clerk user ID (externalAuthId) of the highest bidder for quick lookups.
-export const auctions = pgTable("auctions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  tenantId: uuid("tenant_id")
-    .references(() => tenants.id)
-    .notNull(),
-  variantId: uuid("variant_id")
-    .references(() => variants.id)
-    .notNull(),
-  status: varchar("status", { length: 32 }).default("scheduled"),
-  startsAt: timestamp("starts_at").notNull(),
-  endsAt: timestamp("ends_at").notNull(),
-  antiSnipeSeconds: integer("anti_snipe_seconds").default(0).notNull(),
-  startingBid: numeric("starting_bid", { precision: 12, scale: 2 }).notNull(),
-  minIncrement: numeric("min_increment", { precision: 12, scale: 2 }).notNull(),
-  buyNowPrice: numeric("buy_now_price", { precision: 12, scale: 2 }),
-  currentPrice: numeric("current_price", { precision: 12, scale: 2 }),
-  highestBidId: uuid("highest_bid_id"),
-  highestBidderId: varchar("highest_bidder_id", { length: 256 }), // Clerk user ID (externalAuthId)
-}, (table) => ({
-  tenantStatusEndsAtIdx: index("auctions_tenant_status_ends_at_idx").on(
-    table.tenantId,
-    table.status,
-    table.endsAt,
-  ),
-  statusEndsAtIdx: index("auctions_status_ends_at_idx").on(table.status, table.endsAt),
-  variantIdx: index("auctions_variant_id_idx").on(table.variantId),
-}));
+export const auctions = pgTable(
+  "auctions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    variantId: uuid("variant_id")
+      .references(() => variants.id)
+      .notNull(),
+    status: varchar("status", { length: 32 }).default("scheduled"),
+    startsAt: timestamp("starts_at").notNull(),
+    endsAt: timestamp("ends_at").notNull(),
+    antiSnipeSeconds: integer("anti_snipe_seconds").default(0).notNull(),
+    startingBid: numeric("starting_bid", { precision: 12, scale: 2 }).notNull(),
+    minIncrement: numeric("min_increment", { precision: 12, scale: 2 }).notNull(),
+    buyNowPrice: numeric("buy_now_price", { precision: 12, scale: 2 }),
+    currentPrice: numeric("current_price", { precision: 12, scale: 2 }),
+    highestBidId: uuid("highest_bid_id"),
+    highestBidderId: varchar("highest_bidder_id", { length: 256 }), // Clerk user ID (externalAuthId)
+  },
+  (table) => ({
+    tenantStatusEndsAtIdx: index("auctions_tenant_status_ends_at_idx").on(
+      table.tenantId,
+      table.status,
+      table.endsAt,
+    ),
+    statusEndsAtIdx: index("auctions_status_ends_at_idx").on(table.status, table.endsAt),
+    variantIdx: index("auctions_variant_id_idx").on(table.variantId),
+  }),
+);
 
 export const bids = pgTable(
   "bids",

@@ -11,17 +11,28 @@ function getApiBaseUrl(): string {
   const normalize = (value: string) =>
     value.startsWith("http://") || value.startsWith("https://") ? value : `http://${value}`;
 
-  if (typeof window === "undefined") {
-    // Server-side: use BACKEND_URL or DOMAIN
-    const raw = process.env.BACKEND_URL || process.env.DOMAIN || "http://localhost:3001";
-    return normalize(raw);
+  if (typeof window !== "undefined") {
+    // Client-side: keep image URLs same-origin and rely on /api/image proxy.
+    // This avoids broken production URLs when NEXT_PUBLIC_* is a build-time placeholder.
+    return "";
   }
-  // Client-side: use NEXT_PUBLIC_BACKEND_URL or NEXT_PUBLIC_DOMAIN
-  const raw =
-    process.env.NEXT_PUBLIC_BACKEND_URL ||
-    process.env.NEXT_PUBLIC_DOMAIN ||
-    "http://localhost:3001";
+
+  // Server-side: use API base (for any server-side image URL normalization paths).
+  const raw = process.env.BACKEND_URL || process.env.DOMAIN || "http://localhost:3001";
   return normalize(raw);
+}
+
+function normalizeCorruptedImageUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return trimmed;
+
+  // Recovery for previously persisted malformed URLs like:
+  // /api/image/.../file.webp-0
+  // https://host/api/image/.../file.webp-1
+  return trimmed.replace(
+    /(\.(?:webp|png|jpe?g|gif|svg))-\d+($|[?#])/i,
+    (_match, ext: string, suffix: string) => `${ext}${suffix}`,
+  );
 }
 
 /**
@@ -34,38 +45,40 @@ export function getImage(url: string | null | undefined): string {
     return "";
   }
 
+  const normalizedUrl = normalizeCorruptedImageUrl(url);
+
   // If it's already a full URL (http:// or https://), return as-is
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    return url;
+  if (normalizedUrl.startsWith("http://") || normalizedUrl.startsWith("https://")) {
+    return normalizedUrl;
   }
 
   // If it's already a path starting with /api/image/, prepend API base URL
-  if (url.startsWith("/api/image/")) {
+  if (normalizedUrl.startsWith("/api/image/")) {
     const apiBaseUrl = getApiBaseUrl();
     const baseUrl = apiBaseUrl.replace(/\/$/, "");
-    return `${baseUrl}${url}`;
+    return `${baseUrl}${normalizedUrl}`;
   }
 
   // Legacy support: if it starts with /uploads/, convert to /api/image format
-  if (url.startsWith("/uploads/")) {
+  if (normalizedUrl.startsWith("/uploads/")) {
     const apiBaseUrl = getApiBaseUrl();
     const baseUrl = apiBaseUrl.replace(/\/$/, "");
     // Convert /uploads/shopSlug/... to /api/image/shopSlug/...
-    const pathWithoutUploads = url.replace(/^\/uploads\//, "");
+    const pathWithoutUploads = normalizedUrl.replace(/^\/uploads\//, "");
     return `${baseUrl}/api/image/${pathWithoutUploads}`;
   }
 
   // If it's any other relative path starting with /, prepend API base URL
-  if (url.startsWith("/")) {
+  if (normalizedUrl.startsWith("/")) {
     const apiBaseUrl = getApiBaseUrl();
     const baseUrl = apiBaseUrl.replace(/\/$/, "");
-    return `${baseUrl}${url}`;
+    return `${baseUrl}${normalizedUrl}`;
   }
 
   // Otherwise, treat as relative path and prepend API base URL
   const apiBaseUrl = getApiBaseUrl();
   const baseUrl = apiBaseUrl.replace(/\/$/, "");
-  return `${baseUrl}/api/image/${url}`;
+  return `${baseUrl}/api/image/${normalizedUrl}`;
 }
 
 /**

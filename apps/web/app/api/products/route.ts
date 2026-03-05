@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { CACHE_TAGS } from "@/lib/constants";
 import { resolveBackendBase } from "../_utils/backend";
 
 const API_BASE = resolveBackendBase();
@@ -15,7 +16,10 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type": "application/json",
       },
-      next: { revalidate: 30 },
+      next: {
+        revalidate: 30,
+        tags: [CACHE_TAGS.PRODUCTS],
+      },
     });
 
     return new NextResponse(response.body, {
@@ -33,4 +37,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
-

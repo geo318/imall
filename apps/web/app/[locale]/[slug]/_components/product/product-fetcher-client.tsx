@@ -3,6 +3,7 @@
 import { useAuth } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { ProductGridSkeleton } from "@/components/skeletons/product-card-skeleton";
+import { useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
 import { ProductDetailClient } from "./product-detail-client";
 
@@ -15,6 +16,7 @@ type Props = {
  * Used as fallback when server fetch fails (e.g., for deleted/draft products)
  */
 export function ProductFetcherClient({ productIdentifier }: Props) {
+  const t = useTranslations();
   const { getToken } = useAuth();
 
   const {
@@ -56,10 +58,8 @@ export function ProductFetcherClient({ productIdentifier }: Props) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">404 - Product Not Found</h1>
-          <p className="text-slate-600">
-            The product you're looking for doesn't exist or has been removed.
-          </p>
+          <h1 className="text-2xl font-bold mb-4">{t("productNotFound.title")}</h1>
+          <p className="text-slate-600">{t("productNotFound.description")}</p>
         </div>
       </div>
     );

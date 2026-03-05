@@ -81,3 +81,20 @@ export async function withCachedResponse<T>(
   return promise;
 }
 
+export function invalidateCachedResponses(predicate: (key: string) => boolean) {
+  for (const key of cache.keys()) {
+    if (predicate(key)) {
+      cache.delete(key);
+    }
+  }
+  for (const key of inflight.keys()) {
+    if (predicate(key)) {
+      inflight.delete(key);
+    }
+  }
+}
+
+export function invalidateCachedResponsesByPrefixes(prefixes: string[]) {
+  if (prefixes.length === 0) return;
+  invalidateCachedResponses((key) => prefixes.some((prefix) => key.startsWith(prefix)));
+}

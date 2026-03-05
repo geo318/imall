@@ -6,18 +6,36 @@ import {
   db,
   inventoryLedger,
   inventorySnapshot,
+  productOptionDefinitions,
   productStats,
   products,
   tenants,
+  tenantVariantOptions,
+  variantOptionValues,
   variants,
 } from "@repo/db";
 import { INVENTORY_REASONS, slugify } from "@repo/shared";
-import { and, eq, ilike, inArray, isNotNull, isNull, not, or, type SQL, sum } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  not,
+  or,
+  type SQL,
+  sum,
+} from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { authPlugin, getTenantIdBySlug, isSuperadminRequest } from "../context";
 import { getStorage } from "../storage";
+import { invalidateCachedResponsesByPrefixes } from "../utils/response-cache";
 import { ensureAuth, requireAuth, verifyTenantAccess } from "../utils/auth";
+
+const DEFAULT_CURRENCY = "GEL";
 
 const optionalNumberString = z.preprocess(
   (value) => {
@@ -48,6 +66,27 @@ const optionalDateTimeString = z.preprocess((value) => {
   return trimmed === "" ? undefined : trimmed;
 }, z.string().optional());
 
+const optionalShortString = z.preprocess((value) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}, z.string().max(64).optional());
+
+const optionalThumbnailString = z.preprocess((value) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}, z.string().max(1024).optional());
+
+const optionPairSchema = z.object({
+  optionName: z.string().trim().min(1).max(64),
+  optionKey: optionalShortString,
+  optionValue: z.string().trim().min(1).max(128),
+  optionThumbnail: optionalThumbnailString,
+});
+
 const productSchema = z
   .object({
     title: z.string().min(1).max(256),
@@ -65,7 +104,7 @@ const productSchema = z
       z.object({
         sku: z.string().optional(),
         price: optionalNumberString,
-        currency: z.string().default("USD"),
+        currency: z.string().default(DEFAULT_CURRENCY),
         isAuction: z.boolean().optional(),
         stock: optionalIntegerString,
         auctionStartBid: optionalNumberString,
@@ -73,6 +112,7 @@ const productSchema = z
         auctionBuyNow: optionalNumberString,
         auctionStartsAt: optionalDateTimeString,
         auctionEndsAt: optionalDateTimeString,
+        optionPairs: z.array(optionPairSchema).optional().default([]),
       }),
     ),
     images: z
@@ -120,6 +160,200 @@ const productSchema = z
   });
 
 type VariantInput = z.infer<typeof productSchema>["variants"][number];
+type OptionPairInput = z.infer<typeof optionPairSchema>;
+
+type NormalizedOptionPair = {
+  optionKey: string;
+  optionName: string;
+  optionValue: string;
+  valueKey: string;
+  optionThumbnail?: string;
+};
+
+type PersistVariantOptionsInput = {
+  tenantId: string;
+  productId: string;
+  variantOptionPayloads: Array<{
+    variantId: string;
+    optionPairs: NormalizedOptionPair[];
+  }>;
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
+};
+
+function invalidatePublicProductCaches(shopSlug: string) {
+  invalidateCachedResponsesByPrefixes([
+    "products:any:",
+    "products:search:",
+    `products:shop:${shopSlug}:`,
+  ]);
+}
+
+function normalizeOptionPairs(optionPairs: OptionPairInput[] | undefined): NormalizedOptionPair[] {
+  if (!optionPairs || optionPairs.length === 0) {
+    return [];
+  }
+
+  const deduped = new Map<string, NormalizedOptionPair>();
+  for (const pair of optionPairs) {
+    const optionName = pair.optionName.trim();
+    const optionValue = pair.optionValue.trim();
+    const explicitKey = pair.optionKey?.trim() ?? "";
+    const optionKey = slugify(explicitKey || optionName);
+    const valueKey = slugify(optionValue);
+    const optionThumbnail = pair.optionThumbnail?.trim() || undefined;
+
+    if (!optionName || !optionValue || !optionKey || !valueKey) {
+      continue;
+    }
+
+    deduped.set(optionKey, {
+      optionKey,
+      optionName,
+      optionValue,
+      valueKey,
+      optionThumbnail,
+    });
+  }
+
+  return Array.from(deduped.values());
+}
+
+async function persistVariantOptionsForProduct({
+  tenantId,
+  productId,
+  variantOptionPayloads,
+  tx,
+}: PersistVariantOptionsInput) {
+  await tx
+    .delete(productOptionDefinitions)
+    .where(eq(productOptionDefinitions.productId, productId));
+
+  const orderedProductOptions: Array<{
+    optionKey: string;
+    optionName: string;
+  }> = [];
+  const seenOptionKeys = new Set<string>();
+
+  for (const payload of variantOptionPayloads) {
+    for (const optionPair of payload.optionPairs) {
+      if (seenOptionKeys.has(optionPair.optionKey)) {
+        continue;
+      }
+      seenOptionKeys.add(optionPair.optionKey);
+      orderedProductOptions.push({
+        optionKey: optionPair.optionKey,
+        optionName: optionPair.optionName,
+      });
+    }
+  }
+
+  if (orderedProductOptions.length === 0) {
+    return;
+  }
+
+  const tenantOptionIdByKey = new Map<string, string>();
+  for (const option of orderedProductOptions) {
+    const [tenantOption] = await tx
+      .insert(tenantVariantOptions)
+      .values({
+        tenantId,
+        optionKey: option.optionKey,
+        name: option.optionName,
+      })
+      .onConflictDoUpdate({
+        target: [tenantVariantOptions.tenantId, tenantVariantOptions.optionKey],
+        set: {
+          name: option.optionName,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({
+        id: tenantVariantOptions.id,
+      });
+
+    if (!tenantOption) {
+      continue;
+    }
+    tenantOptionIdByKey.set(option.optionKey, tenantOption.id);
+  }
+
+  const productOptionRows = orderedProductOptions
+    .map((option, index) => {
+      const tenantOptionId = tenantOptionIdByKey.get(option.optionKey);
+      if (!tenantOptionId) {
+        return null;
+      }
+      return {
+        tenantId,
+        productId,
+        tenantOptionId,
+        sortOrder: index,
+      };
+    })
+    .filter(Boolean) as Array<{
+    tenantId: string;
+    productId: string;
+    tenantOptionId: string;
+    sortOrder: number;
+  }>;
+
+  if (productOptionRows.length === 0) {
+    return;
+  }
+
+  const insertedProductOptions = await tx
+    .insert(productOptionDefinitions)
+    .values(productOptionRows)
+    .returning({
+      id: productOptionDefinitions.id,
+      tenantOptionId: productOptionDefinitions.tenantOptionId,
+    });
+
+  const productOptionIdByKey = new Map<string, string>();
+  for (const option of orderedProductOptions) {
+    const tenantOptionId = tenantOptionIdByKey.get(option.optionKey);
+    if (!tenantOptionId) {
+      continue;
+    }
+    const productOption = insertedProductOptions.find(
+      (row) => row.tenantOptionId === tenantOptionId,
+    );
+    if (productOption) {
+      productOptionIdByKey.set(option.optionKey, productOption.id);
+    }
+  }
+
+  const variantOptionRows = variantOptionPayloads.flatMap((payload) => {
+    return payload.optionPairs
+      .map((optionPair) => {
+        const productOptionId = productOptionIdByKey.get(optionPair.optionKey);
+        if (!productOptionId) {
+          return null;
+        }
+
+        return {
+          tenantId,
+          variantId: payload.variantId,
+          productOptionId,
+          value: optionPair.optionValue,
+          valueKey: optionPair.valueKey,
+          thumbnailUrl: optionPair.optionThumbnail ?? null,
+        };
+      })
+      .filter(Boolean) as Array<{
+      tenantId: string;
+      variantId: string;
+      productOptionId: string;
+      value: string;
+      valueKey: string;
+      thumbnailUrl: string | null;
+    }>;
+  });
+
+  if (variantOptionRows.length > 0) {
+    await tx.insert(variantOptionValues).values(variantOptionRows);
+  }
+}
 
 function determineSlug({
   requestedSlug,
@@ -337,7 +571,7 @@ export const adminProductsRoutes = new Elysia({
         const currency =
           productVariants.find((variant) => Number(variant.price) === priceMinValue)?.currency ||
           productVariants[0]?.currency ||
-          "USD";
+          DEFAULT_CURRENCY;
         const hasAuction = productVariants.some((variant) => auctionMap.has(variant.id));
         const auctionBids = productVariants
           .map((variant) => auctionMap.get(variant.id))
@@ -518,27 +752,93 @@ export const adminProductsRoutes = new Elysia({
 
       // Get auctions for variants
       const variantIds = productVariants.map((v) => v.id);
-      const inventoryRows =
-        variantIds.length > 0
-          ? await db
-              .select({
-                variantId: inventoryLedger.variantId,
-                available: sum(inventoryLedger.delta),
-              })
-              .from(inventoryLedger)
-              .where(inArray(inventoryLedger.variantId, variantIds))
-              .groupBy(inventoryLedger.variantId)
-          : [];
+      const [optionDefinitionRows, variantOptionRows, inventoryRows, variantAuctions] =
+        await Promise.all([
+          db
+            .select({
+              optionKey: tenantVariantOptions.optionKey,
+              optionName: tenantVariantOptions.name,
+              sortOrder: productOptionDefinitions.sortOrder,
+            })
+            .from(productOptionDefinitions)
+            .innerJoin(
+              tenantVariantOptions,
+              eq(productOptionDefinitions.tenantOptionId, tenantVariantOptions.id),
+            )
+            .where(eq(productOptionDefinitions.productId, product.id))
+            .orderBy(asc(productOptionDefinitions.sortOrder)),
+          variantIds.length > 0
+            ? db
+                .select({
+                  variantId: variantOptionValues.variantId,
+                  optionKey: tenantVariantOptions.optionKey,
+                  optionName: tenantVariantOptions.name,
+                  optionValue: variantOptionValues.value,
+                  valueKey: variantOptionValues.valueKey,
+                  optionThumbnail: variantOptionValues.thumbnailUrl,
+                  sortOrder: productOptionDefinitions.sortOrder,
+                })
+                .from(variantOptionValues)
+                .innerJoin(
+                  productOptionDefinitions,
+                  eq(variantOptionValues.productOptionId, productOptionDefinitions.id),
+                )
+                .innerJoin(
+                  tenantVariantOptions,
+                  eq(productOptionDefinitions.tenantOptionId, tenantVariantOptions.id),
+                )
+                .where(inArray(variantOptionValues.variantId, variantIds))
+                .orderBy(asc(productOptionDefinitions.sortOrder))
+            : Promise.resolve([]),
+          variantIds.length > 0
+            ? db
+                .select({
+                  variantId: inventoryLedger.variantId,
+                  available: sum(inventoryLedger.delta),
+                })
+                .from(inventoryLedger)
+                .where(inArray(inventoryLedger.variantId, variantIds))
+                .groupBy(inventoryLedger.variantId)
+            : Promise.resolve([]),
+          variantIds.length > 0
+            ? db
+                .select()
+                .from(auctions)
+                .where(
+                  and(eq(auctions.tenantId, tenantId), inArray(auctions.variantId, variantIds)),
+                )
+            : Promise.resolve([]),
+        ]);
       const inventoryMap = new Map(
         inventoryRows.map((row) => [row.variantId, Number(row.available ?? 0)]),
       );
-      const variantAuctions =
-        variantIds.length > 0
-          ? await db
-              .select()
-              .from(auctions)
-              .where(and(eq(auctions.tenantId, tenantId), inArray(auctions.variantId, variantIds)))
-          : [];
+
+      const optionDefinitions = optionDefinitionRows.map((row) => ({
+        optionKey: row.optionKey,
+        optionName: row.optionName,
+        sortOrder: row.sortOrder,
+      }));
+      const optionPairsByVariant = new Map<
+        string,
+        Array<{
+          optionKey: string;
+          optionName: string;
+          optionValue: string;
+          valueKey: string;
+          optionThumbnail?: string;
+        }>
+      >();
+      for (const row of variantOptionRows) {
+        const existing = optionPairsByVariant.get(row.variantId) ?? [];
+        existing.push({
+          optionKey: row.optionKey,
+          optionName: row.optionName,
+          optionValue: row.optionValue,
+          valueKey: row.valueKey,
+          optionThumbnail: row.optionThumbnail ?? undefined,
+        });
+        optionPairsByVariant.set(row.variantId, existing);
+      }
 
       // Get images from comma-delimited string
       const images = product.imageUrls
@@ -559,9 +859,11 @@ export const adminProductsRoutes = new Elysia({
           return {
             ...v,
             availableQty: inventoryMap.has(v.id) ? (inventoryMap.get(v.id) ?? 0) : undefined,
+            optionPairs: optionPairsByVariant.get(v.id) ?? [],
             auction: auction || null,
           };
         }),
+        optionDefinitions,
         images,
         hasAuction: variantAuctions.length > 0,
         isAuction: variantAuctions.length > 0,
@@ -608,7 +910,6 @@ export const adminProductsRoutes = new Elysia({
             },
           );
         }
-
       }
       const capabilities = await getTenantCapabilities(tenantId);
       if (!capabilities.canSell) {
@@ -697,9 +998,15 @@ export const adminProductsRoutes = new Elysia({
           throw new Error("Failed to create product");
         }
 
+        const variantOptionPayloads: Array<{
+          variantId: string;
+          optionPairs: NormalizedOptionPair[];
+        }> = [];
+
         // Create variants and auctions
         for (const variantData of validated.variants) {
           const resolvedPrice = resolveVariantPrice(variantData, validated.isAuction);
+          const normalizedOptionPairs = normalizeOptionPairs(variantData.optionPairs);
           const [variant] = await tx
             .insert(variants)
             .values({
@@ -707,13 +1014,18 @@ export const adminProductsRoutes = new Elysia({
               productId: product.id,
               sku: variantData.sku || null,
               price: resolvedPrice,
-              currency: variantData.currency || "USD",
+              currency: variantData.currency || DEFAULT_CURRENCY,
             })
             .returning();
 
           if (!variant) {
             throw new Error("Failed to create variant");
           }
+
+          variantOptionPayloads.push({
+            variantId: variant.id,
+            optionPairs: normalizedOptionPairs,
+          });
 
           const stockQty = resolveStockQty(variantData, validated.isAuction);
           if (stockQty > 0) {
@@ -746,6 +1058,13 @@ export const adminProductsRoutes = new Elysia({
           }
         }
 
+        await persistVariantOptionsForProduct({
+          tx,
+          tenantId,
+          productId: product.id,
+          variantOptionPayloads,
+        });
+
         // Initialize product stats
         await tx.insert(productStats).values({
           productId: product.id,
@@ -757,7 +1076,9 @@ export const adminProductsRoutes = new Elysia({
           sold: 0,
         });
 
-        return { id: product.id, slug: product.slug };
+        const created = { id: product.id, slug: product.slug };
+        invalidatePublicProductCaches(shopSlug);
+        return created;
       });
     } catch (error) {
       if (error instanceof Response) return error;
@@ -805,7 +1126,6 @@ export const adminProductsRoutes = new Elysia({
             },
           );
         }
-
       }
       const capabilities = await getTenantCapabilities(tenantId);
       if (!capabilities.canSell) {
@@ -959,8 +1279,14 @@ export const adminProductsRoutes = new Elysia({
         // Now delete variants
         await tx.delete(variants).where(eq(variants.productId, productId));
 
+        const variantOptionPayloads: Array<{
+          variantId: string;
+          optionPairs: NormalizedOptionPair[];
+        }> = [];
+
         for (const variantData of validated.variants) {
           const resolvedPrice = resolveVariantPrice(variantData, validated.isAuction);
+          const normalizedOptionPairs = normalizeOptionPairs(variantData.optionPairs);
           const [variant] = await tx
             .insert(variants)
             .values({
@@ -968,13 +1294,18 @@ export const adminProductsRoutes = new Elysia({
               productId,
               sku: variantData.sku || null,
               price: resolvedPrice,
-              currency: variantData.currency || "USD",
+              currency: variantData.currency || DEFAULT_CURRENCY,
             })
             .returning();
 
           if (!variant) {
             throw new Error("Failed to create variant");
           }
+
+          variantOptionPayloads.push({
+            variantId: variant.id,
+            optionPairs: normalizedOptionPairs,
+          });
 
           const stockQty = resolveStockQty(variantData, validated.isAuction);
           if (stockQty > 0) {
@@ -1006,6 +1337,14 @@ export const adminProductsRoutes = new Elysia({
           }
         }
 
+        await persistVariantOptionsForProduct({
+          tx,
+          tenantId,
+          productId,
+          variantOptionPayloads,
+        });
+
+        invalidatePublicProductCaches(shopSlug);
         return { id: productId };
       });
     } catch (error) {
@@ -1054,7 +1393,6 @@ export const adminProductsRoutes = new Elysia({
             },
           );
         }
-
       }
       const capabilities = await getTenantCapabilities(tenantId);
       if (!capabilities.canSell) {
@@ -1072,6 +1410,7 @@ export const adminProductsRoutes = new Elysia({
         .set({ deletedAt: new Date() })
         .where(and(eq(products.id, productId), eq(products.tenantId, tenantId)));
 
+      invalidatePublicProductCaches(shopSlug);
       return { success: true };
     } catch (error) {
       if (error instanceof Response) return error;

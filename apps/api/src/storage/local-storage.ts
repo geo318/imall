@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import sharp from "sharp";
+import { resolveUploadsDir } from "./uploads-dir";
 import type { IStorage } from "./storage.interface";
 
 /**
@@ -10,26 +11,9 @@ export class LocalStorage implements IStorage {
   private baseDir: string;
 
   constructor() {
-    // Store files in API's src/uploads directory - served via /api/image route
-    // In production, this should be configurable (e.g., S3, Cloudinary)
-    // Use absolute path resolution to avoid issues with working directory
-    const currentDir = process.cwd();
-    let apiSrcDir: string;
-
-    // Find API src directory
-    if (currentDir.includes("apps/api")) {
-      // We're in apps/api, resolve to src/uploads
-      apiSrcDir = resolve(currentDir, "src");
-    } else if (currentDir.includes("apps/web")) {
-      // We're in apps/web, go up and into api/src
-      apiSrcDir = resolve(currentDir, "..", "api", "src");
-    } else {
-      // Assume we're at workspace root
-      apiSrcDir = resolve(currentDir, "apps", "api", "src");
-    }
-
-    // Resolve to absolute path - store in apps/api/src/uploads
-    this.baseDir = resolve(apiSrcDir, "uploads");
+    // Store files on persistent disk when available (Render /var/data),
+    // otherwise default to apps/api/src/uploads for local development.
+    this.baseDir = resolveUploadsDir();
     this.ensureDirectoryExists();
   }
 

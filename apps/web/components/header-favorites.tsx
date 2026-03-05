@@ -8,6 +8,7 @@ import { Heart } from "lucide-react";
 import LazyImage from "@/components/shared/lazy-image";
 import { Link } from "@/i18n/navigation.client";
 import { getProductIdentifier } from "@/lib/api/products";
+import { formatCurrencyAmount } from "@/lib/utils/currency";
 
 type FavoriteItem = {
   id: string;
@@ -113,7 +114,7 @@ export function HeaderFavorites() {
                           {item.tenantName}
                         </p>
                         <p className="text-sm font-semibold text-emerald-600 mt-1">
-                          {item.price} {item.currency}
+                          {formatCurrencyAmount(item.price, item.currency)}
                         </p>
                       </div>
                     </Link>

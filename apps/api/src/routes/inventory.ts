@@ -1,7 +1,7 @@
 import { db, inventoryLedger } from "@repo/db";
 import { Elysia, t } from "elysia";
 import {
-  adminGuard,
+  adminOrSuperadminGuard,
   getAvailableStock,
   getTenantIdBySlug,
   INVENTORY_REASONS,
@@ -13,7 +13,7 @@ type InventoryParams = { shopSlug: string };
 export const inventoryRoutes = new Elysia({
   prefix: "/shops/:shopSlug/inventory",
 })
-  .use(adminGuard)
+  .use(adminOrSuperadminGuard)
   .guard({
     params: t.Object({ shopSlug: t.String() }),
   })
