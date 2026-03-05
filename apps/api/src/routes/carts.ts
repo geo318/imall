@@ -18,6 +18,7 @@ import {
   getAvailableStockMap,
   INVENTORY_REASONS,
 } from "../context";
+import { parseImageUrls } from "../utils/image-urls";
 
 // Cart routes - single cart that can hold items from multiple shops
 export const cartRoutes = new Elysia({ prefix: "/carts" })
@@ -121,9 +122,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         const availableQty = stockByTenant.get(item.tenantId)?.get(item.variantId) ?? 0;
 
         // Parse image URLs from comma-delimited string
-        const productImageUrl = item.productImageUrls
-          ? item.productImageUrls.split(",")[0]?.trim() || null
-          : null;
+        const productImageUrl = parseImageUrls(item.productImageUrls)[0] ?? null;
 
         return {
           ...item,

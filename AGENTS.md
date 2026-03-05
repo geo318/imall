@@ -10,6 +10,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 
 ## Recent changes
 
+- Added image URL normalization at API read/write boundaries: product/admin/cart routes now sanitize malformed suffixes like `.webp-0-0` before returning/saving URLs, and web `/api/image` proxy retries with normalized filename on 404 to reduce broken legacy image links.
 - Production image 404 hardening: upload dir resolution now supports ordered candidates (`/var/data/uploads` first when mounted, legacy `apps/api/src/uploads` fallback), image serving checks all candidates before 404, startup diagnostics log upload-dir candidates/existence, and `render.yaml` now declares a persistent API disk mount at `/var/data` to avoid losing images across restarts/deploys.
 - Image URL corruption guard expanded: malformed image suffixes like `.webp-0-0` are now normalized on web URL rendering and also tolerated on API image reads by trying a normalized filename fallback (`.webp`) before returning 404.
 - Home "Why iMall" block was refined for a cleaner look and simpler tone: removed forced uppercase eyebrow styling, tightened typography/cards/list styling, and rewrote Georgian (`ka`) copy to concise messaging for `home.why`, `home.valueProps`, and `home.forVendors`.

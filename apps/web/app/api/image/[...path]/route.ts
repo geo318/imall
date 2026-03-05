@@ -4,6 +4,8 @@ type Params = {
   path?: string[];
 };
 
+const CORRUPTED_IMAGE_INDEX_SUFFIX_RE = /(\.(?:webp|png|jpe?g|gif|svg))(?:-\d+)+$/i;
+
 function forwardImageHeaders(source: Headers) {
   const headers = new Headers();
   const passThrough = [
@@ -32,6 +34,21 @@ function buildBackendImageUrl(path: string[], search: string) {
   return `${backendBase}/api/image/${joinedPath}${search}`;
 }
 
+function normalizePathSegments(path: string[]) {
+  if (path.length === 0) return path;
+  const next = [...path];
+  const last = next.at(-1);
+  if (!last) return path;
+
+  const normalized = last.replace(CORRUPTED_IMAGE_INDEX_SUFFIX_RE, "$1");
+  if (normalized === last) {
+    return path;
+  }
+
+  next[next.length - 1] = normalized;
+  return next;
+}
+
 async function proxyImageRequest(
   request: Request,
   { params }: { params: Promise<Params> },
@@ -45,6 +62,7 @@ async function proxyImageRequest(
   }
 
   const url = new URL(request.url);
+  const normalizedPath = normalizePathSegments(path);
   const backendUrl = buildBackendImageUrl(path, url.search);
   const requestHeaders = new Headers();
 
@@ -69,11 +87,20 @@ async function proxyImageRequest(
     requestHeaders.set("if-modified-since", ifModifiedSince);
   }
 
-  const upstream = await fetch(backendUrl, {
+  let upstream = await fetch(backendUrl, {
     method,
     headers: requestHeaders,
     cache: "force-cache",
   });
+
+  if (upstream.status === 404 && normalizedPath !== path) {
+    const normalizedBackendUrl = buildBackendImageUrl(normalizedPath, url.search);
+    upstream = await fetch(normalizedBackendUrl, {
+      method,
+      headers: requestHeaders,
+      cache: "force-cache",
+    });
+  }
 
   const headers = forwardImageHeaders(upstream.headers);
   return new Response(method === "HEAD" ? null : upstream.body, {

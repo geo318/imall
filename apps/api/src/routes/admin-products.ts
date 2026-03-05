@@ -32,6 +32,7 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import { authPlugin, getTenantIdBySlug, isSuperadminRequest } from "../context";
 import { getStorage } from "../storage";
+import { normalizeImageUrl, parseImageUrls } from "../utils/image-urls";
 import { invalidateCachedResponsesByPrefixes } from "../utils/response-cache";
 import { ensureAuth, requireAuth, verifyTenantAccess } from "../utils/auth";
 
@@ -601,16 +602,11 @@ export const adminProductsRoutes = new Elysia({
             };
 
         // Get images from comma-delimited string
-        const images = product.imageUrls
-          ? product.imageUrls
-              .split(",")
-              .map((url: string, index: number) => ({
-                id: `img-${index}`,
-                url: url.trim(),
-                isPrimary: index === 0,
-              }))
-              .filter((img: { url: string }) => img.url.length > 0)
-          : [];
+        const images = parseImageUrls(product.imageUrls).map((url: string, index: number) => ({
+          id: `img-${index}`,
+          url,
+          isPrimary: index === 0,
+        }));
 
         return {
           ...product,
@@ -841,16 +837,11 @@ export const adminProductsRoutes = new Elysia({
       }
 
       // Get images from comma-delimited string
-      const images = product.imageUrls
-        ? product.imageUrls
-            .split(",")
-            .map((url: string, index: number) => ({
-              id: `img-${index}`,
-              url: url.trim(),
-              isPrimary: index === 0,
-            }))
-            .filter((img: { url: string }) => img.url.length > 0)
-        : [];
+      const images = parseImageUrls(product.imageUrls).map((url: string, index: number) => ({
+        id: `img-${index}`,
+        url,
+        isPrimary: index === 0,
+      }));
 
       return {
         ...product,
@@ -959,7 +950,10 @@ export const adminProductsRoutes = new Elysia({
           for (const img of validated.images) {
             if (img.url) {
               // Already uploaded image - use the URL directly
-              imageUrls.push(img.url);
+              const normalizedUrl = normalizeImageUrl(img.url);
+              if (normalizedUrl.length > 0) {
+                imageUrls.push(normalizedUrl);
+              }
             } else if (img.file) {
               // For new products, upload to temp location first
               // We'll need to update the URLs after product creation
@@ -1155,7 +1149,10 @@ export const adminProductsRoutes = new Elysia({
           for (const img of validated.images) {
             if (img.url) {
               // Already uploaded image - use the URL directly
-              imageUrls.push(img.url);
+              const normalizedUrl = normalizeImageUrl(img.url);
+              if (normalizedUrl.length > 0) {
+                imageUrls.push(normalizedUrl);
+              }
             } else if (img.file) {
               // Upload file with productId for folder organization
               const storageKey = await storage.upload(img.file, shopSlug, productId);
