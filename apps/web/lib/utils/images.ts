@@ -28,9 +28,10 @@ function normalizeCorruptedImageUrl(rawUrl: string): string {
 
   // Recovery for previously persisted malformed URLs like:
   // /api/image/.../file.webp-0
+  // /api/image/.../file.webp-0-0
   // https://host/api/image/.../file.webp-1
   return trimmed.replace(
-    /(\.(?:webp|png|jpe?g|gif|svg))-\d+($|[?#])/i,
+    /(\.(?:webp|png|jpe?g|gif|svg))(?:-\d+)+($|[?#])/i,
     (_match, ext: string, suffix: string) => `${ext}${suffix}`,
   );
 }

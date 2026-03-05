@@ -3,6 +3,24 @@ import { join, resolve } from "node:path";
 import { Elysia } from "elysia";
 import { resolveUploadsDirs } from "../storage/uploads-dir";
 
+function buildPathVariants(pathSegments: string[]): string[][] {
+  const variants: string[][] = [pathSegments];
+  const fileName = pathSegments.at(-1);
+  if (!fileName) {
+    return variants;
+  }
+
+  const normalizedFileName = fileName.replace(
+    /(\.(?:webp|png|jpe?g|gif|svg))(?:-\d+)+$/i,
+    "$1",
+  );
+  if (normalizedFileName !== fileName) {
+    variants.push([...pathSegments.slice(0, -1), normalizedFileName]);
+  }
+
+  return variants;
+}
+
 /**
  * Image serving route
  * Serves images from the uploads directory
@@ -33,22 +51,29 @@ export const imageRoutes = new Elysia({
     }
 
     const uploadsDirs = resolveUploadsDirs();
+    const pathVariants = buildPathVariants(pathSegments);
     let resolvedPath: string | null = null;
 
-    for (const uploadsDir of uploadsDirs) {
-      const candidatePath = resolve(join(uploadsDir, ...pathSegments));
-      const resolvedUploadsDir = resolve(uploadsDir);
+    for (const segments of pathVariants) {
+      for (const uploadsDir of uploadsDirs) {
+        const candidatePath = resolve(join(uploadsDir, ...segments));
+        const resolvedUploadsDir = resolve(uploadsDir);
 
-      if (!candidatePath.startsWith(resolvedUploadsDir)) {
-        continue;
+        if (!candidatePath.startsWith(resolvedUploadsDir)) {
+          continue;
+        }
+
+        try {
+          await fs.access(candidatePath);
+          resolvedPath = candidatePath;
+          break;
+        } catch {
+          // Try the next fallback upload directory.
+        }
       }
 
-      try {
-        await fs.access(candidatePath);
-        resolvedPath = candidatePath;
+      if (resolvedPath) {
         break;
-      } catch {
-        // Try the next fallback upload directory.
       }
     }
 
