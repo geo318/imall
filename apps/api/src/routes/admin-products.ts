@@ -14,7 +14,7 @@ import {
   variantOptionValues,
   variants,
 } from "@repo/db";
-import { INVENTORY_REASONS, slugify } from "@repo/shared";
+import { INVENTORY_REASONS, normalizeImageUrl, parseImageUrls, slugify } from "@repo/shared";
 import {
   and,
   asc,
@@ -32,7 +32,6 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import { authPlugin, getTenantIdBySlug, isSuperadminRequest } from "../context";
 import { getStorage } from "../storage";
-import { normalizeImageUrl, parseImageUrls } from "../utils/image-urls";
 import { invalidateCachedResponsesByPrefixes } from "../utils/response-cache";
 import { ensureAuth, requireAuth, verifyTenantAccess } from "../utils/auth";
 

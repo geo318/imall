@@ -8,6 +8,7 @@ import {
   products,
   variants,
 } from "@repo/db";
+import { parseImageUrls } from "@repo/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
@@ -18,7 +19,6 @@ import {
   getAvailableStockMap,
   INVENTORY_REASONS,
 } from "../context";
-import { parseImageUrls } from "../utils/image-urls";
 
 // Cart routes - single cart that can hold items from multiple shops
 export const cartRoutes = new Elysia({ prefix: "/carts" })

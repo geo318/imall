@@ -8,6 +8,7 @@
     ".": "./dist/index.js",
     "./env": "./dist/env.js",
     "./constants": "./dist/constants.js",
+    "./images": "./dist/images.js",
     "./slug": "./dist/slug.js"
   },
   "scripts": {

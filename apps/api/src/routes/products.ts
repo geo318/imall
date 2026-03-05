@@ -11,6 +11,7 @@ import {
   variantOptionValues,
   variants,
 } from "@repo/db";
+import { parseImageUrls } from "@repo/shared";
 import {
   and,
   asc,
@@ -28,7 +29,6 @@ import {
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { getAvailableStockMap, listQuerySchema } from "../context";
-import { parseImageUrls } from "../utils/image-urls";
 import { logger } from "../utils/logger";
 import { withCachedResponse } from "../utils/response-cache";
 

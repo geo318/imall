@@ -1,3 +1,5 @@
+import { normalizeImageUrl } from "@repo/shared";
+
 /**
  * Image URL utilities for handling product images
  * Images are served from the API server via /api/image route
@@ -23,17 +25,7 @@ function getApiBaseUrl(): string {
 }
 
 function normalizeCorruptedImageUrl(rawUrl: string): string {
-  const trimmed = rawUrl.trim();
-  if (!trimmed) return trimmed;
-
-  // Recovery for previously persisted malformed URLs like:
-  // /api/image/.../file.webp-0
-  // /api/image/.../file.webp-0-0
-  // https://host/api/image/.../file.webp-1
-  return trimmed.replace(
-    /(\.(?:webp|png|jpe?g|gif|svg))(?:-\d+)+($|[?#])/i,
-    (_match, ext: string, suffix: string) => `${ext}${suffix}`,
-  );
+  return normalizeImageUrl(rawUrl);
 }
 
 /**

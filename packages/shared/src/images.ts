@@ -19,3 +19,7 @@ export function parseImageUrls(imageUrls: string | null | undefined): string[] {
     .map((url) => normalizeImageUrl(url))
     .filter((url) => url.length > 0);
 }
+
+export function normalizeImagePathSegment(segment: string): string {
+  return segment.replace(/(\.(?:webp|png|jpe?g|gif|svg))(?:-\d+)+$/i, "$1");
+}

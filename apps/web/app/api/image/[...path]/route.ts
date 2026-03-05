@@ -1,10 +1,9 @@
+import { normalizeImagePathSegment } from "@repo/shared";
 import { resolveBackendBase } from "@/app/api/_utils/backend";
 
 type Params = {
   path?: string[];
 };
-
-const CORRUPTED_IMAGE_INDEX_SUFFIX_RE = /(\.(?:webp|png|jpe?g|gif|svg))(?:-\d+)+$/i;
 
 function forwardImageHeaders(source: Headers) {
   const headers = new Headers();
@@ -40,7 +39,7 @@ function normalizePathSegments(path: string[]) {
   const last = next.at(-1);
   if (!last) return path;
 
-  const normalized = last.replace(CORRUPTED_IMAGE_INDEX_SUFFIX_RE, "$1");
+  const normalized = normalizeImagePathSegment(last);
   if (normalized === last) {
     return path;
   }
