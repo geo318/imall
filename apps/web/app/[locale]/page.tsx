@@ -38,31 +38,35 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <VendorSpotlight />
       </div>
       <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
-        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/40 to-sky-50/40 p-8 shadow-sm sm:p-10">
+        <div className="rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/35 to-sky-50/35 p-7 shadow-sm sm:p-9">
           <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr] lg:items-center">
             <div className="space-y-4">
-              <p className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+              <p className="text-sm font-semibold tracking-tight text-emerald-700">
                 {t("home.why.tag")}
               </p>
-              <h3 className="text-3xl font-semibold text-slate-900">{t("home.why.title")}</h3>
-              <p className="text-slate-600">{t("home.why.description")}</p>
+              <h3 className="max-w-3xl text-2xl font-semibold leading-tight tracking-tight text-slate-900 sm:text-3xl lg:text-4xl">
+                {t("home.why.title")}
+              </h3>
+              <p className="max-w-2xl text-base leading-relaxed text-slate-600">
+                {t("home.why.description")}
+              </p>
               <div className="grid gap-4 sm:grid-cols-3">
                 {valueProps.map((item) => (
                   <div
                     key={item.title}
-                    className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100"
+                    className="rounded-2xl border border-slate-200/80 bg-white/90 p-4 shadow-sm"
                   >
-                    <h4 className="text-base font-semibold text-slate-900">{item.title}</h4>
-                    <p className="mt-1 text-sm text-slate-600">{item.body}</p>
+                    <h4 className="text-base font-semibold leading-snug text-slate-900">{item.title}</h4>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{item.body}</p>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="space-y-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-100">
+            <div className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/95 p-6 shadow-sm">
               <h4 className="text-lg font-semibold text-slate-900">{t("home.forVendors.title")}</h4>
-              <ul className="space-y-3 text-sm text-slate-600">
+              <ul className="list-disc space-y-2.5 pl-5 text-sm leading-relaxed text-slate-600 marker:text-emerald-500">
                 {vendorFeatures.map((feature) => (
-                  <li key={feature}>• {feature}</li>
+                  <li key={feature}>{feature}</li>
                 ))}
               </ul>
               <div className="flex gap-3">

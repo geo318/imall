@@ -91,7 +91,16 @@
   "vendorSpotlight": {
     "title": "Top <highlight>Vendors</highlight>",
     "subtitle": "Meet the passionate creators behind our best products",
-    "sales": "{count} sales"
+    "sales": "{count} sales",
+    "products": "{count} products",
+    "defaultCategory": "General merchandise"
+  },
+  "featuredProducts": {
+    "title": "Featured <highlight>Products</highlight>",
+    "subtitle": "Discover our handpicked selection of unique items from top vendors",
+    "loading": "Loading featured products...",
+    "loadFailed": "Failed to load products. Make sure the API is running.",
+    "empty": "No products yet."
   },
   "footer": {
     "tagline": "The trusted multi-vendor marketplace for unique products. Buy, sell, and auction with confidence.",
@@ -120,6 +129,8 @@
     "noImage": "No image",
     "auction": "Auction",
     "currentBid": "Current bid",
+    "endsIn": "Ends in {time}",
+    "endsSoon": "Ends soon",
     "view": "View",
     "viewProduct": "View product"
   },
@@ -289,11 +300,16 @@
     "liveAuction": "Live auction",
     "verifiedVendor": "Verified vendor",
     "variants": "Variants",
+    "options": "Options",
     "defaultVariant": "Default",
     "description": "Description",
     "freeShipping": "Free shipping",
     "securePayment": "Secure payment",
-    "qualityGuaranteed": "Quality guaranteed"
+    "qualityGuaranteed": "Quality guaranteed",
+    "currentBid": "Current bid",
+    "buyNow": "Buy now",
+    "similarProducts": "Similar products",
+    "variantFallback": "Variant"
   },
   "common": {
     "language": "Language"
@@ -360,5 +376,541 @@
     "notice": "A unique shop URL will be assigned automatically. Selling will stay disabled until approved.",
     "create": "Create shop",
     "creating": "Creating shop..."
+  },
+  "cart": {
+    "title": "Shopping cart",
+    "emptyTitle": "Your cart is empty",
+    "emptyDescription": "You have not added any items yet.",
+    "continueShopping": "Continue shopping",
+    "defaultVariant": "Default variant",
+    "skuLabel": "SKU: {sku}",
+    "soldOut": "Sold out",
+    "onlyLeft": "Only {count} left",
+    "viewProduct": "View product",
+    "aria": {
+      "removeItem": "Remove item",
+      "decreaseQty": "Decrease quantity",
+      "increaseQty": "Increase quantity"
+    },
+    "summary": {
+      "title": "Order summary",
+      "unavailableNotice": "Some items are unavailable. Update quantity or remove them to continue.",
+      "subtotal": "Subtotal",
+      "shipping": "Shipping",
+      "tax": "Tax",
+      "total": "Total",
+      "free": "Free",
+      "freeShippingHint": "Add {amount} more for free shipping",
+      "proceedToCheckout": "Proceed to checkout"
+    },
+    "toasts": {
+      "loadFailed": "Failed to load cart",
+      "notFound": "Cart not found",
+      "notFoundDescription": "Your cart session expired. Add items to create a new cart.",
+      "qtyUpdated": "Quantity updated",
+      "qtyUpdateFailed": "Failed to update quantity",
+      "itemRemoved": "Item removed",
+      "removeFailed": "Failed to remove item"
+    }
+  },
+  "checkout": {
+    "loading": "Loading...",
+    "backToCart": "Back to cart",
+    "steps": {
+      "shipping": "Shipping",
+      "payment": "Payment"
+    },
+    "confirmed": {
+      "title": "Order confirmed",
+      "subtitle": "Thank you for your purchase",
+      "orderPrefix": "Order #MKT-",
+      "continueShopping": "Continue shopping",
+      "backHome": "Back to home"
+    },
+    "shipping": {
+      "title": "Shipping information",
+      "firstName": "First name",
+      "firstNamePlaceholder": "John",
+      "lastName": "Last name",
+      "lastNamePlaceholder": "Doe",
+      "email": "Email",
+      "address": "Address",
+      "addressPlaceholder": "123 Main Street",
+      "city": "City",
+      "cityPlaceholder": "New York",
+      "state": "State",
+      "statePlaceholder": "NY",
+      "zip": "ZIP code",
+      "zipPlaceholder": "10001",
+      "phone": "Phone",
+      "phonePlaceholder": "(555) 123-4567"
+    },
+    "payment": {
+      "title": "Payment method",
+      "card": "Credit / Debit card",
+      "paypal": "PayPal",
+      "installments": "Installments (12% commission)",
+      "cardNumber": "Card number",
+      "cardNumberPlaceholder": "1234 5678 9012 3456",
+      "expiry": "Expiry date",
+      "expiryPlaceholder": "MM/YY",
+      "cardName": "Name on card",
+      "cardNamePlaceholder": "John Doe",
+      "secureNote": "Your payment information is encrypted and secure"
+    },
+    "actions": {
+      "continueToPayment": "Continue to payment",
+      "back": "Back",
+      "placeOrder": "Place order"
+    },
+    "summary": {
+      "title": "Order summary",
+      "subtotal": "Subtotal",
+      "shipping": "Shipping",
+      "installmentFee": "Installment commission (12%)",
+      "total": "Total",
+      "free": "Free"
+    }
+  },
+  "productAvailability": {
+    "title": "Availability",
+    "checking": "Checking availability...",
+    "checkFailed": "Failed to check availability",
+    "noData": "No data received from server",
+    "variantNotFound": "Variant not found",
+    "infoRetrieved": "Stock info retrieved",
+    "availableForPurchase": "Product is available for purchase",
+    "stockAvailable": "Stock available",
+    "itemsInStock": "{count} items in stock",
+    "outOfStock": "Out of stock",
+    "currentlyUnavailable": "This item is currently unavailable",
+    "fetchFailed": "Could not fetch stock info",
+    "inStock": "In stock",
+    "left": "{count} left",
+    "lowStock": "Low stock - order soon",
+    "checkAvailability": "Check availability"
+  },
+  "productButtons": {
+    "addToCart": "Add to cart",
+    "buyNow": "Buy now",
+    "soldOut": "Sold out",
+    "toasts": {
+      "added": "Added to cart",
+      "addFailed": "Failed to add to cart"
+    }
+  },
+  "productShare": {
+    "label": "Share:",
+    "copy": "Copy link",
+    "defaultDescription": "Check out {title}",
+    "toasts": {
+      "copied": "Link copied",
+      "copyFailed": "Failed to copy link"
+    }
+  },
+  "productStatus": {
+    "deletedTitle": "This product has been deleted",
+    "deletedDescription": "This product is no longer public. Only the owner can view it.",
+    "draftTitle": "This product is a draft",
+    "draftDescription": "This product is not published yet. Only the owner can view it."
+  },
+  "productNotFound": {
+    "title": "404 - Product not found",
+    "description": "The product does not exist or has been removed."
+  },
+  "adminDashboard": {
+    "managementTitle": "{slug} management",
+    "workspaceDescription": "Manage settings and operations from one workspace.",
+    "viewShop": "View shop",
+    "pendingSellerNotice": "Selling is not enabled for this shop yet. Only settings are available.",
+    "actions": {
+      "open": "Open"
+    },
+    "status": {
+      "active": "Active",
+      "wip": "WIP"
+    },
+    "sections": {
+      "settings": {
+        "title": "Shop settings",
+        "desc": "Name, branding, payout details"
+      },
+      "payouts": {
+        "title": "Payouts",
+        "desc": "Schedule, ledger, chargebacks"
+      },
+      "catalog": {
+        "title": "Catalog",
+        "desc": "Products, variants, media"
+      },
+      "orders": {
+        "title": "Orders",
+        "desc": "Payments, shipping, fulfillment"
+      },
+      "returns": {
+        "title": "Returns",
+        "desc": "RMA, refunds, restock"
+      },
+      "shipping": {
+        "title": "Shipping",
+        "desc": "Rates and fulfillment rules"
+      },
+      "customers": {
+        "title": "Customers",
+        "desc": "Segments and outreach"
+      }
+    },
+    "overview": {
+      "title": "Shop overview",
+      "description": "Sales, inventory health, and order activity",
+      "manageCatalog": "Manage catalog",
+      "loading": "Loading overview..."
+    },
+    "metrics": {
+      "grossSales": "Gross sales",
+      "last30Orders": "Last 30 orders",
+      "withdrawn": "Withdrawn",
+      "estimatedPayouts": "Estimated payouts",
+      "outstanding": "Outstanding balance",
+      "awaitingTransfer": "Awaiting next transfer",
+      "activeListings": "Active listings",
+      "variants": "Variants",
+      "unitsSold": "Units sold",
+      "pendingOrders": "Pending orders"
+    },
+    "charts": {
+      "ordersLast7Days": "Orders last 7 days",
+      "dailyVolume": "Daily order volume",
+      "productsCount": "{count} products"
+    },
+    "inventory": {
+      "title": "Inventory health",
+      "lowStock": "Low stock",
+      "outOfStock": "Out of stock",
+      "totalProducts": "Total products"
+    },
+    "recentOrders": {
+      "title": "Recent orders",
+      "subtitle": "Latest activity",
+      "viewAll": "View all",
+      "empty": "No orders yet."
+    },
+    "errors": {
+      "authRequired": "Authentication required. Please sign in.",
+      "loadSettingsFailed": "Failed to load shop settings",
+      "loadProductsFailed": "Failed to load products",
+      "signInPrompt": "Please sign in to access admin features."
+    }
+  },
+  "adminCatalog": {
+    "title": "Product catalog",
+    "description": "Manage products, variants, and images",
+    "actions": {
+      "back": "Back",
+      "variantOptions": "Variant options",
+      "addProduct": "Add product",
+      "cancel": "Cancel"
+    },
+    "status": {
+      "active": "Active",
+      "draft": "Draft",
+      "deleted": "Deleted"
+    }
+  },
+  "adminVariantOptions": {
+    "title": "Variant options",
+    "description": "Create reusable option names and use them in product variants.",
+    "newOptionName": "New option name",
+    "newOptionPlaceholder": "e.g. Color",
+    "optionNamePlaceholder": "Option name",
+    "keyLabel": "key: {key}",
+    "loading": "Loading options...",
+    "loadFailed": "Failed to load options: {error}",
+    "empty": "No variant options yet.",
+    "knownValues": "Known values:",
+    "moreValues": "+{count} more",
+    "noValuesUsed": "No values used yet.",
+    "deleteConfirm": "Delete \"{name}\"? This works only if products do not use it.",
+    "actions": {
+      "backToCatalog": "Back to catalog",
+      "add": "Add",
+      "save": "Save",
+      "cancel": "Cancel",
+      "rename": "Rename",
+      "delete": "Delete"
+    },
+    "toasts": {
+      "apiNotFound": "Variant options API not found. Restart API dev server and retry.",
+      "optionAdded": "Option added",
+      "optionAddFailed": "Failed to add option",
+      "optionUpdated": "Option updated",
+      "optionUpdateFailed": "Failed to update option",
+      "optionRemoved": "Option removed",
+      "optionRemoveFailed": "Failed to remove option"
+    }
+  },
+  "adminProductList": {
+    "searchPlaceholder": "Search products",
+    "updatingResults": "Updating results...",
+    "loading": "Loading products...",
+    "empty": "No products found.",
+    "uncategorized": "Uncategorized",
+    "variantCount": "{count} variants",
+    "showVariants": "Show variants",
+    "deleteConfirm": "Are you sure you want to delete this product?",
+    "sort": {
+      "placeholder": "Sort",
+      "newest": "Newest",
+      "oldest": "Oldest",
+      "titleAsc": "Title (A-Z)",
+      "titleDesc": "Title (Z-A)",
+      "priceAsc": "Price (Low-High)",
+      "priceDesc": "Price (High-Low)",
+      "stockAsc": "Stock (Low-High)",
+      "stockDesc": "Stock (High-Low)"
+    },
+    "table": {
+      "product": "Product",
+      "price": "Price",
+      "stock": "Stock",
+      "type": "Type",
+      "status": "Status",
+      "actions": "Actions",
+      "sku": "SKU"
+    },
+    "stock": {
+      "auction": "Auction",
+      "setStock": "Set stock",
+      "out": "Out",
+      "low": "Low",
+      "inStock": "In stock"
+    },
+    "type": {
+      "auction": "Auction",
+      "fixed": "Fixed",
+      "standard": "Standard"
+    },
+    "status": {
+      "active": "Active",
+      "draft": "Draft",
+      "deleted": "Deleted"
+    },
+    "actions": {
+      "edit": "Edit",
+      "view": "View",
+      "delete": "Delete"
+    },
+    "pagination": {
+      "showing": "Showing {from}-{to} of {total}",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {page} of {total}"
+    },
+    "variantOverview": {
+      "title": "Variant overview",
+      "auctionProduct": "Auction product. Current price:",
+      "startingBid": "Starting bid:",
+      "noSkuShort": "--"
+    },
+    "errors": {
+      "fetchFailed": "Failed to fetch products",
+      "deleteFailed": "Failed to delete product"
+    },
+    "toasts": {
+      "deleted": "Product deleted",
+      "deleteFailed": "Failed to delete product"
+    }
+  },
+  "adminOrders": {
+    "eyebrow": "Orders",
+    "title": "Recent orders",
+    "description": "Review orders and update statuses before notifying customers.",
+    "empty": "No orders recorded yet.",
+    "mockNotice": "Showing mock orders generated from your catalog.",
+    "itemsCount": "{count} item(s)",
+    "table": {
+      "order": "Order",
+      "customer": "Customer",
+      "fulfillment": "Fulfillment",
+      "payment": "Payment",
+      "items": "Items",
+      "total": "Total",
+      "created": "Created",
+      "actions": "Actions",
+      "status": "Status"
+    },
+    "actions": {
+      "status": "Status",
+      "save": "Save",
+      "saving": "Saving...",
+      "details": "Details",
+      "hide": "Hide"
+    },
+    "toasts": {
+      "selectStatus": "Select a status before updating",
+      "mockUpdated": "Mock order updated",
+      "updated": "Order status updated",
+      "updateFailed": "Failed to update order"
+    },
+    "details": {
+      "lineItems": "Line items",
+      "fulfillment": "Fulfillment",
+      "destination": "Destination",
+      "shipping": "Shipping",
+      "tracking": "Tracking",
+      "notAssigned": "Not assigned",
+      "sku": "SKU {sku}",
+      "noSku": "No SKU"
+    },
+    "statuses": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "fulfillmentStatus": {
+      "unfulfilled": "Unfulfilled",
+      "partial": "Partial",
+      "fulfilled": "Fulfilled"
+    },
+    "paymentStatus": {
+      "paid": "Paid",
+      "pending": "Pending",
+      "refunded": "Refunded"
+    },
+    "shippingStatus": {
+      "pending": "Pending",
+      "in_transit": "In transit",
+      "delivered": "Delivered"
+    }
+  },
+  "adminPayouts": {
+    "eyebrow": "Payouts",
+    "title": "Payouts & settlements",
+    "description": "Track settlements, fees, and chargebacks.",
+    "mockNotice": "Showing mock payouts and ledger entries.",
+    "scheduleTitle": "Settlement schedule",
+    "ledgerTitle": "Payout ledger",
+    "emptySchedule": "No payouts scheduled yet.",
+    "emptyLedger": "No ledger activity yet.",
+    "bankTransfer": "Bank transfer",
+    "notAvailable": "--",
+    "table": {
+      "reference": "Reference",
+      "status": "Status",
+      "scheduled": "Scheduled",
+      "amount": "Amount",
+      "method": "Method"
+    },
+    "ledger": {
+      "type": "Type",
+      "date": "Date",
+      "amount": "Amount",
+      "notes": "Notes"
+    },
+    "status": {
+      "scheduled": "Scheduled",
+      "paid": "Paid",
+      "failed": "Failed"
+    },
+    "ledgerType": {
+      "withdrawal": "Withdrawal",
+      "fee": "Fee",
+      "chargeback": "Chargeback"
+    }
+  },
+  "adminReturns": {
+    "eyebrow": "Returns",
+    "title": "Returns & refunds",
+    "description": "Track RMAs, refund status, and restock decisions.",
+    "mockNotice": "Showing mock return requests.",
+    "requestsTitle": "Return requests",
+    "empty": "No returns logged yet.",
+    "table": {
+      "rma": "RMA",
+      "status": "Status",
+      "requested": "Requested",
+      "items": "Items",
+      "refund": "Refund",
+      "restock": "Restock"
+    },
+    "status": {
+      "requested": "Requested",
+      "approved": "Approved",
+      "received": "Received",
+      "refunded": "Refunded"
+    },
+    "restock": {
+      "pending": "Pending",
+      "restocked": "Restocked"
+    }
+  },
+  "adminShipping": {
+    "eyebrow": "Shipping",
+    "title": "Shipping profiles & fulfillment",
+    "description": "Configure delivery rates, carriers, and routing rules.",
+    "mockNotice": "Showing mock shipping setup.",
+    "profilesTitle": "Shipping profiles",
+    "rulesTitle": "Fulfillment rules",
+    "emptyProfiles": "No shipping profiles yet.",
+    "emptyRules": "No fulfillment rules yet.",
+    "variableRate": "Variable",
+    "notAvailable": "--",
+    "etaDays": "{min}-{max} days",
+    "handlingDays": "{days} days",
+    "status": {
+      "active": "Active",
+      "paused": "Paused"
+    },
+    "table": {
+      "profile": "Profile",
+      "carrier": "Carrier",
+      "rate": "Rate",
+      "eta": "ETA",
+      "status": "Status"
+    },
+    "rules": {
+      "priority": "Priority",
+      "destination": "Destination",
+      "orderValue": "Order value",
+      "handling": "Handling",
+      "status": "Status",
+      "allDestinations": "All",
+      "noMax": "No max"
+    }
+  },
+  "adminCustomers": {
+    "eyebrow": "Customers",
+    "title": "Customer management",
+    "description": "Track customer activity, segments, and outreach.",
+    "mockNotice": "Showing mock customers, segments, and outreach.",
+    "guest": "Guest",
+    "notAvailable": "--",
+    "emptyCustomers": "No customers yet.",
+    "emptySegments": "No segments yet.",
+    "emptyMessages": "No messages yet.",
+    "sections": {
+      "customers": "Customers",
+      "segments": "Customer segments",
+      "outreach": "Recent outreach"
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "status": "Status",
+      "orders": "Orders",
+      "lifetimeValue": "Lifetime value",
+      "lastOrder": "Last order"
+    },
+    "segments": {
+      "segment": "Segment",
+      "description": "Description"
+    },
+    "outreach": {
+      "channel": "Channel",
+      "subject": "Subject",
+      "status": "Status",
+      "sent": "Sent"
+    }
   }
 }

@@ -91,7 +91,16 @@
   "vendorSpotlight": {
     "title": "Лучшие <highlight>продавцы</highlight>",
     "subtitle": "Познакомьтесь с авторами наших лучших товаров",
-    "sales": "{count} продаж"
+    "sales": "{count} продаж",
+    "products": "{count} товаров",
+    "defaultCategory": "Общие товары"
+  },
+  "featuredProducts": {
+    "title": "Избранные <highlight>товары</highlight>",
+    "subtitle": "Откройте для себя отобранные товары от лучших продавцов",
+    "loading": "Загрузка избранных товаров...",
+    "loadFailed": "Не удалось загрузить товары. Проверьте API.",
+    "empty": "Товаров пока нет."
   },
   "footer": {
     "tagline": "Надежный маркетплейс для уникальных товаров. Покупайте, продавайте и участвуйте в аукционах с уверенностью.",
@@ -120,6 +129,8 @@
     "noImage": "Нет изображения",
     "auction": "Аукцион",
     "currentBid": "Текущая ставка",
+    "endsIn": "Закончится через {time}",
+    "endsSoon": "Скоро закончится",
     "view": "Смотреть",
     "viewProduct": "Смотреть товар"
   },
@@ -289,11 +300,16 @@
     "liveAuction": "Активный аукцион",
     "verifiedVendor": "Проверенный продавец",
     "variants": "Варианты",
+    "options": "Опции",
     "defaultVariant": "По умолчанию",
     "description": "Описание",
     "freeShipping": "Бесплатная доставка",
     "securePayment": "Безопасная оплата",
-    "qualityGuaranteed": "Гарантия качества"
+    "qualityGuaranteed": "Гарантия качества",
+    "currentBid": "Текущая ставка",
+    "buyNow": "Купить сейчас",
+    "similarProducts": "Похожие товары",
+    "variantFallback": "Вариант"
   },
   "common": {
     "language": "Язык"
@@ -360,5 +376,541 @@
     "notice": "Уникальный URL магазина назначается автоматически. Продажи будут отключены до одобрения.",
     "create": "Создать магазин",
     "creating": "Создание магазина..."
+  },
+  "cart": {
+    "title": "Корзина",
+    "emptyTitle": "Корзина пуста",
+    "emptyDescription": "Вы еще ничего не добавили.",
+    "continueShopping": "Продолжить покупки",
+    "defaultVariant": "Вариант по умолчанию",
+    "skuLabel": "SKU: {sku}",
+    "soldOut": "Нет в наличии",
+    "onlyLeft": "Осталось {count}",
+    "viewProduct": "Открыть товар",
+    "aria": {
+      "removeItem": "Удалить товар",
+      "decreaseQty": "Уменьшить количество",
+      "increaseQty": "Увеличить количество"
+    },
+    "summary": {
+      "title": "Итог",
+      "unavailableNotice": "Некоторые товары недоступны. Обновите количество или удалите их.",
+      "subtotal": "Подытог",
+      "shipping": "Доставка",
+      "tax": "Налог",
+      "total": "Итого",
+      "free": "Бесплатно",
+      "freeShippingHint": "Добавьте еще на {amount} для бесплатной доставки",
+      "proceedToCheckout": "Перейти к оплате"
+    },
+    "toasts": {
+      "loadFailed": "Не удалось загрузить корзину",
+      "notFound": "Корзина не найдена",
+      "notFoundDescription": "Сессия корзины истекла.",
+      "qtyUpdated": "Количество обновлено",
+      "qtyUpdateFailed": "Не удалось обновить количество",
+      "itemRemoved": "Товар удален",
+      "removeFailed": "Не удалось удалить товар"
+    }
+  },
+  "checkout": {
+    "loading": "Загрузка...",
+    "backToCart": "Назад в корзину",
+    "steps": {
+      "shipping": "Доставка",
+      "payment": "Оплата"
+    },
+    "confirmed": {
+      "title": "Заказ подтвержден",
+      "subtitle": "Спасибо за покупку",
+      "orderPrefix": "Заказ #MKT-",
+      "continueShopping": "Продолжить покупки",
+      "backHome": "На главную"
+    },
+    "shipping": {
+      "title": "Данные доставки",
+      "firstName": "Имя",
+      "firstNamePlaceholder": "Иван",
+      "lastName": "Фамилия",
+      "lastNamePlaceholder": "Иванов",
+      "email": "Email",
+      "address": "Адрес",
+      "addressPlaceholder": "ул. Пример 10",
+      "city": "Город",
+      "cityPlaceholder": "Тбилиси",
+      "state": "Регион",
+      "statePlaceholder": "Тбилиси",
+      "zip": "Индекс",
+      "zipPlaceholder": "0108",
+      "phone": "Телефон",
+      "phonePlaceholder": "+995 5XX XXX XXX"
+    },
+    "payment": {
+      "title": "Способ оплаты",
+      "card": "Банковская карта",
+      "paypal": "PayPal",
+      "installments": "Рассрочка (комиссия 12%)",
+      "cardNumber": "Номер карты",
+      "cardNumberPlaceholder": "1234 5678 9012 3456",
+      "expiry": "Срок действия",
+      "expiryPlaceholder": "MM/YY",
+      "cardName": "Имя на карте",
+      "cardNamePlaceholder": "Ivan Ivanov",
+      "secureNote": "Платежные данные зашифрованы и защищены"
+    },
+    "actions": {
+      "continueToPayment": "Далее",
+      "back": "Назад",
+      "placeOrder": "Оформить заказ"
+    },
+    "summary": {
+      "title": "Итог",
+      "subtotal": "Подытог",
+      "shipping": "Доставка",
+      "installmentFee": "Комиссия рассрочки (12%)",
+      "total": "Итого",
+      "free": "Бесплатно"
+    }
+  },
+  "productAvailability": {
+    "title": "ხელმისაწვდომობა",
+    "checking": "ვამოწმებთ...",
+    "checkFailed": "შემოწმება ვერ მოხერხდა",
+    "noData": "მონაცემი ვერ მივიღეთ",
+    "variantNotFound": "ვარიანტი ვერ მოიძებნა",
+    "infoRetrieved": "მარაგი განახლდა",
+    "availableForPurchase": "პროდუქტი ხელმისაწვდომია",
+    "stockAvailable": "მარაგი ხელმისაწვდომია",
+    "itemsInStock": "მარაგშია {count}",
+    "outOfStock": "ამოწურულია",
+    "currentlyUnavailable": "ამჟამად მიუწვდომელია",
+    "fetchFailed": "მარაგის მიღება ვერ მოხერხდა",
+    "inStock": "მარაგში",
+    "left": "დარჩა {count}",
+    "lowStock": "მარაგი ცოტაა - იჩქარეთ",
+    "checkAvailability": "შემოწმება"
+  },
+  "productButtons": {
+    "addToCart": "კალათაში დამატება",
+    "buyNow": "ახლავე ყიდვა",
+    "soldOut": "ამოწურულია",
+    "toasts": {
+      "added": "დამატებულია კალათაში",
+      "addFailed": "დამატება ვერ მოხერხდა"
+    }
+  },
+  "productShare": {
+    "label": "გაზიარება:",
+    "copy": "ბმულის კოპირება",
+    "defaultDescription": "ნახეთ {title}",
+    "toasts": {
+      "copied": "ბმული დაკოპირდა",
+      "copyFailed": "კოპირება ვერ მოხერხდა"
+    }
+  },
+  "productStatus": {
+    "deletedTitle": "პროდუქტი წაშლილია",
+    "deletedDescription": "პროდუქტი საჯაროდ აღარ ჩანს. მხოლოდ მფლობელი ხედავს.",
+    "draftTitle": "პროდუქტი მონახაზშია",
+    "draftDescription": "პროდუქტი ჯერ არ არის გამოქვეყნებული. მხოლოდ მფლობელი ხედავს."
+  },
+  "productNotFound": {
+    "title": "404 - პროდუქტი ვერ მოიძებნა",
+    "description": "პროდუქტი არ არსებობს ან წაშლილია."
+  },
+  "adminDashboard": {
+    "managementTitle": "Управление {slug}",
+    "workspaceDescription": "Управляйте магазином из одного места.",
+    "viewShop": "Открыть магазин",
+    "pendingSellerNotice": "Продажи еще не включены. Доступны только настройки.",
+    "actions": {
+      "open": "გახსნა"
+    },
+    "status": {
+      "active": "აქტიური",
+      "wip": "მუშაობაში"
+    },
+    "sections": {
+      "settings": {
+        "title": "პარამეტრები",
+        "desc": "სახელი, ბრენდინგი, გადახდები"
+      },
+      "payouts": {
+        "title": "გადარიცხვები",
+        "desc": "გრაფიკი, ლეჯერი"
+      },
+      "catalog": {
+        "title": "კატალოგი",
+        "desc": "პროდუქტები და ვარიანტები"
+      },
+      "orders": {
+        "title": "შეკვეთები",
+        "desc": "გადახდა, მიწოდება"
+      },
+      "returns": {
+        "title": "დაბრუნება",
+        "desc": "RMA და რეფანდი"
+      },
+      "shipping": {
+        "title": "მიწოდება",
+        "desc": "ტარიფები და წესები"
+      },
+      "customers": {
+        "title": "კლიენტები",
+        "desc": "სეგმენტები და კომუნიკაცია"
+      }
+    },
+    "overview": {
+      "title": "მაღაზიის მიმოხილვა",
+      "description": "გაყიდვები, მარაგი და შეკვეთები",
+      "manageCatalog": "კატალოგის მართვა",
+      "loading": "იტვირთება..."
+    },
+    "metrics": {
+      "grossSales": "მთლიანი გაყიდვა",
+      "last30Orders": "ბოლო 30 შეკვეთა",
+      "withdrawn": "გატანილი",
+      "estimatedPayouts": "სავარაუდო გადარიცხვები",
+      "outstanding": "დარჩენილი ბალანსი",
+      "awaitingTransfer": "შემდეგ გადარიცხვამდე",
+      "activeListings": "აქტიური ლისტინგი",
+      "variants": "ვარიანტები",
+      "unitsSold": "გაყიდული ერთეული",
+      "pendingOrders": "მოლოდინში შეკვეთები"
+    },
+    "charts": {
+      "ordersLast7Days": "ბოლო 7 დღის შეკვეთები",
+      "dailyVolume": "დღიური მოცულობა",
+      "productsCount": "{count} პროდუქტი"
+    },
+    "inventory": {
+      "title": "მარაგის მდგომარეობა",
+      "lowStock": "დაბალი მარაგი",
+      "outOfStock": "ამოწურული",
+      "totalProducts": "სულ პროდუქტები"
+    },
+    "recentOrders": {
+      "title": "ბოლო შეკვეთები",
+      "subtitle": "ბოლო აქტივობა",
+      "viewAll": "ყველას ნახვა",
+      "empty": "შეკვეთები ჯერ არაა."
+    },
+    "errors": {
+      "authRequired": "აუტენტიფიკაცია საჭიროა.",
+      "loadSettingsFailed": "პარამეტრების ჩატვირთვა ვერ მოხერხდა",
+      "loadProductsFailed": "პროდუქტების ჩატვირთვა ვერ მოხერხდა",
+      "signInPrompt": "გთხოვთ შეხვიდეთ ადმინისტრირებისთვის."
+    }
+  },
+  "adminCatalog": {
+    "title": "Каталог товаров",
+    "description": "Управляйте товарами, вариантами и изображениями",
+    "actions": {
+      "back": "Back",
+      "variantOptions": "Variant options",
+      "addProduct": "Add product",
+      "cancel": "Cancel"
+    },
+    "status": {
+      "active": "Active",
+      "draft": "Draft",
+      "deleted": "Deleted"
+    }
+  },
+  "adminVariantOptions": {
+    "title": "Variant options",
+    "description": "Create reusable option names and use them in product variants.",
+    "newOptionName": "New option name",
+    "newOptionPlaceholder": "e.g. Color",
+    "optionNamePlaceholder": "Option name",
+    "keyLabel": "key: {key}",
+    "loading": "Loading options...",
+    "loadFailed": "Failed to load options: {error}",
+    "empty": "No variant options yet.",
+    "knownValues": "Known values:",
+    "moreValues": "+{count} more",
+    "noValuesUsed": "No values used yet.",
+    "deleteConfirm": "Delete \"{name}\"? This works only if products do not use it.",
+    "actions": {
+      "backToCatalog": "Back to catalog",
+      "add": "Add",
+      "save": "Save",
+      "cancel": "Cancel",
+      "rename": "Rename",
+      "delete": "Delete"
+    },
+    "toasts": {
+      "apiNotFound": "Variant options API not found. Restart API dev server and retry.",
+      "optionAdded": "Option added",
+      "optionAddFailed": "Failed to add option",
+      "optionUpdated": "Option updated",
+      "optionUpdateFailed": "Failed to update option",
+      "optionRemoved": "Option removed",
+      "optionRemoveFailed": "Failed to remove option"
+    }
+  },
+  "adminProductList": {
+    "searchPlaceholder": "Search products",
+    "updatingResults": "Updating results...",
+    "loading": "Loading products...",
+    "empty": "No products found.",
+    "uncategorized": "Uncategorized",
+    "variantCount": "{count} variants",
+    "showVariants": "Show variants",
+    "deleteConfirm": "Are you sure you want to delete this product?",
+    "sort": {
+      "placeholder": "Sort",
+      "newest": "Newest",
+      "oldest": "Oldest",
+      "titleAsc": "Title (A-Z)",
+      "titleDesc": "Title (Z-A)",
+      "priceAsc": "Price (Low-High)",
+      "priceDesc": "Price (High-Low)",
+      "stockAsc": "Stock (Low-High)",
+      "stockDesc": "Stock (High-Low)"
+    },
+    "table": {
+      "product": "Product",
+      "price": "Price",
+      "stock": "Stock",
+      "type": "Type",
+      "status": "Status",
+      "actions": "Actions",
+      "sku": "SKU"
+    },
+    "stock": {
+      "auction": "Auction",
+      "setStock": "Set stock",
+      "out": "Out",
+      "low": "Low",
+      "inStock": "In stock"
+    },
+    "type": {
+      "auction": "Auction",
+      "fixed": "Fixed",
+      "standard": "Standard"
+    },
+    "status": {
+      "active": "Active",
+      "draft": "Draft",
+      "deleted": "Deleted"
+    },
+    "actions": {
+      "edit": "Edit",
+      "view": "View",
+      "delete": "Delete"
+    },
+    "pagination": {
+      "showing": "Showing {from}-{to} of {total}",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {page} of {total}"
+    },
+    "variantOverview": {
+      "title": "Variant overview",
+      "auctionProduct": "Auction product. Current price:",
+      "startingBid": "Starting bid:",
+      "noSkuShort": "--"
+    },
+    "errors": {
+      "fetchFailed": "Failed to fetch products",
+      "deleteFailed": "Failed to delete product"
+    },
+    "toasts": {
+      "deleted": "Product deleted",
+      "deleteFailed": "Failed to delete product"
+    }
+  },
+  "adminOrders": {
+    "eyebrow": "Заказы",
+    "title": "Последние заказы",
+    "description": "Проверяйте заказы и обновляйте статусы.",
+    "empty": "No orders recorded yet.",
+    "mockNotice": "Showing mock orders generated from your catalog.",
+    "itemsCount": "{count} item(s)",
+    "table": {
+      "order": "Order",
+      "customer": "Customer",
+      "fulfillment": "Fulfillment",
+      "payment": "Payment",
+      "items": "Items",
+      "total": "Total",
+      "created": "Created",
+      "actions": "Actions",
+      "status": "Status"
+    },
+    "actions": {
+      "status": "Status",
+      "save": "Save",
+      "saving": "Saving...",
+      "details": "Details",
+      "hide": "Hide"
+    },
+    "toasts": {
+      "selectStatus": "Select a status before updating",
+      "mockUpdated": "Mock order updated",
+      "updated": "Order status updated",
+      "updateFailed": "Failed to update order"
+    },
+    "details": {
+      "lineItems": "Line items",
+      "fulfillment": "Fulfillment",
+      "destination": "Destination",
+      "shipping": "Shipping",
+      "tracking": "Tracking",
+      "notAssigned": "Not assigned",
+      "sku": "SKU {sku}",
+      "noSku": "No SKU"
+    },
+    "statuses": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "fulfillmentStatus": {
+      "unfulfilled": "Unfulfilled",
+      "partial": "Partial",
+      "fulfilled": "Fulfilled"
+    },
+    "paymentStatus": {
+      "paid": "Paid",
+      "pending": "Pending",
+      "refunded": "Refunded"
+    },
+    "shippingStatus": {
+      "pending": "Pending",
+      "in_transit": "In transit",
+      "delivered": "Delivered"
+    }
+  },
+  "adminPayouts": {
+    "eyebrow": "Выплаты",
+    "title": "Выплаты и расчеты",
+    "description": "Track settlements, fees, and chargebacks.",
+    "mockNotice": "Showing mock payouts and ledger entries.",
+    "scheduleTitle": "Settlement schedule",
+    "ledgerTitle": "Payout ledger",
+    "emptySchedule": "No payouts scheduled yet.",
+    "emptyLedger": "No ledger activity yet.",
+    "bankTransfer": "Bank transfer",
+    "notAvailable": "--",
+    "table": {
+      "reference": "Reference",
+      "status": "Status",
+      "scheduled": "Scheduled",
+      "amount": "Amount",
+      "method": "Method"
+    },
+    "ledger": {
+      "type": "Type",
+      "date": "Date",
+      "amount": "Amount",
+      "notes": "Notes"
+    },
+    "status": {
+      "scheduled": "Scheduled",
+      "paid": "Paid",
+      "failed": "Failed"
+    },
+    "ledgerType": {
+      "withdrawal": "Withdrawal",
+      "fee": "Fee",
+      "chargeback": "Chargeback"
+    }
+  },
+  "adminReturns": {
+    "eyebrow": "Возвраты",
+    "title": "Возвраты и возвраты средств",
+    "description": "Track RMAs, refund status, and restock decisions.",
+    "mockNotice": "Showing mock return requests.",
+    "requestsTitle": "Return requests",
+    "empty": "No returns logged yet.",
+    "table": {
+      "rma": "RMA",
+      "status": "Status",
+      "requested": "Requested",
+      "items": "Items",
+      "refund": "Refund",
+      "restock": "Restock"
+    },
+    "status": {
+      "requested": "Requested",
+      "approved": "Approved",
+      "received": "Received",
+      "refunded": "Refunded"
+    },
+    "restock": {
+      "pending": "Pending",
+      "restocked": "Restocked"
+    }
+  },
+  "adminShipping": {
+    "eyebrow": "Доставка",
+    "title": "Профили доставки",
+    "description": "Configure delivery rates, carriers, and routing rules.",
+    "mockNotice": "Showing mock shipping setup.",
+    "profilesTitle": "Shipping profiles",
+    "rulesTitle": "Fulfillment rules",
+    "emptyProfiles": "No shipping profiles yet.",
+    "emptyRules": "No fulfillment rules yet.",
+    "variableRate": "Variable",
+    "notAvailable": "--",
+    "etaDays": "{min}-{max} days",
+    "handlingDays": "{days} days",
+    "status": {
+      "active": "Active",
+      "paused": "Paused"
+    },
+    "table": {
+      "profile": "Profile",
+      "carrier": "Carrier",
+      "rate": "Rate",
+      "eta": "ETA",
+      "status": "Status"
+    },
+    "rules": {
+      "priority": "Priority",
+      "destination": "Destination",
+      "orderValue": "Order value",
+      "handling": "Handling",
+      "status": "Status",
+      "allDestinations": "All",
+      "noMax": "No max"
+    }
+  },
+  "adminCustomers": {
+    "eyebrow": "Клиенты",
+    "title": "Управление клиентами",
+    "description": "Track customer activity, segments, and outreach.",
+    "mockNotice": "Showing mock customers, segments, and outreach.",
+    "guest": "Guest",
+    "notAvailable": "--",
+    "emptyCustomers": "No customers yet.",
+    "emptySegments": "No segments yet.",
+    "emptyMessages": "No messages yet.",
+    "sections": {
+      "customers": "Customers",
+      "segments": "Customer segments",
+      "outreach": "Recent outreach"
+    },
+    "table": {
+      "name": "Name",
+      "email": "Email",
+      "status": "Status",
+      "orders": "Orders",
+      "lifetimeValue": "Lifetime value",
+      "lastOrder": "Last order"
+    },
+    "segments": {
+      "segment": "Segment",
+      "description": "Description"
+    },
+    "outreach": {
+      "channel": "Channel",
+      "subject": "Subject",
+      "status": "Status",
+      "sent": "Sent"
+    }
   }
 }

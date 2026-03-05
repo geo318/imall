@@ -2,6 +2,7 @@
 
 import { Clock } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
+import { useTranslations } from "@/i18n/provider";
 
 type Props = {
   endsAt: string;
@@ -12,6 +13,7 @@ type Props = {
  * Optimized to only update when the display value changes (not every second)
  */
 function AuctionTimerComponent({ endsAt }: Props) {
+  const t = useTranslations();
   const [timeLeft, setTimeLeft] = useState<string | null>(null);
   const lastDisplayValueRef = useRef<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -84,7 +86,11 @@ function AuctionTimerComponent({ endsAt }: Props) {
   return (
     <div className="flex items-center gap-1 text-xs text-amber-700">
       <Clock className="h-3 w-3" />
-      <span>Ends in {timeLeft}</span>
+      <span>
+        {timeLeft === "soon"
+          ? t("productCard.endsSoon")
+          : t("productCard.endsIn", { time: timeLeft })}
+      </span>
     </div>
   );
 }

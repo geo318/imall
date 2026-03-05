@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import type { MarketingProduct } from "@/components/marketing/product-card";
+import { useTranslations } from "@/i18n/provider";
 import { fetchAnyProducts } from "@/lib/api/products";
 import { mapApiProductToMarketing } from "@/lib/marketing";
 import { FeaturedProducts } from "./featured-products";
@@ -11,6 +12,8 @@ type Props = {
 };
 
 export function FeaturedProductsClient({ limit = 24 }: Props) {
+  const t = useTranslations();
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["featured-products", limit],
     queryFn: () => fetchAnyProducts(limit),
@@ -21,7 +24,7 @@ export function FeaturedProductsClient({ limit = 24 }: Props) {
     return (
       <section className="py-14 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-slate-500">Loading featured products…</p>
+          <p className="text-center text-slate-500">{t("featuredProducts.loading")}</p>
         </div>
       </section>
     );
@@ -32,7 +35,7 @@ export function FeaturedProductsClient({ limit = 24 }: Props) {
       <section className="py-14 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <p className="text-center text-red-600">
-            Failed to load products. Make sure the API is running.
+            {t("featuredProducts.loadFailed")}
           </p>
         </div>
       </section>
@@ -56,7 +59,7 @@ export function FeaturedProductsClient({ limit = 24 }: Props) {
     return (
       <section className="py-14 sm:py-16 lg:py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <p className="text-center text-slate-500">No products yet for this shop.</p>
+          <p className="text-center text-slate-500">{t("featuredProducts.empty")}</p>
         </div>
       </section>
     );

@@ -56,31 +56,31 @@
     },
     "why": {
       "tag": "რატომ iMall",
-      "title": "შექმნილია ბაზრებისთვის, რომლებსაც სჭირდებათ ნდობა, სისწრაფე და მოქნილობა.",
-      "description": "მრავალმაღაზიანი ვიტრინები, საჭიროებისამებრ აუქციონები და ერთიანი ადმინისტრაცია, რომელიც ყველაფერს გამართულად მართავს."
+      "title": "ყველაფერი ერთ სივრცეში: ნდობა, სისწრაფე და მოქნილობა.",
+      "description": "მაღაზიები, აუქციონები და ადმინისტრაცია ერთად - მარტივად და გამართულად."
     },
     "valueProps": [
       {
         "title": "სანდო გამყიდველები",
-        "body": "შერჩეული გამყიდველები დამოწმებული პროფილებით და გამჭვირვალე მიწოდების პირობებით."
+        "body": "დამოწმებული პროფილები და გამჭვირვალე წესები."
       },
       {
         "title": "აუქციონი + კალათა",
-        "body": "დადეთ ფსონი ექსკლუზიურ შეთავაზებებზე ან შეიძინეთ დაუყოვნებლივ სტანდარტული კალათით."
+        "body": "ან ფსონი, ან სწრაფი ყიდვა - ერთ პლატფორმაზე."
       },
       {
-        "title": "მასშტაბირებისთვის შექმნილი",
-        "body": "მრავალმაღაზიანი როუტინგი, საერთო ავთენტიფიკაცია და ერთიანი ადმინისტრაცია."
+        "title": "მარტივი ადმინისტრაცია",
+        "body": "მარაგი, შეკვეთები და გადახდები - ერთ პანელში."
       }
     ],
     "forVendors": {
       "title": "გამყიდველებისთვის",
       "features": [
-        "მინიმალური დაყენებით განათავსეთ პროდუქტები ან გაუშვით აუქციონები.",
-        "მართეთ მარაგი, გადახდები და შეკვეთები ერთ სივრცეში.",
-        "მყიდველის შეტყობინებები და ნდობის სიგნალები მალე."
+        "დაამატეთ პროდუქტი ან გაუშვით აუქციონი რამდენიმე ნაბიჯში.",
+        "მართეთ მარაგი, შეკვეთები და გადახდები ერთ ეკრანზე.",
+        "დაიწყეთ სწრაფად და გაიზარდეთ ეტაპობრივად."
       ],
-      "openAdmin": "ადმინის გახსნა"
+      "openAdmin": "ადმინ პანელი"
     }
   },
   "categoryBanner": {
@@ -91,7 +91,16 @@
   "vendorSpotlight": {
     "title": "ტოპ <highlight>გამყიდველები</highlight>",
     "subtitle": "გაიცანით ჩვენი საუკეთესო გამყიდველები",
-    "sales": "{count} გაყიდვა"
+    "sales": "{count} გაყიდვა",
+    "products": "{count} პროდუქტი",
+    "defaultCategory": "ზოგადი კატეგორია"
+  },
+  "featuredProducts": {
+    "title": "რჩეული <highlight>პროდუქტები</highlight>",
+    "subtitle": "აღმოაჩინეთ გამორჩეული ნივთები საუკეთესო გამყიდველებისგან",
+    "loading": "რჩეული პროდუქტები იტვირთება...",
+    "loadFailed": "პროდუქტების ჩატვირთვა ვერ მოხერხდა. შეამოწმეთ API.",
+    "empty": "პროდუქტები ჯერ არ არის."
   },
   "footer": {
     "tagline": "სანდო მრავალგამყიდველიანი მარკეტპლეისი უნიკალური პროდუქტებისთვის. იყიდეთ, გაყიდეთ და აუქციონზე ივაჭრეთ თავდაჯერებით.",
@@ -120,6 +129,8 @@
     "noImage": "სურათი არ არის",
     "auction": "აუქციონი",
     "currentBid": "მიმდინარე ფსონი",
+    "endsIn": "მთავრდება {time}-ში",
+    "endsSoon": "მალე მთავრდება",
     "view": "ნახვა",
     "viewProduct": "პროდუქტის ნახვა"
   },
@@ -258,7 +269,7 @@
     "subtitle": "დაათვალიერეთ ჩვენი შერჩეული კოლექცია დამოწმებული გამყიდველებისგან.",
     "searchPlaceholder": "პროდუქტების ძიება...",
     "filters": "ფილტრები",
-    "filtersClear": "ყველა ფილტრის გასუფთავება",
+    "filtersClear": "გასუფთავება",
     "filtersPrice": "ფასის დიაპაზონი",
     "filtersCategories": "კატეგორიები",
     "filtersListingType": "განთავსების ტიპი",
@@ -289,11 +300,16 @@
     "liveAuction": "აქტიური აუქციონი",
     "verifiedVendor": "დამოწმებული გამყიდველი",
     "variants": "ვარიანტები",
+    "options": "ოფციები",
     "defaultVariant": "ნაგულისხმევი",
     "description": "აღწერა",
     "freeShipping": "უფასო მიწოდება",
     "securePayment": "უსაფრთხო გადახდა",
-    "qualityGuaranteed": "ხარისხის გარანტია"
+    "qualityGuaranteed": "ხარისხის გარანტია",
+    "currentBid": "მიმდინარე ფასი",
+    "buyNow": "ახლავე ყიდვა",
+    "similarProducts": "მსგავსი პროდუქტები",
+    "variantFallback": "ვარიანტი"
   },
   "common": {
     "language": "ენა"
@@ -360,5 +376,541 @@
     "notice": "უნიკალური მაღაზიის URL ავტომატურად შეიქმნება. გაყიდვები დარჩება გამორთული დამტკიცებამდე.",
     "create": "მაღაზიის შექმნა",
     "creating": "მაღაზია იქმნება..."
+  },
+  "cart": {
+    "title": "კალათა",
+    "emptyTitle": "კალათა ცარიელია",
+    "emptyDescription": "ჯერ არაფერი დაგიმატებიათ.",
+    "continueShopping": "გაგრძელება",
+    "defaultVariant": "ნაგულისხმევი ვარიანტი",
+    "skuLabel": "SKU: {sku}",
+    "soldOut": "ამოიწურა",
+    "onlyLeft": "დარჩენილია {count}",
+    "viewProduct": "პროდუქტის ნახვა",
+    "aria": {
+      "removeItem": "წაშლა",
+      "decreaseQty": "რაოდენობის შემცირება",
+      "increaseQty": "რაოდენობის გაზრდა"
+    },
+    "summary": {
+      "title": "შეჯამება",
+      "unavailableNotice": "ზოგი პროდუქტი მიუწვდომელია. განაახლეთ რაოდენობა ან წაშალეთ.",
+      "subtotal": "ქვეჯამი",
+      "shipping": "მიწოდება",
+      "tax": "გადასახადი",
+      "total": "სულ",
+      "free": "უფასო",
+      "freeShippingHint": "უფასო მიწოდებისთვის დაამატეთ {amount}",
+      "proceedToCheckout": "გადასვლა გადახდაზე"
+    },
+    "toasts": {
+      "loadFailed": "კალათა ვერ ჩაიტვირთა",
+      "notFound": "კალათა ვერ მოიძებნა",
+      "notFoundDescription": "სესია ამოიწურა. დაამატეთ პროდუქტები თავიდან.",
+      "qtyUpdated": "რაოდენობა განახლდა",
+      "qtyUpdateFailed": "რაოდენობა ვერ განახლდა",
+      "itemRemoved": "პროდუქტი წაიშალა",
+      "removeFailed": "წაშლა ვერ მოხერხდა"
+    }
+  },
+  "checkout": {
+    "loading": "იტვირთება...",
+    "backToCart": "კალათაში დაბრუნება",
+    "steps": {
+      "shipping": "მიწოდება",
+      "payment": "გადახდა"
+    },
+    "confirmed": {
+      "title": "შეკვეთა დადასტურდა",
+      "subtitle": "მადლობა შეძენისთვის",
+      "orderPrefix": "შეკვეთა #MKT-",
+      "continueShopping": "გაგრძელება",
+      "backHome": "მთავარზე"
+    },
+    "shipping": {
+      "title": "მიწოდების ინფორმაცია",
+      "firstName": "სახელი",
+      "firstNamePlaceholder": "გიორგი",
+      "lastName": "გვარი",
+      "lastNamePlaceholder": "ლომიძე",
+      "email": "ელ-ფოსტა",
+      "address": "მისამართი",
+      "addressPlaceholder": "მაგ: კოსტავას 10",
+      "city": "ქალაქი",
+      "cityPlaceholder": "თბილისი",
+      "state": "რეგიონი",
+      "statePlaceholder": "თბილისი",
+      "zip": "ინდექსი",
+      "zipPlaceholder": "0108",
+      "phone": "ტელეფონი",
+      "phonePlaceholder": "+995 5XX XXX XXX"
+    },
+    "payment": {
+      "title": "გადახდის მეთოდი",
+      "card": "ბარათი",
+      "paypal": "PayPal",
+      "installments": "განვადება (12% საკომისიო)",
+      "cardNumber": "ბარათის ნომერი",
+      "cardNumberPlaceholder": "1234 5678 9012 3456",
+      "expiry": "მოქმედების ვადა",
+      "expiryPlaceholder": "MM/YY",
+      "cardName": "სახელი ბარათზე",
+      "cardNamePlaceholder": "Giorgi Lomidze",
+      "secureNote": "გადახდის ინფორმაცია დაცულია"
+    },
+    "actions": {
+      "continueToPayment": "გაგრძელება",
+      "back": "უკან",
+      "placeOrder": "შეკვეთის გაფორმება"
+    },
+    "summary": {
+      "title": "შეჯამება",
+      "subtotal": "ქვეჯამი",
+      "shipping": "მიწოდება",
+      "installmentFee": "განვადების საკომისიო (12%)",
+      "total": "სულ",
+      "free": "უფასო"
+    }
+  },
+  "productAvailability": {
+    "title": "ხელმისაწვდომობა",
+    "checking": "ვამოწმებთ...",
+    "checkFailed": "შემოწმება ვერ მოხერხდა",
+    "noData": "მონაცემი ვერ მივიღეთ",
+    "variantNotFound": "ვარიანტი ვერ მოიძებნა",
+    "infoRetrieved": "მარაგი განახლდა",
+    "availableForPurchase": "პროდუქტი ხელმისაწვდომია",
+    "stockAvailable": "მარაგი ხელმისაწვდომია",
+    "itemsInStock": "მარაგშია {count}",
+    "outOfStock": "ამოწურულია",
+    "currentlyUnavailable": "ამჟამად მიუწვდომელია",
+    "fetchFailed": "მარაგის მიღება ვერ მოხერხდა",
+    "inStock": "მარაგში",
+    "left": "დარჩა {count}",
+    "lowStock": "მარაგი ცოტაა - იჩქარეთ",
+    "checkAvailability": "შემოწმება"
+  },
+  "productButtons": {
+    "addToCart": "კალათაში დამატება",
+    "buyNow": "ახლავე ყიდვა",
+    "soldOut": "ამოწურულია",
+    "toasts": {
+      "added": "დამატებულია კალათაში",
+      "addFailed": "დამატება ვერ მოხერხდა"
+    }
+  },
+  "productShare": {
+    "label": "გაზიარება:",
+    "copy": "ბმულის კოპირება",
+    "defaultDescription": "ნახეთ {title}",
+    "toasts": {
+      "copied": "ბმული დაკოპირდა",
+      "copyFailed": "კოპირება ვერ მოხერხდა"
+    }
+  },
+  "productStatus": {
+    "deletedTitle": "პროდუქტი წაშლილია",
+    "deletedDescription": "პროდუქტი საჯაროდ აღარ ჩანს. მხოლოდ მფლობელი ხედავს.",
+    "draftTitle": "პროდუქტი მონახაზშია",
+    "draftDescription": "პროდუქტი ჯერ არ არის გამოქვეყნებული. მხოლოდ მფლობელი ხედავს."
+  },
+  "productNotFound": {
+    "title": "404 - პროდუქტი ვერ მოიძებნა",
+    "description": "პროდუქტი არ არსებობს ან წაშლილია."
+  },
+  "adminDashboard": {
+    "managementTitle": "{slug} მართვა",
+    "workspaceDescription": "მართეთ მაღაზია ერთი სივრციდან.",
+    "viewShop": "მაღაზიის ნახვა",
+    "pendingSellerNotice": "გაყიდვა ჯერ არ არის ჩართული. ხელმისაწვდომია მხოლოდ პარამეტრები.",
+    "actions": {
+      "open": "გახსნა"
+    },
+    "status": {
+      "active": "აქტიური",
+      "wip": "მუშაობაში"
+    },
+    "sections": {
+      "settings": {
+        "title": "პარამეტრები",
+        "desc": "სახელი, ბრენდინგი, გადახდები"
+      },
+      "payouts": {
+        "title": "გადარიცხვები",
+        "desc": "გრაფიკი, ლეჯერი"
+      },
+      "catalog": {
+        "title": "კატალოგი",
+        "desc": "პროდუქტები და ვარიანტები"
+      },
+      "orders": {
+        "title": "შეკვეთები",
+        "desc": "გადახდა, მიწოდება"
+      },
+      "returns": {
+        "title": "დაბრუნება",
+        "desc": "RMA და რეფანდი"
+      },
+      "shipping": {
+        "title": "მიწოდება",
+        "desc": "ტარიფები და წესები"
+      },
+      "customers": {
+        "title": "კლიენტები",
+        "desc": "სეგმენტები და კომუნიკაცია"
+      }
+    },
+    "overview": {
+      "title": "მაღაზიის მიმოხილვა",
+      "description": "გაყიდვები, მარაგი და შეკვეთები",
+      "manageCatalog": "კატალოგის მართვა",
+      "loading": "იტვირთება..."
+    },
+    "metrics": {
+      "grossSales": "მთლიანი გაყიდვა",
+      "last30Orders": "ბოლო 30 შეკვეთა",
+      "withdrawn": "გატანილი",
+      "estimatedPayouts": "სავარაუდო გადარიცხვები",
+      "outstanding": "დარჩენილი ბალანსი",
+      "awaitingTransfer": "შემდეგ გადარიცხვამდე",
+      "activeListings": "აქტიური ლისტინგი",
+      "variants": "ვარიანტები",
+      "unitsSold": "გაყიდული ერთეული",
+      "pendingOrders": "მოლოდინში შეკვეთები"
+    },
+    "charts": {
+      "ordersLast7Days": "ბოლო 7 დღის შეკვეთები",
+      "dailyVolume": "დღიური მოცულობა",
+      "productsCount": "{count} პროდუქტი"
+    },
+    "inventory": {
+      "title": "მარაგის მდგომარეობა",
+      "lowStock": "დაბალი მარაგი",
+      "outOfStock": "ამოწურული",
+      "totalProducts": "სულ პროდუქტები"
+    },
+    "recentOrders": {
+      "title": "ბოლო შეკვეთები",
+      "subtitle": "ბოლო აქტივობა",
+      "viewAll": "ყველას ნახვა",
+      "empty": "შეკვეთები ჯერ არაა."
+    },
+    "errors": {
+      "authRequired": "აუტენტიფიკაცია საჭიროა.",
+      "loadSettingsFailed": "პარამეტრების ჩატვირთვა ვერ მოხერხდა",
+      "loadProductsFailed": "პროდუქტების ჩატვირთვა ვერ მოხერხდა",
+      "signInPrompt": "გთხოვთ შეხვიდეთ ადმინისტრირებისთვის."
+    }
+  },
+  "adminCatalog": {
+    "title": "პროდუქტების კატალოგი",
+    "description": "მართეთ პროდუქტები, ვარიანტები და სურათები",
+    "actions": {
+      "back": "უკან",
+      "variantOptions": "ვარიანტის ოფციები",
+      "addProduct": "პროდუქტის დამატება",
+      "cancel": "გაუქმება"
+    },
+    "status": {
+      "active": "აქტიური",
+      "draft": "დრაფტი",
+      "deleted": "წაშლილი"
+    }
+  },
+  "adminVariantOptions": {
+    "title": "ვარიანტის ოფციები",
+    "description": "შექმენით ოფციის სახელები და გამოიყენეთ პროდუქტის ვარიანტებში.",
+    "newOptionName": "ახალი ოფციის სახელი",
+    "newOptionPlaceholder": "მაგ: ფერი",
+    "optionNamePlaceholder": "ოფციის სახელი",
+    "keyLabel": "გასაღები: {key}",
+    "loading": "იტვირთება...",
+    "loadFailed": "ოფციების ჩატვირთვა ვერ მოხერხდა: {error}",
+    "empty": "ოფციები ჯერ არ არის.",
+    "knownValues": "არსებული მნიშვნელობები:",
+    "moreValues": "+{count} მეტი",
+    "noValuesUsed": "მნიშვნელობები ჯერ არ გამოყენებულა.",
+    "deleteConfirm": "წავშალოთ \"{name}\"? თუ პროდუქტში გამოიყენება, ვერ წაიშლება.",
+    "actions": {
+      "backToCatalog": "კატალოგში დაბრუნება",
+      "add": "დამატება",
+      "save": "შენახვა",
+      "cancel": "გაუქმება",
+      "rename": "გადარქმევა",
+      "delete": "წაშლა"
+    },
+    "toasts": {
+      "apiNotFound": "Variant options API ვერ მოიძებნა. გადატვირთეთ API dev სერვერი.",
+      "optionAdded": "ოფცია დაემატა",
+      "optionAddFailed": "ოფციის დამატება ვერ მოხერხდა",
+      "optionUpdated": "ოფცია განახლდა",
+      "optionUpdateFailed": "ოფციის განახლება ვერ მოხერხდა",
+      "optionRemoved": "ოფცია წაიშალა",
+      "optionRemoveFailed": "ოფციის წაშლა ვერ მოხერხდა"
+    }
+  },
+  "adminProductList": {
+    "searchPlaceholder": "პროდუქტების ძიება",
+    "updatingResults": "განახლება...",
+    "loading": "პროდუქტები იტვირთება...",
+    "empty": "პროდუქტები ვერ მოიძებნა.",
+    "uncategorized": "უკატეგორიო",
+    "variantCount": "{count} ვარიანტი",
+    "showVariants": "ვარიანტების ნახვა",
+    "deleteConfirm": "ნამდვილად გსურთ პროდუქტის წაშლა?",
+    "sort": {
+      "placeholder": "დალაგება",
+      "newest": "ახალი",
+      "oldest": "ძველი",
+      "titleAsc": "დასახელება (A-Z)",
+      "titleDesc": "დასახელება (Z-A)",
+      "priceAsc": "ფასი (მცირე-მაღალი)",
+      "priceDesc": "ფასი (მაღალი-მცირე)",
+      "stockAsc": "მარაგი (მცირე-მაღალი)",
+      "stockDesc": "მარაგი (მაღალი-მცირე)"
+    },
+    "table": {
+      "product": "პროდუქტი",
+      "price": "ფასი",
+      "stock": "მარაგი",
+      "type": "ტიპი",
+      "status": "სტატუსი",
+      "actions": "მოქმედებები",
+      "sku": "SKU"
+    },
+    "stock": {
+      "auction": "აუქციონი",
+      "setStock": "მარაგის დაყენება",
+      "out": "ამოწურული",
+      "low": "დაბალი",
+      "inStock": "მარაგში"
+    },
+    "type": {
+      "auction": "აუქციონი",
+      "fixed": "ფიქსირებული",
+      "standard": "სტანდარტული"
+    },
+    "status": {
+      "active": "აქტიური",
+      "draft": "დრაფტი",
+      "deleted": "წაშლილი"
+    },
+    "actions": {
+      "edit": "რედაქტირება",
+      "view": "ნახვა",
+      "delete": "წაშლა"
+    },
+    "pagination": {
+      "showing": "ნაჩვენებია {from}-{to} / {total}",
+      "previous": "წინა",
+      "next": "შემდეგი",
+      "pageOf": "გვერდი {page} / {total}"
+    },
+    "variantOverview": {
+      "title": "ვარიანტების მიმოხილვა",
+      "auctionProduct": "აუქციონის პროდუქტი. მიმდინარე ფასი:",
+      "startingBid": "საწყისი ფასი:",
+      "noSkuShort": "--"
+    },
+    "errors": {
+      "fetchFailed": "პროდუქტების მიღება ვერ მოხერხდა",
+      "deleteFailed": "წაშლა ვერ მოხერხდა"
+    },
+    "toasts": {
+      "deleted": "პროდუქტი წაიშალა",
+      "deleteFailed": "წაშლა ვერ მოხერხდა"
+    }
+  },
+  "adminOrders": {
+    "eyebrow": "შეკვეთები",
+    "title": "ბოლო შეკვეთები",
+    "description": "შეამოწმეთ შეკვეთები და განაახლეთ სტატუსები.",
+    "empty": "შეკვეთები ჯერ არ არის.",
+    "mockNotice": "ნაჩვენებია დემო შეკვეთები კატალოგიდან.",
+    "itemsCount": "{count} პროდუქტი",
+    "table": {
+      "order": "შეკვეთა",
+      "customer": "კლიენტი",
+      "fulfillment": "მიწოდება",
+      "payment": "გადახდა",
+      "items": "პროდუქტები",
+      "total": "სულ",
+      "created": "თარიღი",
+      "actions": "მოქმედებები",
+      "status": "სტატუსი"
+    },
+    "actions": {
+      "status": "სტატუსი",
+      "save": "შენახვა",
+      "saving": "ინახება...",
+      "details": "დეტალები",
+      "hide": "დამალვა"
+    },
+    "toasts": {
+      "selectStatus": "აირჩიეთ სტატუსი",
+      "mockUpdated": "დემო შეკვეთა განახლდა",
+      "updated": "შეკვეთის სტატუსი განახლდა",
+      "updateFailed": "განახლება ვერ მოხერხდა"
+    },
+    "details": {
+      "lineItems": "პოზიციები",
+      "fulfillment": "მიწოდება",
+      "destination": "მისამართი",
+      "shipping": "სერვისი",
+      "tracking": "თრექინგი",
+      "notAssigned": "არ არის მინიჭებული",
+      "sku": "SKU {sku}",
+      "noSku": "SKU არ არის"
+    },
+    "statuses": {
+      "pending": "მოლოდინში",
+      "processing": "მუშავდება",
+      "completed": "დასრულდა",
+      "cancelled": "გაუქმდა"
+    },
+    "fulfillmentStatus": {
+      "unfulfilled": "შეუსრულებელი",
+      "partial": "ნაწილობრივ",
+      "fulfilled": "შესრულებული"
+    },
+    "paymentStatus": {
+      "paid": "გადახდილი",
+      "pending": "მოლოდინში",
+      "refunded": "დაბრუნებული"
+    },
+    "shippingStatus": {
+      "pending": "მოლოდინში",
+      "in_transit": "ტრანზიტში",
+      "delivered": "მიტანილია"
+    }
+  },
+  "adminPayouts": {
+    "eyebrow": "გადარიცხვები",
+    "title": "გადარიცხვები და ანგარიშსწორება",
+    "description": "აკონტროლეთ გადარიცხვები, საკომისიოები და ჩარჯბექები.",
+    "mockNotice": "ნაჩვენებია დემო ჩანაწერები.",
+    "scheduleTitle": "გადარიცხვების გრაფიკი",
+    "ledgerTitle": "ლეჯერი",
+    "emptySchedule": "გადარიცხვები ჯერ არ არის.",
+    "emptyLedger": "აქტივობა ჯერ არ არის.",
+    "bankTransfer": "საბანკო გადარიცხვა",
+    "notAvailable": "--",
+    "table": {
+      "reference": "რეფერენსი",
+      "status": "სტატუსი",
+      "scheduled": "გეგმა",
+      "amount": "თანხა",
+      "method": "მეთოდი"
+    },
+    "ledger": {
+      "type": "ტიპი",
+      "date": "თარიღი",
+      "amount": "თანხა",
+      "notes": "შენიშვნა"
+    },
+    "status": {
+      "scheduled": "დაგეგმილი",
+      "paid": "გადახდილი",
+      "failed": "ვერ შესრულდა"
+    },
+    "ledgerType": {
+      "withdrawal": "გატანა",
+      "fee": "საკომისიო",
+      "chargeback": "ჩარჯბექი"
+    }
+  },
+  "adminReturns": {
+    "eyebrow": "დაბრუნება",
+    "title": "დაბრუნება და რეფანდი",
+    "description": "აკონტროლეთ RMA, რეფანდი და დაბრუნებული მარაგი.",
+    "mockNotice": "ნაჩვენებია დემო დაბრუნებები.",
+    "requestsTitle": "დაბრუნების მოთხოვნები",
+    "empty": "დაბრუნებები ჯერ არ არის.",
+    "table": {
+      "rma": "RMA",
+      "status": "სტატუსი",
+      "requested": "მოთხოვნილი",
+      "items": "ერთეული",
+      "refund": "რეფანდი",
+      "restock": "მარაგში დაბრუნება"
+    },
+    "status": {
+      "requested": "მოთხოვნილი",
+      "approved": "დამტკიცებული",
+      "received": "მიღებული",
+      "refunded": "დაბრუნებული"
+    },
+    "restock": {
+      "pending": "მოლოდინში",
+      "restocked": "დაბრუნებულია"
+    }
+  },
+  "adminShipping": {
+    "eyebrow": "მიწოდება",
+    "title": "მიწოდების პროფილები და წესები",
+    "description": "მართეთ ტარიფები, გადამზიდავები და წესები.",
+    "mockNotice": "ნაჩვენებია დემო მიწოდების კონფიგი.",
+    "profilesTitle": "მიწოდების პროფილები",
+    "rulesTitle": "ფულფილმენტის წესები",
+    "emptyProfiles": "პროფილები ჯერ არ არის.",
+    "emptyRules": "წესები ჯერ არ არის.",
+    "variableRate": "ცვლადი",
+    "notAvailable": "--",
+    "etaDays": "{min}-{max} დღე",
+    "handlingDays": "{days} დღე",
+    "status": {
+      "active": "აქტიური",
+      "paused": "შეჩერებული"
+    },
+    "table": {
+      "profile": "პროფილი",
+      "carrier": "კურიერი",
+      "rate": "ტარიფი",
+      "eta": "ETA",
+      "status": "სტატუსი"
+    },
+    "rules": {
+      "priority": "პრიორიტეტი",
+      "destination": "მიმართულება",
+      "orderValue": "შეკვეთის ღირებულება",
+      "handling": "დამუშავება",
+      "status": "სტატუსი",
+      "allDestinations": "ყველა",
+      "noMax": "ლიმიტის გარეშე"
+    }
+  },
+  "adminCustomers": {
+    "eyebrow": "კლიენტები",
+    "title": "კლიენტების მართვა",
+    "description": "ნახეთ აქტივობა, სეგმენტები და კომუნიკაცია.",
+    "mockNotice": "ნაჩვენებია დემო კლიენტები და სეგმენტები.",
+    "guest": "სტუმარი",
+    "notAvailable": "--",
+    "emptyCustomers": "კლიენტები ჯერ არ არის.",
+    "emptySegments": "სეგმენტები ჯერ არ არის.",
+    "emptyMessages": "შეტყობინებები ჯერ არ არის.",
+    "sections": {
+      "customers": "კლიენტები",
+      "segments": "კლიენტის სეგმენტები",
+      "outreach": "ბოლო კომუნიკაცია"
+    },
+    "table": {
+      "name": "სახელი",
+      "email": "ელ-ფოსტა",
+      "status": "სტატუსი",
+      "orders": "შეკვეთები",
+      "lifetimeValue": "ჯამური ღირებულება",
+      "lastOrder": "ბოლო შეკვეთა"
+    },
+    "segments": {
+      "segment": "სეგმენტი",
+      "description": "აღწერა"
+    },
+    "outreach": {
+      "channel": "არხი",
+      "subject": "თემა",
+      "status": "სტატუსი",
+      "sent": "გაგზავნილი"
+    }
   }
 }
