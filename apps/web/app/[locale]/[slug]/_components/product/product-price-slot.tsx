@@ -1,6 +1,8 @@
 "use client";
 
 import type { ApiProduct } from "@/lib/api/products";
+import { useTranslations } from "@/i18n/provider";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 type Props = {
   product: ApiProduct;
@@ -11,24 +13,24 @@ type Props = {
  * Dynamic slot: Price display (static from server data, no Suspense needed)
  */
 export function ProductPriceSlot({ product, selectedVariantId }: Props) {
+  const t = useTranslations();
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
   const auction = selectedVariant?.auction ?? null;
   const currentPrice = auction?.currentPrice ?? auction?.startingBid ?? selectedVariant?.price;
   const price = selectedVariant ? Number(selectedVariant.price) : 0;
-  const currency = selectedVariant?.currency ?? "USD";
+  const currency = selectedVariant?.currency ?? DEFAULT_CURRENCY_CODE;
 
   if (auction) {
     return (
       <div className="space-y-2">
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold">${Number(currentPrice ?? 0).toFixed(2)}</span>
-          <span className="text-muted-foreground">{currency}</span>
-        </div>
-        <p className="text-sm text-muted-foreground">Current bid</p>
+        <span className="text-3xl font-bold">{formatCurrencyAmount(currentPrice ?? 0, currency)}</span>
+        <p className="text-sm text-muted-foreground">{t("productDetail.currentBid")}</p>
         {auction.buyNowPrice && (
           <p className="text-sm">
-            Buy now:{" "}
-            <span className="font-semibold">${Number(auction.buyNowPrice).toFixed(2)}</span>
+            {t("productDetail.buyNow")}:{" "}
+            <span className="font-semibold">
+              {formatCurrencyAmount(auction.buyNowPrice, currency)}
+            </span>
           </p>
         )}
       </div>
@@ -37,10 +39,7 @@ export function ProductPriceSlot({ product, selectedVariantId }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-bold">${price.toFixed(2)}</span>
-        <span className="text-muted-foreground">{currency}</span>
-      </div>
+      <span className="text-3xl font-bold">{formatCurrencyAmount(price, currency)}</span>
     </div>
   );
 }

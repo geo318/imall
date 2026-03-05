@@ -1,16 +1,12 @@
-import { Metadata } from "next";
 import { Badge } from "@repo/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@repo/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@repo/ui/table";
+import type { Metadata } from "next";
+import type { Locale } from "@/i18n/config";
+import { getTranslations } from "@/i18n/server";
 import { getRequestOrigin } from "@/lib/server/request-origin";
-import { getSuperadminCookieHeader } from "@/lib/superadmin";
+import { getServerAuthCookieHeader } from "@/lib/superadmin";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 type ShippingProfile = {
   id: string;
@@ -40,7 +36,7 @@ async function fetchProfiles(slug: string): Promise<ShippingProfile[]> {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/shipping-profiles`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
   if (!response.ok) {
     throw new Error("Failed to load shipping profiles");
@@ -52,7 +48,7 @@ async function fetchRules(slug: string): Promise<FulfillmentRule[]> {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/fulfillment-rules`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
   if (!response.ok) {
     throw new Error("Failed to load fulfillment rules");
@@ -69,7 +65,7 @@ function buildMockProfiles(): ShippingProfile[] {
       serviceLevel: "Ground",
       rateType: "flat",
       flatRate: 8.5,
-      currency: "USD",
+      currency: DEFAULT_CURRENCY_CODE,
       estimatedMinDays: 3,
       estimatedMaxDays: 6,
       active: true,
@@ -81,7 +77,7 @@ function buildMockProfiles(): ShippingProfile[] {
       serviceLevel: "Express",
       rateType: "flat",
       flatRate: 18,
-      currency: "USD",
+      currency: DEFAULT_CURRENCY_CODE,
       estimatedMinDays: 1,
       estimatedMaxDays: 2,
       active: true,
@@ -124,8 +120,13 @@ export const metadata: Metadata = {
   title: "Shipping",
 };
 
-export default async function ShippingPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function ShippingPage({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { slug, locale } = await params;
+  const t = await getTranslations(locale as Locale);
   let profiles = await fetchProfiles(slug).catch(() => []);
   let rules = await fetchRules(slug).catch(() => []);
   let isMock = false;
@@ -143,40 +144,38 @@ export default async function ShippingPage({ params }: { params: Promise<{ slug:
     <div className="container py-10 space-y-8">
       <div className="space-y-1">
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Shipping
+          {t("adminShipping.eyebrow")}
         </p>
-        <h1 className="text-3xl font-bold">Shipping profiles & fulfillment</h1>
-        <p className="text-sm text-muted-foreground">
-          Configure delivery rates, carriers, and routing rules.
-        </p>
+        <h1 className="text-3xl font-bold">{t("adminShipping.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("adminShipping.description")}</p>
       </div>
 
       {isMock ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          Showing mock shipping setup. Connect live fulfillment data when available.
+          {t("adminShipping.mockNotice")}
         </div>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Shipping profiles</CardTitle>
+          <CardTitle>{t("adminShipping.profilesTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Profile</TableHead>
-                <TableHead>Carrier</TableHead>
-                <TableHead>Rate</TableHead>
-                <TableHead>ETA</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{t("adminShipping.table.profile")}</TableHead>
+                <TableHead>{t("adminShipping.table.carrier")}</TableHead>
+                <TableHead>{t("adminShipping.table.rate")}</TableHead>
+                <TableHead>{t("adminShipping.table.eta")}</TableHead>
+                <TableHead>{t("adminShipping.table.status")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {profiles.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="py-10 text-center text-slate-500">
-                    No shipping profiles yet.
+                    {t("adminShipping.emptyProfiles")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -184,25 +183,29 @@ export default async function ShippingPage({ params }: { params: Promise<{ slug:
                   <TableRow key={profile.id}>
                     <TableCell className="font-medium">{profile.name}</TableCell>
                     <TableCell className="text-slate-500">
-                      {[profile.carrier, profile.serviceLevel].filter(Boolean).join(" / ") ||
-                        "--"}
+                      {[profile.carrier, profile.serviceLevel].filter(Boolean).join(" / ") || "--"}
                     </TableCell>
                     <TableCell>
                       {profile.flatRate === null
-                        ? "Variable"
-                        : `${profile.currency ?? "USD"} ${toNumber(profile.flatRate)?.toFixed(2) ?? "0.00"}`}
+                        ? t("adminShipping.variableRate")
+                        : formatCurrencyAmount(
+                            toNumber(profile.flatRate) ?? 0,
+                            profile.currency ?? DEFAULT_CURRENCY_CODE,
+                          )}
                     </TableCell>
                     <TableCell>
                       {(() => {
                         const minDays = toNumber(profile.estimatedMinDays);
                         const maxDays = toNumber(profile.estimatedMaxDays);
-                        if (minDays === null || maxDays === null) return "--";
-                        return `${minDays}-${maxDays} days`;
+                        if (minDays === null || maxDays === null) return t("adminShipping.notAvailable");
+                        return t("adminShipping.etaDays", { min: minDays, max: maxDays });
                       })()}
                     </TableCell>
                     <TableCell>
                       <Badge variant={profile.active ? "secondary" : "outline"}>
-                        {profile.active ? "Active" : "Paused"}
+                        {profile.active
+                          ? t("adminShipping.status.active")
+                          : t("adminShipping.status.paused")}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -215,44 +218,48 @@ export default async function ShippingPage({ params }: { params: Promise<{ slug:
 
       <Card>
         <CardHeader>
-          <CardTitle>Fulfillment rules</CardTitle>
+          <CardTitle>{t("adminShipping.rulesTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Priority</TableHead>
-                <TableHead>Destination</TableHead>
-                <TableHead>Order value</TableHead>
-                <TableHead>Handling</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>{t("adminShipping.rules.priority")}</TableHead>
+                <TableHead>{t("adminShipping.rules.destination")}</TableHead>
+                <TableHead>{t("adminShipping.rules.orderValue")}</TableHead>
+                <TableHead>{t("adminShipping.rules.handling")}</TableHead>
+                <TableHead>{t("adminShipping.rules.status")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rules.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="py-10 text-center text-slate-500">
-                    No fulfillment rules yet.
+                    {t("adminShipping.emptyRules")}
                   </TableCell>
                 </TableRow>
               ) : (
                 rules.map((rule) => (
                   <TableRow key={rule.id}>
                     <TableCell>{toNumber(rule.priority) ?? 0}</TableCell>
-                    <TableCell>{rule.destinationCountry ?? "All"}</TableCell>
+                    <TableCell>{rule.destinationCountry ?? t("adminShipping.rules.allDestinations")}</TableCell>
                     <TableCell>
                       {toNumber(rule.minOrderValue) ?? 0} -{" "}
-                      {toNumber(rule.maxOrderValue) ?? "No max"}
+                      {toNumber(rule.maxOrderValue) ?? t("adminShipping.rules.noMax")}
                     </TableCell>
                     <TableCell>
                       {(() => {
                         const handlingDays = toNumber(rule.handlingDays);
-                        return handlingDays === null ? "--" : `${handlingDays} days`;
+                        return handlingDays === null
+                          ? t("adminShipping.notAvailable")
+                          : t("adminShipping.handlingDays", { days: handlingDays });
                       })()}
                     </TableCell>
                     <TableCell>
                       <Badge variant={rule.active ? "secondary" : "outline"}>
-                        {rule.active ? "Active" : "Paused"}
+                        {rule.active
+                          ? t("adminShipping.status.active")
+                          : t("adminShipping.status.paused")}
                       </Badge>
                     </TableCell>
                   </TableRow>

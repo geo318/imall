@@ -14,6 +14,7 @@ import type { ApiProduct } from "@/lib/api/products";
 import { useAuctionWebSocket } from "@/lib/hooks/use-auction-websocket";
 import { revalidateProductClient } from "@/lib/revalidate-client";
 import { calculateNextMinBid } from "@/lib/utils/bid-increments";
+import { DEFAULT_CURRENCY_CODE, currencySymbol, formatCurrencyAmount } from "@/lib/utils/currency";
 import { AuctionFormSkeleton, AuctionTimerSkeleton } from "../product/product-detail-skeleton";
 import { AuctionTimerSlot } from "./auction-timer-slot";
 
@@ -61,7 +62,9 @@ export function AuctionBidCard({
         } else {
           setIsUserWinning(false);
         }
-        toast.info(`New bid: $${message.amount}`, { duration: 3000 });
+        toast.info(`New bid: ${formatCurrencyAmount(message.amount, DEFAULT_CURRENCY_CODE)}`, {
+          duration: 3000,
+        });
       } else if (message.type === "auction.finished") {
         setIsUserWinning(false);
         toast.info("Auction has ended", { duration: 5000 });
@@ -244,13 +247,15 @@ export function AuctionBidCard({
           <div>
             <p className="text-sm text-muted-foreground">Current Bid</p>
             <p className="text-2xl font-bold text-primary">
-              $
-              {Number(
-                freshAuction?.currentPrice ??
-                  freshAuction?.startingBid ??
-                  selectedVariant?.price ??
-                  0,
-              ).toFixed(2)}
+              {formatCurrencyAmount(
+                Number(
+                  freshAuction?.currentPrice ??
+                    freshAuction?.startingBid ??
+                    selectedVariant?.price ??
+                    0,
+                ),
+                DEFAULT_CURRENCY_CODE,
+              )}
             </p>
           </div>
           <div>
@@ -272,7 +277,9 @@ export function AuctionBidCard({
                 const num = Number(val);
                 return !Number.isNaN(num) && num >= minBid;
               },
-              { message: `Minimum bid is $${minBid.toFixed(2)}` },
+              {
+                message: `Minimum bid is ${formatCurrencyAmount(minBid, DEFAULT_CURRENCY_CODE)}`,
+              },
             ),
           }}
         >
@@ -287,7 +294,7 @@ export function AuctionBidCard({
               <div className="flex gap-3">
                 <div className="relative flex-1">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    $
+                    {currencySymbol(DEFAULT_CURRENCY_CODE)}
                   </span>
                   <Input
                     type="number"
@@ -313,7 +320,7 @@ export function AuctionBidCard({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground text-center">
-                Minimum bid: ${minBid.toFixed(2)}
+                Minimum bid: {formatCurrencyAmount(minBid, DEFAULT_CURRENCY_CODE)}
               </p>
               {!isSignedIn && (
                 <p className="text-sm text-amber-600 text-center">Please sign in to place a bid</p>

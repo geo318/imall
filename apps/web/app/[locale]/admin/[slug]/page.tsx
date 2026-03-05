@@ -7,7 +7,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Package } from "lucide-react";
 import { use, useMemo } from "react";
 import { Link } from "@/i18n/navigation.client";
+import { useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 type OrderEntry = {
   id: string;
@@ -16,6 +18,13 @@ type OrderEntry = {
   currency: string | null;
   createdAt: string;
   itemCount: number;
+};
+
+type PayoutEntry = {
+  id: string;
+  status: string;
+  amount: string;
+  paidAt?: string | null;
 };
 
 type ProductWithStats = ApiProduct & {
@@ -27,50 +36,83 @@ type ProductWithStats = ApiProduct & {
 const sections = [
   {
     href: "settings",
-    title: "Shop settings",
-    desc: "Name, branding, bank details, payout notes",
+    titleKey: "adminDashboard.sections.settings.title",
+    descKey: "adminDashboard.sections.settings.desc",
     status: "active",
+    requiresSeller: false,
   },
   {
     href: "payouts",
-    title: "Payouts",
-    desc: "Settlement schedule, ledger, chargebacks",
+    titleKey: "adminDashboard.sections.payouts.title",
+    descKey: "adminDashboard.sections.payouts.desc",
     status: "active",
+    requiresSeller: true,
   },
   {
     href: "catalog",
-    title: "Catalog",
-    desc: "Products, markdown descriptions, variants, media",
+    titleKey: "adminDashboard.sections.catalog.title",
+    descKey: "adminDashboard.sections.catalog.desc",
     status: "active",
+    requiresSeller: true,
   },
   {
     href: "orders",
-    title: "Orders",
-    desc: "Payments, shipping status, fulfillment notes",
+    titleKey: "adminDashboard.sections.orders.title",
+    descKey: "adminDashboard.sections.orders.desc",
     status: "active",
+    requiresSeller: true,
   },
   {
     href: "returns",
-    title: "Returns",
-    desc: "RMAs, refunds, restock tracking",
+    titleKey: "adminDashboard.sections.returns.title",
+    descKey: "adminDashboard.sections.returns.desc",
     status: "active",
+    requiresSeller: true,
   },
   {
     href: "shipping",
-    title: "Shipping",
-    desc: "Rates, carriers, fulfillment rules",
+    titleKey: "adminDashboard.sections.shipping.title",
+    descKey: "adminDashboard.sections.shipping.desc",
     status: "active",
+    requiresSeller: true,
   },
   {
     href: "customers",
-    title: "Customers",
-    desc: "Segments, lifetime value, outreach",
+    titleKey: "adminDashboard.sections.customers.title",
+    descKey: "adminDashboard.sections.customers.desc",
     status: "active",
+    requiresSeller: true,
   },
 ];
 
 export default function AdminShopPage({ params }: { params: Promise<{ slug: string }> }) {
+  const t = useTranslations();
   const { slug } = use(params);
+  const parseAmount = (value: string | number | null | undefined) => {
+    if (value === null || value === undefined) return 0;
+    const numeric = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
+
+  const { data: settings } = useQuery<{ canSell?: boolean }>({
+    queryKey: ["admin-settings", slug],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/${slug}/settings`);
+      if (!response.ok) {
+        if (response.status === 404) return { canSell: false };
+        if (response.status === 401) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || t("adminDashboard.errors.authRequired"));
+        }
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || t("adminDashboard.errors.loadSettingsFailed"));
+      }
+      return response.json();
+    },
+    retry: false,
+  });
+
+  const canSell = Boolean(settings?.canSell);
 
   const {
     data: products,
@@ -91,6 +133,7 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
       }
       return response.json();
     },
+    enabled: canSell,
     retry: false, // Don't retry on auth errors
   });
 
@@ -104,7 +147,31 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
       }
       return response.json();
     },
+    enabled: canSell,
   });
+
+  const {
+    data: payouts,
+    isLoading: payoutsLoading,
+    error: payoutsError,
+  } = useQuery<PayoutEntry[]>({
+    queryKey: ["admin-payouts", slug],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/${slug}/payouts`);
+      if (!response.ok) {
+        if (response.status === 404) return [];
+        throw new Error("Failed to fetch payouts");
+      }
+      return response.json();
+    },
+    enabled: canSell,
+    retry: false,
+  });
+
+  const visibleSections = useMemo(
+    () => sections.filter((section) => canSell || !section.requiresSeller),
+    [canSell],
+  );
 
   const overview = useMemo(() => {
     const items = products ?? [];
@@ -130,8 +197,19 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
 
     const orderRows = orders ?? [];
     const grossSales = orderRows.reduce((sum, order) => sum + Number(order.total), 0);
-    const withdrawn = grossSales * 0.6;
-    const outstanding = grossSales - withdrawn;
+    const payoutRows = payouts ?? [];
+    const withdrawn = payoutRows.reduce((sum, payout) => {
+      if (payout.status === "paid" || payout.paidAt) {
+        return sum + parseAmount(payout.amount);
+      }
+      return sum;
+    }, 0);
+    const outstanding = payoutRows.reduce((sum, payout) => {
+      if (payout.status === "paid" || payout.status === "failed") {
+        return sum;
+      }
+      return sum + parseAmount(payout.amount);
+    }, 0);
     const pendingOrders = orderRows.filter((order) =>
       ["pending", "processing"].includes(order.status),
     ).length;
@@ -167,7 +245,7 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5),
     };
-  }, [orders, products]);
+  }, [orders, payouts, products]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -176,121 +254,144 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
           <CardHeader className="flex flex-row items-start justify-between">
             <div className="space-y-1">
               <Badge variant="secondary">Admin workspace</Badge>
-              <CardTitle>{slug} management</CardTitle>
+              <CardTitle>{t("adminDashboard.managementTitle", { slug })}</CardTitle>
               <CardDescription>
-                Clerk roles pending; assume admin-only for now. Hook API mutations to these sections
-                next.
+                {t("adminDashboard.workspaceDescription")}
               </CardDescription>
             </div>
             <Link
               href={`/${slug}`}
               className="text-sm font-semibold text-brand-700 hover:underline"
             >
-              View shop →
+              {t("adminDashboard.viewShop")}
             </Link>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
-              {sections.map((section) => (
+              {visibleSections.map((section) => (
                 <Card
                   key={section.href}
                   className="h-full border-slate-200 transition hover:border-brand-200 hover:shadow-md"
                 >
                   <CardHeader>
                     <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="text-base">{section.title}</CardTitle>
+                      <CardTitle className="text-base">{t(section.titleKey)}</CardTitle>
                       <Badge variant={section.status === "active" ? "secondary" : "outline"}>
-                        {section.status === "active" ? "Active" : "WIP"}
+                        {section.status === "active"
+                          ? t("adminDashboard.status.active")
+                          : t("adminDashboard.status.wip")}
                       </Badge>
                     </div>
-                    <CardDescription>{section.desc}</CardDescription>
+                    <CardDescription>{t(section.descKey)}</CardDescription>
                   </CardHeader>
                   <CardContent className="pt-2">
                     <Link href={`/admin/${slug}/${section.href}`}>
                       <Button variant="outline" size="sm">
-                        Open
+                        {t("adminDashboard.actions.open")}
                       </Button>
                     </Link>
                   </CardContent>
                 </Card>
               ))}
             </div>
+            {!canSell ? (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {t("adminDashboard.pendingSellerNotice")}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
         {/* Shop Overview */}
+        {canSell ? (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Package className="h-5 w-5 text-slate-600" />
-                <CardTitle>Shop overview</CardTitle>
+                <CardTitle>{t("adminDashboard.overview.title")}</CardTitle>
               </div>
               <Link href={`/admin/${slug}/catalog`}>
                 <Button variant="outline" size="sm">
-                  Manage Catalog
+                  {t("adminDashboard.overview.manageCatalog")}
                 </Button>
               </Link>
             </div>
-            <CardDescription>Sales, inventory health, and order activity</CardDescription>
+            <CardDescription>{t("adminDashboard.overview.description")}</CardDescription>
           </CardHeader>
           <CardContent>
-            {productsLoading || ordersLoading ? (
-              <div className="text-center py-8 text-slate-600">Loading overview...</div>
-            ) : productsError ? (
+            {productsLoading || ordersLoading || payoutsLoading ? (
+              <div className="text-center py-8 text-slate-600">
+                {t("adminDashboard.overview.loading")}
+              </div>
+            ) : productsError || payoutsError ? (
               <div className="text-center py-8">
                 <p className="text-red-600 font-semibold mb-2">
-                  {productsError instanceof Error
+                  {(productsError instanceof Error
                     ? productsError.message
-                    : "Failed to load products"}
+                    : payoutsError instanceof Error
+                      ? payoutsError.message
+                    : t("adminDashboard.errors.loadProductsFailed"))}
                 </p>
-                <p className="text-sm text-slate-600">Please sign in to access admin features.</p>
+                <p className="text-sm text-slate-600">{t("adminDashboard.errors.signInPrompt")}</p>
               </div>
             ) : (
               <div className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="text-xs text-slate-500">Gross sales</div>
+                    <div className="text-xs text-slate-500">{t("adminDashboard.metrics.grossSales")}</div>
                     <div className="text-2xl font-bold text-slate-900">
-                      ${overview.grossSales.toFixed(2)}
+                      {formatCurrencyAmount(overview.grossSales, DEFAULT_CURRENCY_CODE)}
                     </div>
-                    <div className="text-xs text-slate-500">Last 30 orders</div>
+                    <div className="text-xs text-slate-500">
+                      {t("adminDashboard.metrics.last30Orders")}
+                    </div>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="text-xs text-slate-500">Withdrawn</div>
+                    <div className="text-xs text-slate-500">{t("adminDashboard.metrics.withdrawn")}</div>
                     <div className="text-2xl font-bold text-slate-900">
-                      ${overview.withdrawn.toFixed(2)}
+                      {formatCurrencyAmount(overview.withdrawn, DEFAULT_CURRENCY_CODE)}
                     </div>
-                    <div className="text-xs text-slate-500">Estimated payouts</div>
+                    <div className="text-xs text-slate-500">
+                      {t("adminDashboard.metrics.estimatedPayouts")}
+                    </div>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="text-xs text-slate-500">Outstanding balance</div>
-                    <div className="text-2xl font-bold text-slate-900">
-                      ${overview.outstanding.toFixed(2)}
+                    <div className="text-xs text-slate-500">
+                      {t("adminDashboard.metrics.outstanding")}
                     </div>
-                    <div className="text-xs text-slate-500">Awaiting next transfer</div>
+                    <div className="text-2xl font-bold text-slate-900">
+                      {formatCurrencyAmount(overview.outstanding, DEFAULT_CURRENCY_CODE)}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {t("adminDashboard.metrics.awaitingTransfer")}
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-4">
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="text-xs text-slate-500">Active listings</div>
+                    <div className="text-xs text-slate-500">
+                      {t("adminDashboard.metrics.activeListings")}
+                    </div>
                     <div className="text-xl font-semibold text-slate-900">
                       {overview.activeProducts}
                     </div>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="text-xs text-slate-500">Variants</div>
+                    <div className="text-xs text-slate-500">{t("adminDashboard.metrics.variants")}</div>
                     <div className="text-xl font-semibold text-slate-900">
                       {overview.totalVariants}
                     </div>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="text-xs text-slate-500">Units sold</div>
+                    <div className="text-xs text-slate-500">{t("adminDashboard.metrics.unitsSold")}</div>
                     <div className="text-xl font-semibold text-slate-900">{overview.unitsSold}</div>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="text-xs text-slate-500">Pending orders</div>
+                    <div className="text-xs text-slate-500">
+                      {t("adminDashboard.metrics.pendingOrders")}
+                    </div>
                     <div className="text-xl font-semibold text-slate-900">
                       {overview.pendingOrders}
                     </div>
@@ -301,12 +402,14 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
                   <div className="rounded-lg border border-slate-200 bg-white p-4 lg:col-span-2">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-semibold">Orders last 7 days</div>
-                        <div className="text-xs text-slate-500">
-                          Daily order volume (mock when no orders)
+                        <div className="text-sm font-semibold">
+                          {t("adminDashboard.charts.ordersLast7Days")}
                         </div>
+                        <div className="text-xs text-slate-500">{t("adminDashboard.charts.dailyVolume")}</div>
                       </div>
-                      <Badge variant="secondary">{overview.productCount} products</Badge>
+                      <Badge variant="secondary">
+                        {t("adminDashboard.charts.productsCount", { count: overview.productCount })}
+                      </Badge>
                     </div>
                     <div className="mt-4 flex items-end gap-2 h-28">
                       {overview.dailySeries.map((entry) => (
@@ -321,18 +424,18 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
                     </div>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="text-sm font-semibold">Inventory health</div>
+                    <div className="text-sm font-semibold">{t("adminDashboard.inventory.title")}</div>
                     <div className="mt-4 space-y-3 text-sm">
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Low stock</span>
+                        <span className="text-slate-500">{t("adminDashboard.inventory.lowStock")}</span>
                         <Badge variant="destructive">{overview.lowStock}</Badge>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Out of stock</span>
+                        <span className="text-slate-500">{t("adminDashboard.inventory.outOfStock")}</span>
                         <Badge variant="destructive">{overview.outOfStock}</Badge>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500">Total products</span>
+                        <span className="text-slate-500">{t("adminDashboard.inventory.totalProducts")}</span>
                         <Badge variant="secondary">{overview.productCount}</Badge>
                       </div>
                     </div>
@@ -342,15 +445,19 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
                 <div className="rounded-lg border border-slate-200 bg-white p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-semibold">Recent orders</div>
-                      <div className="text-xs text-slate-500">Latest activity snapshot</div>
+                      <div className="text-sm font-semibold">{t("adminDashboard.recentOrders.title")}</div>
+                      <div className="text-xs text-slate-500">
+                        {t("adminDashboard.recentOrders.subtitle")}
+                      </div>
                     </div>
                     <Link href={`/admin/${slug}/orders`} className="text-xs text-brand-700">
-                      View all
+                      {t("adminDashboard.recentOrders.viewAll")}
                     </Link>
                   </div>
                   {overview.recentOrders.length === 0 ? (
-                    <div className="py-6 text-sm text-slate-500">No orders yet.</div>
+                    <div className="py-6 text-sm text-slate-500">
+                      {t("adminDashboard.recentOrders.empty")}
+                    </div>
                   ) : (
                     <div className="mt-4 space-y-3">
                       {overview.recentOrders.map((order) => (
@@ -366,10 +473,10 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
                           </div>
                           <div className="text-right">
                             <p className="font-semibold text-slate-900">
-                              ${Number(order.total).toFixed(2)}
+                              {formatCurrencyAmount(Number(order.total), DEFAULT_CURRENCY_CODE)}
                             </p>
                             <Badge variant="secondary" className="capitalize">
-                              {order.status}
+                              {t(`adminOrders.statuses.${order.status}`) || order.status}
                             </Badge>
                           </div>
                         </div>
@@ -381,6 +488,7 @@ export default function AdminShopPage({ params }: { params: Promise<{ slug: stri
             )}
           </CardContent>
         </Card>
+        ) : null}
       </div>
     </div>
   );

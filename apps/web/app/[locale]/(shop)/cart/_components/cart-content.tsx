@@ -9,12 +9,15 @@ import { toast } from "sonner";
 import { getCart, removeCartItem, updateCartItemQty } from "@/actions/carts";
 import LazyImage from "@/components/shared/lazy-image";
 import { CartSkeleton } from "@/components/skeletons/cart-skeleton";
+import { useTranslations } from "@/i18n/provider";
 import type { CartItem } from "@/lib/api/cart";
 import { getProductIdentifier } from "@/lib/api/products";
 import { revalidateCartClient } from "@/lib/revalidate-client";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 import { cn } from "@/lib/utils";
 
 export function CartContent() {
+  const t = useTranslations();
   const [cartId, setCartId] = useState<string | null>(null);
   const [isLoadingCartId, setIsLoadingCartId] = useState(true);
   const queryClient = useQueryClient();
@@ -49,23 +52,23 @@ export function CartContent() {
   // Handle query errors with toast
   useEffect(() => {
     if (error) {
-      const msg = error instanceof Error ? error.message : "Failed to load cart";
+      const msg = error instanceof Error ? error.message : t("cart.toasts.loadFailed");
       // If cart not found, clear the invalid cart ID from localStorage
       if (msg.toLowerCase().includes("not found")) {
         if (globalThis.window) {
           globalThis.window.localStorage.removeItem("cart");
           setCartId(null);
         }
-        toast.error("Cart not found", {
-          description: "Your cart session has expired. Please add items to create a new cart.",
+        toast.error(t("cart.toasts.notFound"), {
+          description: t("cart.toasts.notFoundDescription"),
         });
       } else {
-        toast.error("Failed to load cart", {
+        toast.error(t("cart.toasts.loadFailed"), {
           description: msg,
         });
       }
     }
-  }, [error]);
+  }, [error, t]);
 
   const items: CartItem[] = cart?.items ?? [];
 
@@ -96,12 +99,12 @@ export function CartContent() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
       await revalidateCartClient();
-      toast.success("Quantity updated");
+      toast.success(t("cart.toasts.qtyUpdated"));
     },
     onError: (err) => {
-      const msg = err instanceof Error ? err.message : "Failed to update quantity";
+      const msg = err instanceof Error ? err.message : t("cart.toasts.qtyUpdateFailed");
       console.error("Failed to update cart item quantity:", err);
-      toast.error("Failed to update quantity", {
+      toast.error(t("cart.toasts.qtyUpdateFailed"), {
         description: msg,
       });
     },
@@ -115,12 +118,12 @@ export function CartContent() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
       await revalidateCartClient();
-      toast.success("Item removed from cart");
+      toast.success(t("cart.toasts.itemRemoved"));
     },
     onError: (err) => {
-      const msg = err instanceof Error ? err.message : "Failed to remove item";
+      const msg = err instanceof Error ? err.message : t("cart.toasts.removeFailed");
       console.error("Failed to remove cart item:", err);
-      toast.error("Failed to remove item", {
+      toast.error(t("cart.toasts.removeFailed"), {
         description: msg,
       });
     },
@@ -156,10 +159,10 @@ export function CartContent() {
     return (
       <div className="text-center py-16">
         <ShoppingBag className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Your cart is empty</h2>
-        <p className="text-muted-foreground mb-6">Looks like you haven't added anything yet.</p>
+        <h2 className="text-xl font-semibold mb-2">{t("cart.emptyTitle")}</h2>
+        <p className="text-muted-foreground mb-6">{t("cart.emptyDescription")}</p>
         <Button>
-          <Link href="/products">Continue Shopping</Link>
+          <Link href="/products">{t("cart.continueShopping")}</Link>
         </Button>
       </div>
     );
@@ -204,22 +207,25 @@ export function CartContent() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold truncate">{item.productTitle}</h3>
                   <p className="text-sm text-muted-foreground mb-2">
-                    {item.sku ? `SKU: ${item.sku}` : "Default variant"}
+                    {item.sku
+                      ? t("cart.skuLabel", { sku: item.sku })
+                      : t("cart.defaultVariant")}
                   </p>
                   {(isSoldOut || isOver) && (
                     <p className="mb-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
-                      {isSoldOut ? "Sold out" : `Only ${available} left`}
+                      {isSoldOut
+                        ? t("cart.soldOut")
+                        : t("cart.onlyLeft", { count: available ?? 0 })}
                     </p>
                   )}
                   <p className="font-bold text-primary">
-                    ${Number(item.price).toFixed(2)}
-                    <span className="ml-1 text-sm text-muted-foreground">{item.currency}</span>
+                    {formatCurrencyAmount(Number(item.price), DEFAULT_CURRENCY_CODE)}
                   </p>
                   <Link
                     href={`/${getProductIdentifier(item.productId, item.productSlug)}`}
                     className="text-xs text-muted-foreground underline mt-2 inline-block hover:text-foreground"
                   >
-                    View product
+                    {t("cart.viewProduct")}
                   </Link>
                 </div>
                 <div className="flex flex-col items-end justify-between relative z-20">
@@ -228,7 +234,7 @@ export function CartContent() {
                     onClick={() => removeItemMutation.mutate(item.id)}
                     disabled={removeItemMutation.isPending}
                     className="p-2 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-60"
-                    aria-label="Remove item"
+                    aria-label={t("cart.aria.removeItem")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -248,7 +254,7 @@ export function CartContent() {
                         })
                       }
                       className="p-2 hover:bg-muted rounded-full transition-colors disabled:opacity-60 disabled:pointer-events-none"
-                      aria-label="Decrease quantity"
+                      aria-label={t("cart.aria.decreaseQty")}
                     >
                       <Minus className="h-4 w-4" />
                     </button>
@@ -263,7 +269,7 @@ export function CartContent() {
                         })
                       }
                       className="p-2 hover:bg-muted rounded-full transition-colors disabled:opacity-60 disabled:pointer-events-none"
-                      aria-label="Increase quantity"
+                      aria-label={t("cart.aria.increaseQty")}
                     >
                       <Plus className="h-4 w-4" />
                     </button>
@@ -278,45 +284,46 @@ export function CartContent() {
       {/* Order Summary */}
       <div className="lg:col-span-1">
         <div className="bg-card border border-border rounded-xl p-6 sticky top-24">
-          <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
+          <h2 className="text-lg font-semibold mb-4">{t("cart.summary.title")}</h2>
 
           {unavailableItems.length > 0 && (
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-              Some items are unavailable. Sold out items are excluded from totals. Please update
-              quantities or remove them to proceed.
+              {t("cart.summary.unavailableNotice")}
             </div>
           )}
 
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span>${subtotal.toFixed(2)}</span>
+              <span className="text-muted-foreground">{t("cart.summary.subtotal")}</span>
+              <span>{formatCurrencyAmount(subtotal, DEFAULT_CURRENCY_CODE)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Shipping</span>
+              <span className="text-muted-foreground">{t("cart.summary.shipping")}</span>
               <span>
                 {shipping === 0 ? (
-                  <span className="text-success">Free</span>
+                  <span className="text-success">{t("cart.summary.free")}</span>
                 ) : (
-                  `$${shipping.toFixed(2)}`
+                  formatCurrencyAmount(shipping, DEFAULT_CURRENCY_CODE)
                 )}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax</span>
-              <span>${tax.toFixed(2)}</span>
+              <span className="text-muted-foreground">{t("cart.summary.tax")}</span>
+              <span>{formatCurrencyAmount(tax, DEFAULT_CURRENCY_CODE)}</span>
             </div>
             <div className="border-t border-border pt-3 mt-3">
               <div className="flex justify-between text-base font-semibold">
-                <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{t("cart.summary.total")}</span>
+                <span>{formatCurrencyAmount(total, DEFAULT_CURRENCY_CODE)}</span>
               </div>
             </div>
           </div>
 
           {shipping > 0 && (
             <p className="text-xs text-muted-foreground mt-4">
-              Add ${(100 - subtotal).toFixed(2)} more for free shipping
+              {t("cart.summary.freeShippingHint", {
+                amount: formatCurrencyAmount(100 - subtotal, DEFAULT_CURRENCY_CODE),
+              })}
             </p>
           )}
 
@@ -326,13 +333,13 @@ export function CartContent() {
             disabled={purchasableItems.length === 0 || unavailableItems.length > 0}
           >
             <Link href="/checkout" className="flex items-center group">
-              Proceed to Checkout
+              {t("cart.summary.proceedToCheckout")}
               <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </Button>
 
           <Button variant="ghost" className="w-full mt-2">
-            <Link href="/products">Continue Shopping</Link>
+            <Link href="/products">{t("cart.continueShopping")}</Link>
           </Button>
         </div>
       </div>

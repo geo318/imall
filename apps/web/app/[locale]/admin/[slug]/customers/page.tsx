@@ -2,8 +2,11 @@ import { Badge } from "@repo/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@repo/ui/table";
 import type { Metadata } from "next";
+import type { Locale } from "@/i18n/config";
+import { getTranslations } from "@/i18n/server";
 import { getRequestOrigin } from "@/lib/server/request-origin";
-import { getSuperadminCookieHeader } from "@/lib/superadmin";
+import { getServerAuthCookieHeader } from "@/lib/superadmin";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 type CustomerEntry = {
   id: string;
@@ -35,7 +38,7 @@ async function fetchCustomers(slug: string): Promise<CustomerEntry[]> {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/customers`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
   if (!response.ok) {
     throw new Error("Failed to load customers");
@@ -47,7 +50,7 @@ async function fetchSegments(slug: string): Promise<SegmentEntry[]> {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/customers/segments`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
   if (!response.ok) {
     throw new Error("Failed to load segments");
@@ -59,7 +62,7 @@ async function fetchMessages(slug: string): Promise<MessageEntry[]> {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/customers/messages`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
   if (!response.ok) {
     throw new Error("Failed to load messages");
@@ -76,7 +79,7 @@ function buildMockCustomers(): CustomerEntry[] {
       status: "vip",
       orderCount: 6,
       totalSpent: 1120,
-      currency: "USD",
+      currency: DEFAULT_CURRENCY_CODE,
       lastOrderAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     },
     {
@@ -86,7 +89,7 @@ function buildMockCustomers(): CustomerEntry[] {
       status: "active",
       orderCount: 3,
       totalSpent: 410,
-      currency: "USD",
+      currency: DEFAULT_CURRENCY_CODE,
       lastOrderAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
     },
   ];
@@ -130,8 +133,13 @@ export const metadata: Metadata = {
   title: "Customers",
 };
 
-export default async function CustomersPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function CustomersPage({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { slug, locale } = await params;
+  const t = await getTranslations(locale as Locale);
   let customers = await fetchCustomers(slug).catch(() => []);
   let segments = await fetchSegments(slug).catch(() => []);
   let messages = await fetchMessages(slug).catch(() => []);
@@ -154,48 +162,50 @@ export default async function CustomersPage({ params }: { params: Promise<{ slug
     <div className="container py-10 space-y-8">
       <div className="space-y-1">
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Customers
+          {t("adminCustomers.eyebrow")}
         </p>
-        <h1 className="text-3xl font-bold">Customer management</h1>
-        <p className="text-sm text-muted-foreground">
-          Track customer activity, segments, and outbound messaging.
-        </p>
+        <h1 className="text-3xl font-bold">{t("adminCustomers.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("adminCustomers.description")}</p>
       </div>
 
       {isMock ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          Showing mock customers and segments. Connect live CRM data when available.
+          {t("adminCustomers.mockNotice")}
         </div>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Customers</CardTitle>
+          <CardTitle>{t("adminCustomers.sections.customers")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Orders</TableHead>
-                <TableHead>Lifetime value</TableHead>
-                <TableHead>Last order</TableHead>
+                <TableHead>{t("adminCustomers.table.name")}</TableHead>
+                <TableHead>{t("adminCustomers.table.email")}</TableHead>
+                <TableHead>{t("adminCustomers.table.status")}</TableHead>
+                <TableHead>{t("adminCustomers.table.orders")}</TableHead>
+                <TableHead>{t("adminCustomers.table.lifetimeValue")}</TableHead>
+                <TableHead>{t("adminCustomers.table.lastOrder")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {customers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-slate-500">
-                    No customers yet.
+                    {t("adminCustomers.emptyCustomers")}
                   </TableCell>
                 </TableRow>
               ) : (
                 customers.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name ?? "Guest"}</TableCell>
-                    <TableCell className="text-slate-500">{customer.email ?? "--"}</TableCell>
+                    <TableCell className="font-medium">
+                      {customer.name ?? t("adminCustomers.guest")}
+                    </TableCell>
+                    <TableCell className="text-slate-500">
+                      {customer.email ?? t("adminCustomers.notAvailable")}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
                         {customer.status}
@@ -203,14 +213,15 @@ export default async function CustomersPage({ params }: { params: Promise<{ slug
                     </TableCell>
                     <TableCell>{customer.orderCount}</TableCell>
                     <TableCell>
-                      {(customer.currency ?? "USD") +
-                        " " +
-                        toNumber(customer.totalSpent).toFixed(2)}
+                      {formatCurrencyAmount(
+                        toNumber(customer.totalSpent),
+                        customer.currency ?? DEFAULT_CURRENCY_CODE,
+                      )}
                     </TableCell>
                     <TableCell>
                       {customer.lastOrderAt
                         ? new Date(customer.lastOrderAt).toLocaleDateString()
-                        : "--"}
+                        : t("adminCustomers.notAvailable")}
                     </TableCell>
                   </TableRow>
                 ))
@@ -222,28 +233,30 @@ export default async function CustomersPage({ params }: { params: Promise<{ slug
 
       <Card>
         <CardHeader>
-          <CardTitle>Customer segments</CardTitle>
+          <CardTitle>{t("adminCustomers.sections.segments")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Segment</TableHead>
-                <TableHead>Description</TableHead>
+                <TableHead>{t("adminCustomers.segments.segment")}</TableHead>
+                <TableHead>{t("adminCustomers.segments.description")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {segments.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={2} className="py-10 text-center text-slate-500">
-                    No segments yet.
+                    {t("adminCustomers.emptySegments")}
                   </TableCell>
                 </TableRow>
               ) : (
                 segments.map((segment) => (
                   <TableRow key={segment.id}>
                     <TableCell className="font-medium">{segment.name}</TableCell>
-                    <TableCell className="text-slate-500">{segment.description ?? "--"}</TableCell>
+                    <TableCell className="text-slate-500">
+                      {segment.description ?? t("adminCustomers.notAvailable")}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -254,30 +267,32 @@ export default async function CustomersPage({ params }: { params: Promise<{ slug
 
       <Card>
         <CardHeader>
-          <CardTitle>Recent outreach</CardTitle>
+          <CardTitle>{t("adminCustomers.sections.outreach")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Channel</TableHead>
-                <TableHead>Subject</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Sent</TableHead>
+                <TableHead>{t("adminCustomers.outreach.channel")}</TableHead>
+                <TableHead>{t("adminCustomers.outreach.subject")}</TableHead>
+                <TableHead>{t("adminCustomers.outreach.status")}</TableHead>
+                <TableHead>{t("adminCustomers.outreach.sent")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {messages.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="py-10 text-center text-slate-500">
-                    No messages yet.
+                    {t("adminCustomers.emptyMessages")}
                   </TableCell>
                 </TableRow>
               ) : (
                 messages.map((message) => (
                   <TableRow key={message.id}>
                     <TableCell className="capitalize">{message.channel}</TableCell>
-                    <TableCell className="text-slate-500">{message.subject ?? "--"}</TableCell>
+                    <TableCell className="text-slate-500">
+                      {message.subject ?? t("adminCustomers.notAvailable")}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
                         {message.status}

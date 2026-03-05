@@ -5,6 +5,8 @@ import { Button } from "@repo/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { Fragment, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { useTranslations } from "@/i18n/provider";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 const ORDER_STATUSES = ["pending", "processing", "completed", "cancelled"] as const;
 
@@ -62,6 +64,9 @@ const paymentBadgeStyles: Record<string, string> = {
 };
 
 export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
+  const t = useTranslations();
+  const tr = (key: string, fallback: string, values?: Record<string, string | number>) =>
+    t(key, values) || fallback;
   const [rows, setRows] = useState(orders);
   const [isPending, startTransition] = useTransition();
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
@@ -83,12 +88,12 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
     const fallbackStatus = rows.find((order) => order.id === orderId)?.status;
     const status = statusChanges[orderId] ?? fallbackStatus;
     if (!status) {
-      toast.error("Select a status before updating");
+      toast.error(tr("adminOrders.toasts.selectStatus", "Select a status before updating"));
       return;
     }
     if (isMock) {
       setRows((prev) => prev.map((order) => (order.id === orderId ? { ...order, status } : order)));
-      toast.success("Mock order updated");
+      toast.success(tr("adminOrders.toasts.mockUpdated", "Mock order updated"));
       return;
     }
 
@@ -102,7 +107,7 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
         });
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
-          throw new Error(payload.error || "Update failed");
+          throw new Error(payload.error || tr("adminOrders.toasts.updateFailed", "Update failed"));
         }
         const payload = await response.json();
         setRows((prev) =>
@@ -110,9 +115,13 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
             order.id === orderId ? { ...order, status: payload.status ?? order.status } : order,
           ),
         );
-        toast.success("Order status updated");
+        toast.success(tr("adminOrders.toasts.updated", "Order status updated"));
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to update order");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : tr("adminOrders.toasts.updateFailed", "Failed to update order"),
+        );
       } finally {
         setSelectedOrder(null);
       }
@@ -122,7 +131,7 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
   if (rows.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-card p-6 text-center text-sm text-muted-foreground">
-        No orders recorded yet.
+        {tr("adminOrders.empty", "No orders recorded yet.")}
       </div>
     );
   }
@@ -131,21 +140,24 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
     <div className="space-y-4">
       {isMock && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Showing mock orders generated from your catalog. Connect live orders to replace this view.
+          {tr(
+            "adminOrders.mockNotice",
+            "Showing mock orders generated from your catalog. Connect live orders to replace this view.",
+          )}
         </div>
       )}
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-4 py-3">Order</th>
-              <th className="px-4 py-3">Customer</th>
-              <th className="px-4 py-3">Fulfillment</th>
-              <th className="px-4 py-3">Payment</th>
-              <th className="px-4 py-3">Items</th>
-              <th className="px-4 py-3">Total</th>
-              <th className="px-4 py-3">Created</th>
-              <th className="px-4 py-3">Actions</th>
+              <th className="px-4 py-3">{tr("adminOrders.table.order", "Order")}</th>
+              <th className="px-4 py-3">{tr("adminOrders.table.customer", "Customer")}</th>
+              <th className="px-4 py-3">{tr("adminOrders.table.fulfillment", "Fulfillment")}</th>
+              <th className="px-4 py-3">{tr("adminOrders.table.payment", "Payment")}</th>
+              <th className="px-4 py-3">{tr("adminOrders.table.items", "Items")}</th>
+              <th className="px-4 py-3">{tr("adminOrders.table.total", "Total")}</th>
+              <th className="px-4 py-3">{tr("adminOrders.table.created", "Created")}</th>
+              <th className="px-4 py-3">{tr("adminOrders.table.actions", "Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -155,7 +167,7 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                   <td className="px-4 py-4">
                     <div className="font-mono text-xs text-muted-foreground">{order.id}</div>
                     <Badge className={`mt-2 capitalize ${statusBadgeStyles[order.status] || ""}`}>
-                      {order.status}
+                      {tr(`adminOrders.statuses.${order.status}`, order.status)}
                     </Badge>
                   </td>
                   <td className="px-4 py-4">
@@ -168,27 +180,35 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                         fulfillmentBadgeStyles[order.fulfillmentStatus] || ""
                       }`}
                     >
-                      {order.fulfillmentStatus}
+                      {tr(
+                        `adminOrders.fulfillmentStatus.${order.fulfillmentStatus}`,
+                        order.fulfillmentStatus,
+                      )}
                     </Badge>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      {order.shippingStatus.replace("_", " ")}
+                      {tr(
+                        `adminOrders.shippingStatus.${order.shippingStatus}`,
+                        order.shippingStatus.replace("_", " "),
+                      )}
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <Badge
-                      className={`capitalize ${paymentBadgeStyles[order.paymentStatus] || ""}`}
-                    >
-                      {order.paymentStatus}
+                    <Badge className={`capitalize ${paymentBadgeStyles[order.paymentStatus] || ""}`}>
+                      {tr(`adminOrders.paymentStatus.${order.paymentStatus}`, order.paymentStatus)}
                     </Badge>
                   </td>
                   <td className="px-4 py-4">
-                    <div className="text-sm font-medium">{order.itemCount} item(s)</div>
+                    <div className="text-sm font-medium">
+                      {tr("adminOrders.itemsCount", `${order.itemCount} item(s)`, {
+                        count: order.itemCount,
+                      })}
+                    </div>
                     <div className="text-xs text-muted-foreground">
-                      {order.items[0]?.title ?? "Items"}
+                      {order.items[0]?.title ?? tr("adminOrders.table.items", "Items")}
                     </div>
                   </td>
                   <td className="px-4 py-4 font-semibold">
-                    ${Number(order.total).toFixed(2)} {order.currency ?? "USD"}
+                    {formatCurrencyAmount(Number(order.total), order.currency ?? DEFAULT_CURRENCY_CODE)}
                   </td>
                   <td className="px-4 py-4 text-sm text-muted-foreground">
                     {new Date(order.createdAt).toLocaleString()}
@@ -201,12 +221,15 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                         onValueChange={(value) => handleChange(order.id, value)}
                       >
                         <SelectTrigger className="w-full text-left">
-                          <SelectValue placeholder="Status" />
+                          <SelectValue placeholder={tr("adminOrders.actions.status", "Status")} />
                         </SelectTrigger>
                         <SelectContent>
                           {ORDER_STATUSES.map((status) => (
                             <SelectItem key={status} value={status}>
-                              {status.charAt(0).toUpperCase() + status.slice(1)}
+                              {tr(
+                                `adminOrders.statuses.${status}`,
+                                status.charAt(0).toUpperCase() + status.slice(1),
+                              )}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -217,7 +240,9 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                           onClick={() => handleUpdate(order.id)}
                           disabled={isPending && selectedOrder === order.id}
                         >
-                          {isPending && selectedOrder === order.id ? "Saving..." : "Save"}
+                          {isPending && selectedOrder === order.id
+                            ? tr("adminOrders.actions.saving", "Saving...")
+                            : tr("adminOrders.actions.save", "Save")}
                         </Button>
                         <Button
                           size="sm"
@@ -226,7 +251,9 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                             setExpandedOrder((prev) => (prev === order.id ? null : order.id))
                           }
                         >
-                          {expandedOrder === order.id ? "Hide" : "Details"}
+                          {expandedOrder === order.id
+                            ? tr("adminOrders.actions.hide", "Hide")
+                            : tr("adminOrders.actions.details", "Details")}
                         </Button>
                       </div>
                     </div>
@@ -238,7 +265,7 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                       <div className="grid gap-4 md:grid-cols-2">
                         <div>
                           <div className="text-xs font-semibold uppercase text-muted-foreground">
-                            Line items
+                            {tr("adminOrders.details.lineItems", "Line items")}
                           </div>
                           <div className="mt-2 space-y-2">
                             {order.items.map((item) => (
@@ -249,12 +276,20 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                                 <div>
                                   <p className="font-medium text-slate-900">{item.title}</p>
                                   <p className="text-xs text-muted-foreground">
-                                    {item.sku ? `SKU ${item.sku}` : "No SKU"}
+                                    {item.sku
+                                      ? tr("adminOrders.details.sku", `SKU ${item.sku}`, {
+                                          sku: item.sku,
+                                        })
+                                      : tr("adminOrders.details.noSku", "No SKU")}
                                   </p>
                                 </div>
                                 <div className="text-right text-xs text-muted-foreground">
                                   <div>
-                                    {item.qty} × ${item.price.toFixed(2)} {item.currency}
+                                    {item.qty} ×{" "}
+                                    {formatCurrencyAmount(
+                                      item.price,
+                                      item.currency ?? DEFAULT_CURRENCY_CODE,
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -263,24 +298,37 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                         </div>
                         <div>
                           <div className="text-xs font-semibold uppercase text-muted-foreground">
-                            Fulfillment
+                            {tr("adminOrders.details.fulfillment", "Fulfillment")}
                           </div>
                           <div className="mt-2 space-y-2 rounded-md border border-slate-200 bg-white p-3 text-sm">
                             <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Destination</span>
+                              <span className="text-muted-foreground">
+                                {tr("adminOrders.details.destination", "Destination")}
+                              </span>
                               <span>{order.destination}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Shipping</span>
+                              <span className="text-muted-foreground">
+                                {tr("adminOrders.details.shipping", "Shipping")}
+                              </span>
                               <span>{order.shippingMethod}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Tracking</span>
-                              <span>{order.trackingNumber ?? "Not assigned"}</span>
+                              <span className="text-muted-foreground">
+                                {tr("adminOrders.details.tracking", "Tracking")}
+                              </span>
+                              <span>{order.trackingNumber ?? tr("adminOrders.details.notAssigned", "Not assigned")}</span>
                             </div>
                             <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Status</span>
-                              <span>{order.shippingStatus.replace("_", " ")}</span>
+                              <span className="text-muted-foreground">
+                                {tr("adminOrders.table.status", "Status")}
+                              </span>
+                              <span>
+                                {tr(
+                                  `adminOrders.shippingStatus.${order.shippingStatus}`,
+                                  order.shippingStatus.replace("_", " "),
+                                )}
+                              </span>
                             </div>
                           </div>
                         </div>

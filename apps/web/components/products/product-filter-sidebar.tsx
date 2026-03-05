@@ -6,12 +6,14 @@ import { Label } from "@repo/ui/label";
 import { RangeSlider } from "@repo/ui/range-slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/i18n/provider";
+import { DEFAULT_CURRENCY_CODE, currencySymbol } from "@/lib/utils/currency";
 import { cn } from "@/lib/utils";
 
 export type SortKey = "newest" | "oldest" | "price-asc" | "price-desc";
 export type ListingType = "all" | "buy-now" | "auction";
+export type PriceRange = [number, number];
 export type CategoryFilterOption = {
   value: string;
   label: string;
@@ -21,8 +23,8 @@ export type CategoryFilterOption = {
 type Props = {
   className?: string;
   categories: CategoryFilterOption[];
-  priceRange: [number, number];
-  onPriceRangeChange: (range: [number, number]) => void;
+  priceRange: PriceRange;
+  onPriceRangeChange: (range: PriceRange) => void;
   selectedCategories: string[];
   onCategoriesChange: (categories: string[]) => void;
   listingType: ListingType;
@@ -34,6 +36,27 @@ type Props = {
   showListingType?: boolean;
   priceMax?: number;
 };
+
+export function resolveDraftPriceRange(current: PriceRange, incoming: PriceRange): PriceRange {
+  if (current[0] === incoming[0] && current[1] === incoming[1]) {
+    return current;
+  }
+  return incoming;
+}
+
+export function createPriceRangeHandlers(
+  setDraftRange: (range: PriceRange) => void,
+  onCommitRange: (range: PriceRange) => void,
+) {
+  return {
+    onDraftChange: (range: PriceRange) => {
+      setDraftRange(range);
+    },
+    onCommit: (range: PriceRange) => {
+      onCommitRange(range);
+    },
+  };
+}
 
 export function ProductFilterSidebar({
   className,
@@ -52,12 +75,22 @@ export function ProductFilterSidebar({
   priceMax = 500,
 }: Props) {
   const t = useTranslations();
+  const [draftPriceRange, setDraftPriceRange] = useState<PriceRange>(priceRange);
   const [expandedSections, setExpandedSections] = useState({
     price: true,
     categories: true,
     listingType: true,
     sorting: true,
   });
+  const gelSymbol = useMemo(() => currencySymbol(DEFAULT_CURRENCY_CODE), []);
+  const priceRangeHandlers = useMemo(
+    () => createPriceRangeHandlers(setDraftPriceRange, onPriceRangeChange),
+    [onPriceRangeChange],
+  );
+
+  useEffect(() => {
+    setDraftPriceRange((current) => resolveDraftPriceRange(current, priceRange));
+  }, [priceRange]);
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -172,8 +205,9 @@ export function ProductFilterSidebar({
         {expandedSections.price && (
           <div className="space-y-4 pt-2" style={{ pointerEvents: "auto" }}>
             <RangeSlider
-              value={priceRange}
-              onValueChange={(value) => onPriceRangeChange(value as [number, number])}
+              value={draftPriceRange}
+              onValueChange={(value) => priceRangeHandlers.onDraftChange(value as PriceRange)}
+              onValueCommit={(value) => priceRangeHandlers.onCommit(value as PriceRange)}
               min={0}
               max={priceMax}
               step={10}
@@ -181,8 +215,14 @@ export function ProductFilterSidebar({
               className="w-full"
             />
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>${priceRange[0]}</span>
-              <span>${priceRange[1]}</span>
+              <span>
+                {gelSymbol}
+                {draftPriceRange[0]}
+              </span>
+              <span>
+                {gelSymbol}
+                {draftPriceRange[1]}
+              </span>
             </div>
           </div>
         )}

@@ -2,8 +2,11 @@ import { Badge } from "@repo/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@repo/ui/table";
 import type { Metadata } from "next";
+import type { Locale } from "@/i18n/config";
+import { getTranslations } from "@/i18n/server";
 import { getRequestOrigin } from "@/lib/server/request-origin";
-import { getSuperadminCookieHeader } from "@/lib/superadmin";
+import { getServerAuthCookieHeader } from "@/lib/superadmin";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 type PayoutEntry = {
   id: string;
@@ -29,7 +32,7 @@ async function fetchPayouts(slug: string): Promise<PayoutEntry[]> {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/payouts`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
   if (!response.ok) {
     throw new Error("Failed to load payouts");
@@ -41,7 +44,7 @@ async function fetchLedger(slug: string): Promise<LedgerEntry[]> {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/payouts/ledger`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
   if (!response.ok) {
     throw new Error("Failed to load payout ledger");
@@ -56,7 +59,7 @@ function buildMockPayouts(): PayoutEntry[] {
       id: "PAYOUT-1001",
       status: "scheduled",
       amount: 1840.5,
-      currency: "USD",
+      currency: DEFAULT_CURRENCY_CODE,
       scheduledFor: new Date(now + 3 * 24 * 60 * 60 * 1000).toISOString(),
       paidAt: null,
       method: "Bank transfer",
@@ -66,7 +69,7 @@ function buildMockPayouts(): PayoutEntry[] {
       id: "PAYOUT-1000",
       status: "paid",
       amount: 1250,
-      currency: "USD",
+      currency: DEFAULT_CURRENCY_CODE,
       scheduledFor: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
       paidAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
       method: "Bank transfer",
@@ -82,7 +85,7 @@ function buildMockLedger(): LedgerEntry[] {
       id: "LEDGER-0009",
       type: "withdrawal",
       amount: -1250,
-      currency: "USD",
+      currency: DEFAULT_CURRENCY_CODE,
       occurredAt: new Date(now - 4 * 24 * 60 * 60 * 1000).toISOString(),
       notes: "Payout transfer",
     },
@@ -90,7 +93,7 @@ function buildMockLedger(): LedgerEntry[] {
       id: "LEDGER-0010",
       type: "fee",
       amount: -42.75,
-      currency: "USD",
+      currency: DEFAULT_CURRENCY_CODE,
       occurredAt: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
       notes: "Processing fees",
     },
@@ -98,7 +101,7 @@ function buildMockLedger(): LedgerEntry[] {
       id: "LEDGER-0011",
       type: "chargeback",
       amount: -120,
-      currency: "USD",
+      currency: DEFAULT_CURRENCY_CODE,
       occurredAt: new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString(),
       notes: "Order #1042 dispute",
     },
@@ -113,7 +116,7 @@ function toNumber(value: number | string | null | undefined) {
 
 function formatMoney(amount: number | string, currency: string) {
   const value = toNumber(amount);
-  return `${currency} ${value.toFixed(2)}`;
+  return formatCurrencyAmount(value, currency || DEFAULT_CURRENCY_CODE);
 }
 
 function statusVariant(status: string) {
@@ -126,8 +129,13 @@ export const metadata: Metadata = {
   title: "Payouts",
 };
 
-export default async function PayoutsPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function PayoutsPage({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { slug, locale } = await params;
+  const t = await getTranslations(locale as Locale);
   let payouts = await fetchPayouts(slug).catch(() => []);
   let ledger = await fetchLedger(slug).catch(() => []);
   let isMock = false;
@@ -145,40 +153,38 @@ export default async function PayoutsPage({ params }: { params: Promise<{ slug: 
     <div className="container py-10 space-y-8">
       <div className="space-y-1">
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Payouts
+          {t("adminPayouts.eyebrow")}
         </p>
-        <h1 className="text-3xl font-bold">Payouts & settlements</h1>
-        <p className="text-sm text-muted-foreground">
-          Track upcoming settlements, fees, and chargebacks.
-        </p>
+        <h1 className="text-3xl font-bold">{t("adminPayouts.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("adminPayouts.description")}</p>
       </div>
 
       {isMock ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          Showing mock payouts and ledger entries. Wire to live finance data when available.
+          {t("adminPayouts.mockNotice")}
         </div>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Settlement schedule</CardTitle>
+          <CardTitle>{t("adminPayouts.scheduleTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Reference</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Scheduled</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Method</TableHead>
+                <TableHead>{t("adminPayouts.table.reference")}</TableHead>
+                <TableHead>{t("adminPayouts.table.status")}</TableHead>
+                <TableHead>{t("adminPayouts.table.scheduled")}</TableHead>
+                <TableHead>{t("adminPayouts.table.amount")}</TableHead>
+                <TableHead>{t("adminPayouts.table.method")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {payouts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="py-10 text-center text-slate-500">
-                    No payouts scheduled yet.
+                    {t("adminPayouts.emptySchedule")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -189,13 +195,13 @@ export default async function PayoutsPage({ params }: { params: Promise<{ slug: 
                     </TableCell>
                     <TableCell>
                       <Badge variant={statusVariant(payout.status)} className="capitalize">
-                        {payout.status}
+                        {t(`adminPayouts.status.${payout.status}`) || payout.status}
                       </Badge>
                     </TableCell>
                     <TableCell>{new Date(payout.scheduledFor).toLocaleDateString()}</TableCell>
                     <TableCell>{formatMoney(payout.amount, payout.currency)}</TableCell>
                     <TableCell className="text-slate-500">
-                      {payout.method ?? "Bank transfer"}
+                      {payout.method ?? t("adminPayouts.bankTransfer")}
                     </TableCell>
                   </TableRow>
                 ))
@@ -207,32 +213,36 @@ export default async function PayoutsPage({ params }: { params: Promise<{ slug: 
 
       <Card>
         <CardHeader>
-          <CardTitle>Payout ledger</CardTitle>
+          <CardTitle>{t("adminPayouts.ledgerTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Amount</TableHead>
-                <TableHead>Notes</TableHead>
+                <TableHead>{t("adminPayouts.ledger.type")}</TableHead>
+                <TableHead>{t("adminPayouts.ledger.date")}</TableHead>
+                <TableHead>{t("adminPayouts.ledger.amount")}</TableHead>
+                <TableHead>{t("adminPayouts.ledger.notes")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {ledger.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="py-10 text-center text-slate-500">
-                    No ledger activity yet.
+                    {t("adminPayouts.emptyLedger")}
                   </TableCell>
                 </TableRow>
               ) : (
                 ledger.map((entry) => (
                   <TableRow key={entry.id}>
-                    <TableCell className="capitalize">{entry.type}</TableCell>
+                    <TableCell className="capitalize">
+                      {t(`adminPayouts.ledgerType.${entry.type}`) || entry.type}
+                    </TableCell>
                     <TableCell>{new Date(entry.occurredAt).toLocaleDateString()}</TableCell>
                     <TableCell>{formatMoney(entry.amount, entry.currency)}</TableCell>
-                    <TableCell className="text-slate-500">{entry.notes ?? "--"}</TableCell>
+                    <TableCell className="text-slate-500">
+                      {entry.notes ?? t("adminPayouts.notAvailable")}
+                    </TableCell>
                   </TableRow>
                 ))
               )}

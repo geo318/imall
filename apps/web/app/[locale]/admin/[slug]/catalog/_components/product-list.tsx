@@ -12,7 +12,9 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import LazyImage from "@/components/shared/lazy-image";
 import { Link } from "@/i18n/navigation.client";
+import { useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
+import { DEFAULT_CURRENCY_CODE, currencySymbol, formatCurrencyAmount } from "@/lib/utils/currency";
 import { getPrimaryImage } from "@/lib/utils/images";
 
 type Props = {
@@ -42,21 +44,24 @@ type ProductWithStats = ApiProduct & {
 const PAGE_SIZE = 15;
 
 const sortOptions = [
-  { value: "createdAt:desc", label: "Newest" },
-  { value: "createdAt:asc", label: "Oldest" },
-  { value: "title:asc", label: "Title (A-Z)" },
-  { value: "title:desc", label: "Title (Z-A)" },
-  { value: "price:asc", label: "Price (Low-High)" },
-  { value: "price:desc", label: "Price (High-Low)" },
-  { value: "stock:asc", label: "Stock (Low-High)" },
-  { value: "stock:desc", label: "Stock (High-Low)" },
-];
+  { value: "createdAt:desc", labelKey: "adminProductList.sort.newest" },
+  { value: "createdAt:asc", labelKey: "adminProductList.sort.oldest" },
+  { value: "title:asc", labelKey: "adminProductList.sort.titleAsc" },
+  { value: "title:desc", labelKey: "adminProductList.sort.titleDesc" },
+  { value: "price:asc", labelKey: "adminProductList.sort.priceAsc" },
+  { value: "price:desc", labelKey: "adminProductList.sort.priceDesc" },
+  { value: "stock:asc", labelKey: "adminProductList.sort.stockAsc" },
+  { value: "stock:desc", labelKey: "adminProductList.sort.stockDesc" },
+] as const;
 
 export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props) {
+  const t = useTranslations();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sortSelection, setSortSelection] = useState(sortOptions[0]?.value ?? "createdAt:desc");
+  const [sortSelection, setSortSelection] = useState<string>(
+    sortOptions[0]?.value ?? "createdAt:desc",
+  );
   const [page, setPage] = useState(1);
   const [activeProduct, setActiveProduct] = useState<ProductWithStats | null>(null);
 
@@ -97,7 +102,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
     queryKey: ["admin-products", shopSlug, statusFilter, debouncedSearch, sortSelection],
     queryFn: async () => {
       const response = await fetch(`/api/admin/${shopSlug}/products?${queryString}`);
-      if (!response.ok) throw new Error("Failed to fetch products");
+      if (!response.ok) throw new Error(t("adminProductList.errors.fetchFailed"));
       return response.json();
     },
     placeholderData: keepPreviousData,
@@ -119,14 +124,14 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
       const response = await fetch(`/api/admin/${shopSlug}/products/${productId}`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to delete product");
+      if (!response.ok) throw new Error(t("adminProductList.errors.deleteFailed"));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-products", shopSlug] });
-      toast.success("Product deleted successfully");
+      toast.success(t("adminProductList.toasts.deleted"));
     },
     onError: () => {
-      toast.error("Failed to delete product");
+      toast.error(t("adminProductList.toasts.deleteFailed"));
     },
   });
 
@@ -137,26 +142,26 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
 
   const renderStock = (product: ProductWithStats, hasAuction: boolean) => {
     if (hasAuction) {
-      return <Badge variant="outline">Auction</Badge>;
+      return <Badge variant="outline">{t("adminProductList.stock.auction")}</Badge>;
     }
     const trackedStocks = product.variants
       .map((variant) => variant.availableQty)
       .filter((qty): qty is number => typeof qty === "number");
 
     if (trackedStocks.length === 0) {
-      return <Badge variant="outline">Set stock</Badge>;
+      return <Badge variant="outline">{t("adminProductList.stock.setStock")}</Badge>;
     }
 
     const hasOut = trackedStocks.some((qty) => qty <= 0);
     const hasLow = trackedStocks.some((qty) => qty > 0 && qty <= 5);
 
     if (hasOut) {
-      return <Badge variant="destructive">Out</Badge>;
+      return <Badge variant="destructive">{t("adminProductList.stock.out")}</Badge>;
     }
     if (hasLow) {
-      return <Badge variant="destructive">Low</Badge>;
+      return <Badge variant="destructive">{t("adminProductList.stock.low")}</Badge>;
     }
-    return <Badge className="bg-emerald-100 text-emerald-900">In stock</Badge>;
+    return <Badge className="bg-emerald-100 text-emerald-900">{t("adminProductList.stock.inStock")}</Badge>;
   };
 
   return (
@@ -164,21 +169,23 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <Input
-            placeholder="Search products"
+            placeholder={t("adminProductList.searchPlaceholder")}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             className="sm:max-w-xs"
           />
-          {isFetching && <span className="text-xs text-slate-500">Updating results...</span>}
+          {isFetching && (
+            <span className="text-xs text-slate-500">{t("adminProductList.updatingResults")}</span>
+          )}
         </div>
         <Select value={sortSelection} onValueChange={setSortSelection}>
           <SelectTrigger className="sm:w-56">
-            <SelectValue placeholder="Sort" />
+            <SelectValue placeholder={t("adminProductList.sort.placeholder")} />
           </SelectTrigger>
           <SelectContent>
             {sortOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>
-                {option.label}
+                {t(option.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -189,19 +196,19 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Stock</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t("adminProductList.table.product")}</TableHead>
+              <TableHead>{t("adminProductList.table.price")}</TableHead>
+              <TableHead>{t("adminProductList.table.stock")}</TableHead>
+              <TableHead>{t("adminProductList.table.type")}</TableHead>
+              <TableHead>{t("adminProductList.table.status")}</TableHead>
+              <TableHead className="text-right">{t("adminProductList.table.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {pageProducts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-slate-500">
-                  {isLoading ? "Loading products..." : "No products found."}
+                  {isLoading ? t("adminProductList.loading") : t("adminProductList.empty")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -231,9 +238,10 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                 const priceValue = hasAuction ? auctionPrice : basePrice;
                 const priceLabel =
                   priceValue !== null && priceValue !== undefined && Number.isFinite(priceValue)
-                    ? `$${Number(priceValue).toFixed(2)}`
+                    ? formatCurrencyAmount(Number(priceValue), product.currency || primaryVariant?.currency)
                     : "--";
-                const currency = product.currency || primaryVariant?.currency || "USD";
+                const currency = product.currency || primaryVariant?.currency || DEFAULT_CURRENCY_CODE;
+                const currencyLabel = currencySymbol(currency);
                 const trackedStocks = product.variants
                   .map((variant) => variant.availableQty)
                   .filter((qty): qty is number => typeof qty === "number");
@@ -259,8 +267,8 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                         <div className="min-w-0">
                           <p className="truncate font-semibold text-slate-900">{product.title}</p>
                           <p className="text-xs text-slate-500">
-                            {product.category || "Uncategorized"} · {variantCount} variant
-                            {variantCount === 1 ? "" : "s"}
+                            {product.category || t("adminProductList.uncategorized")} ·{" "}
+                            {t("adminProductList.variantCount", { count: variantCount })}
                           </p>
                         </div>
                       </div>
@@ -268,7 +276,8 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                     <TableCell>
                       <div className="font-semibold text-slate-900">{priceLabel}</div>
                       <div className="text-xs text-slate-500">
-                        {hasAuction ? "Auction" : "Fixed"} · {currency}
+                        {hasAuction ? t("adminProductList.type.auction") : t("adminProductList.type.fixed")} ·{" "}
+                        {currencyLabel}
                       </div>
                       {variantCount > 1 && !hasAuction && (
                         <button
@@ -276,7 +285,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                           onClick={() => setActiveProduct(product)}
                           className="text-xs text-brand-700 hover:underline"
                         >
-                          Show variants
+                          {t("adminProductList.showVariants")}
                         </button>
                       )}
                     </TableCell>
@@ -296,19 +305,25 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                     </TableCell>
                     <TableCell>
                       {hasAuction ? (
-                        <Badge className="bg-indigo-100 text-indigo-900">Auction</Badge>
+                        <Badge className="bg-indigo-100 text-indigo-900">
+                          {t("adminProductList.type.auction")}
+                        </Badge>
                       ) : (
-                        <Badge variant="secondary">Standard</Badge>
+                        <Badge variant="secondary">{t("adminProductList.type.standard")}</Badge>
                       )}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-2">
                         {product.draft ? (
-                          <Badge variant="secondary">Draft</Badge>
+                          <Badge variant="secondary">{t("adminProductList.status.draft")}</Badge>
                         ) : (
-                          <Badge className="bg-emerald-100 text-emerald-900">Active</Badge>
+                          <Badge className="bg-emerald-100 text-emerald-900">
+                            {t("adminProductList.status.active")}
+                          </Badge>
                         )}
-                        {product.deletedAt && <Badge variant="destructive">Deleted</Badge>}
+                        {product.deletedAt && (
+                          <Badge variant="destructive">{t("adminProductList.status.deleted")}</Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -318,12 +333,17 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                           size="sm"
                           onClick={() => onEdit(product.id)}
                           className="h-8 w-8 p-0"
-                          title="Edit"
+                          title={t("adminProductList.actions.edit")}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Link href={`/${productIdentifier}`} target="_blank">
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="View">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            title={t("adminProductList.actions.view")}
+                          >
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         </Link>
@@ -332,12 +352,12 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              if (confirm("Are you sure you want to delete this product?")) {
+                              if (confirm(t("adminProductList.deleteConfirm"))) {
                                 deleteMutation.mutate(product.id);
                               }
                             }}
                             className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                            title="Delete"
+                            title={t("adminProductList.actions.delete")}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -355,8 +375,11 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
       {products.length > PAGE_SIZE && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-slate-500">
-            Showing {startIndex + 1}-{Math.min(startIndex + PAGE_SIZE, products.length)} of{" "}
-            {products.length}
+            {t("adminProductList.pagination.showing", {
+              from: startIndex + 1,
+              to: Math.min(startIndex + PAGE_SIZE, products.length),
+              total: products.length,
+            })}
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -365,10 +388,10 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
               onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               disabled={page === 1}
             >
-              Previous
+              {t("adminProductList.pagination.previous")}
             </Button>
             <span className="text-xs text-slate-500">
-              Page {page} of {totalPages}
+              {t("adminProductList.pagination.pageOf", { page, total: totalPages })}
             </span>
             <Button
               variant="outline"
@@ -376,7 +399,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
               onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
               disabled={page === totalPages}
             >
-              Next
+              {t("adminProductList.pagination.next")}
             </Button>
           </div>
         </div>
@@ -384,7 +407,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
 
       <Modal open={Boolean(activeProduct)} onClose={() => setActiveProduct(null)}>
         <ModalHeader>
-          <ModalTitle>Variant overview</ModalTitle>
+          <ModalTitle>{t("adminProductList.variantOverview.title")}</ModalTitle>
         </ModalHeader>
         <ModalBody>
           {activeProduct ? (
@@ -392,22 +415,28 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
               <div>
                 <p className="font-semibold text-slate-900">{activeProduct.title}</p>
                 <p className="text-xs text-slate-500">
-                  {activeProduct.category || "Uncategorized"}
+                  {activeProduct.category || t("adminProductList.uncategorized")}
                 </p>
               </div>
               {activeProduct.hasAuction ||
               activeProduct.auctionStartingBid ||
               activeProduct.auctionCurrentPrice ? (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                  Auction product. Current price:{" "}
+                  {t("adminProductList.variantOverview.auctionProduct")}{" "}
                   {activeProduct.auctionCurrentPrice !== null &&
                   activeProduct.auctionCurrentPrice !== undefined
-                    ? `$${Number(activeProduct.auctionCurrentPrice).toFixed(2)}`
+                    ? formatCurrencyAmount(
+                        Number(activeProduct.auctionCurrentPrice),
+                        activeProduct.currency,
+                      )
                     : "--"}{" "}
-                  · Starting bid:{" "}
+                  · {t("adminProductList.variantOverview.startingBid")}{" "}
                   {activeProduct.auctionStartingBid !== null &&
                   activeProduct.auctionStartingBid !== undefined
-                    ? `$${Number(activeProduct.auctionStartingBid).toFixed(2)}`
+                    ? formatCurrencyAmount(
+                        Number(activeProduct.auctionStartingBid),
+                        activeProduct.currency,
+                      )
                     : "--"}
                 </div>
               ) : (
@@ -415,23 +444,26 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>SKU</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Stock</TableHead>
+                        <TableHead>{t("adminProductList.table.sku")}</TableHead>
+                        <TableHead>{t("adminProductList.table.price")}</TableHead>
+                        <TableHead>{t("adminProductList.table.stock")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {activeProduct.variants.map((variant) => {
                         const priceValue = Number(variant.price);
                         const priceLabel = Number.isFinite(priceValue)
-                          ? `$${priceValue.toFixed(2)}`
+                          ? formatCurrencyAmount(priceValue, variant.currency)
                           : "--";
                         const stockQty = variant.availableQty ?? 0;
                         return (
                           <TableRow key={variant.id}>
-                            <TableCell>{variant.sku || "--"}</TableCell>
                             <TableCell>
-                              {priceLabel} {variant.currency}
+                              {variant.sku ||
+                                t("adminProductList.variantOverview.noSkuShort")}
+                            </TableCell>
+                            <TableCell>
+                              {priceLabel}
                             </TableCell>
                             <TableCell>{stockQty}</TableCell>
                           </TableRow>

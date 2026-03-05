@@ -1,17 +1,13 @@
-import { Metadata } from "next";
 import { Badge } from "@repo/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@repo/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@repo/ui/table";
+import type { Metadata } from "next";
+import type { Locale } from "@/i18n/config";
+import { getTranslations } from "@/i18n/server";
 import type { ApiProduct } from "@/lib/api/products";
 import { getRequestOrigin } from "@/lib/server/request-origin";
-import { getSuperadminCookieHeader } from "@/lib/superadmin";
+import { getServerAuthCookieHeader } from "@/lib/superadmin";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 type ReturnItem = {
   id: string;
@@ -35,7 +31,7 @@ async function fetchReturns(slug: string): Promise<ReturnEntry[]> {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/returns`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
   if (!response.ok) {
     throw new Error("Failed to load returns");
@@ -47,7 +43,7 @@ async function fetchProducts(slug: string): Promise<ApiProduct[]> {
   const origin = await getRequestOrigin();
   const response = await fetch(`${origin}/api/admin/${slug}/products?status=active`, {
     cache: "no-store",
-    headers: await getSuperadminCookieHeader(),
+    headers: await getServerAuthCookieHeader(),
   });
   if (!response.ok) {
     return [];
@@ -65,7 +61,7 @@ function buildMockReturns(products: ApiProduct[]): ReturnEntry[] {
     status: statuses[index % statuses.length] ?? "requested",
     rmaNumber: `RMA-${1000 + index}`,
     refundAmount: Number(product.priceMin ?? 25) * 0.8,
-    refundCurrency: product.currency ?? "USD",
+    refundCurrency: product.currency ?? DEFAULT_CURRENCY_CODE,
     requestedAt: new Date(Date.now() - index * 2 * 24 * 60 * 60 * 1000).toISOString(),
     restockStatus: index % 2 === 0 ? "pending" : "restocked",
     items: [
@@ -89,15 +85,20 @@ function formatRefund(amount: number | string | null, currency: string | null) {
   if (amount === null) return "--";
   const value = typeof amount === "number" ? amount : Number(amount);
   if (!Number.isFinite(value)) return "--";
-  return `${currency ?? "USD"} ${value.toFixed(2)}`;
+  return formatCurrencyAmount(value, currency ?? DEFAULT_CURRENCY_CODE);
 }
 
 export const metadata: Metadata = {
   title: "Returns",
 };
 
-export default async function ReturnsPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function ReturnsPage({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { slug, locale } = await params;
+  const t = await getTranslations(locale as Locale);
   let returns = await fetchReturns(slug).catch(() => []);
   let isMock = false;
 
@@ -111,41 +112,39 @@ export default async function ReturnsPage({ params }: { params: Promise<{ slug: 
     <div className="container py-10 space-y-8">
       <div className="space-y-1">
         <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Returns
+          {t("adminReturns.eyebrow")}
         </p>
-        <h1 className="text-3xl font-bold">Returns & refunds</h1>
-        <p className="text-sm text-muted-foreground">
-          Track RMAs, refund status, and restock decisions.
-        </p>
+        <h1 className="text-3xl font-bold">{t("adminReturns.title")}</h1>
+        <p className="text-sm text-muted-foreground">{t("adminReturns.description")}</p>
       </div>
 
       {isMock ? (
         <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          Showing mock return requests. Connect live return data when available.
+          {t("adminReturns.mockNotice")}
         </div>
       ) : null}
 
       <Card>
         <CardHeader>
-          <CardTitle>Return requests</CardTitle>
+          <CardTitle>{t("adminReturns.requestsTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>RMA</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Requested</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Refund</TableHead>
-                <TableHead>Restock</TableHead>
+                <TableHead>{t("adminReturns.table.rma")}</TableHead>
+                <TableHead>{t("adminReturns.table.status")}</TableHead>
+                <TableHead>{t("adminReturns.table.requested")}</TableHead>
+                <TableHead>{t("adminReturns.table.items")}</TableHead>
+                <TableHead>{t("adminReturns.table.refund")}</TableHead>
+                <TableHead>{t("adminReturns.table.restock")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {returns.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="py-10 text-center text-slate-500">
-                    No returns logged yet.
+                    {t("adminReturns.empty")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -154,15 +153,15 @@ export default async function ReturnsPage({ params }: { params: Promise<{ slug: 
                     <TableCell className="font-medium">{entry.rmaNumber ?? entry.id}</TableCell>
                     <TableCell>
                       <Badge variant={statusVariant(entry.status)} className="capitalize">
-                        {entry.status}
+                        {t(`adminReturns.status.${entry.status}`) || entry.status}
                       </Badge>
                     </TableCell>
                     <TableCell>{new Date(entry.requestedAt).toLocaleDateString()}</TableCell>
                     <TableCell>{entry.items.length}</TableCell>
-                    <TableCell>
-                      {formatRefund(entry.refundAmount, entry.refundCurrency)}
+                    <TableCell>{formatRefund(entry.refundAmount, entry.refundCurrency)}</TableCell>
+                    <TableCell className="capitalize">
+                      {t(`adminReturns.restock.${entry.restockStatus}`) || entry.restockStatus}
                     </TableCell>
-                    <TableCell className="capitalize">{entry.restockStatus}</TableCell>
                   </TableRow>
                 ))
               )}

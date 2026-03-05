@@ -5,14 +5,17 @@ import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
 import { ArrowLeft, Check, CreditCard, Shield, Truck } from "lucide-react";
 import { Link } from "@/i18n/navigation.client";
+import { useTranslations } from "@/i18n/provider";
 import { useEffect, useState } from "react";
 import { checkoutCart, getCart } from "@/actions/carts";
 import type { CartItem } from "@/lib/api/cart";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 export default function CheckoutPage() {
+  const t = useTranslations();
   const [items, setItems] = useState<CartItem[]>([]);
   const [step, setStep] = useState<"shipping" | "payment" | "confirmation">("shipping");
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "paypal" | "installments">("card");
   const [loading, setLoading] = useState(true);
 
   const cartKey = "cart";
@@ -39,8 +42,8 @@ export default function CheckoutPage() {
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
   const shipping = subtotal > 100 ? 0 : 9.99;
-  const tax = subtotal * 0.08;
-  const total = subtotal + shipping + tax;
+  const installmentCommission = paymentMethod === "installments" ? subtotal * 0.12 : 0;
+  const total = subtotal + shipping + installmentCommission;
 
   const handleContinue = async () => {
     if (step === "shipping") {
@@ -63,7 +66,7 @@ export default function CheckoutPage() {
   if (loading) {
     return (
       <div className="container py-8">
-        <p className="p-4">Loading…</p>
+        <p className="p-4">{t("checkout.loading")}</p>
       </div>
     );
   }
@@ -75,18 +78,18 @@ export default function CheckoutPage() {
           <div className="w-20 h-20 bg-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <Check className="h-10 w-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">Order Confirmed!</h1>
-          <p className="text-slate-600 mb-2">Thank you for your purchase</p>
+          <h1 className="text-3xl font-bold mb-2">{t("checkout.confirmed.title")}</h1>
+          <p className="text-slate-600 mb-2">{t("checkout.confirmed.subtitle")}</p>
           <p className="text-sm text-slate-500 mb-8">
-            Order #MKT-
+            {t("checkout.confirmed.orderPrefix")}
             {Math.random().toString(36).substring(2, 8).toUpperCase()}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button>
-              <Link href="/">Continue Shopping</Link>
+              <Link href="/">{t("checkout.confirmed.continueShopping")}</Link>
             </Button>
             <Button variant="outline">
-              <Link href="/">Back to Home</Link>
+              <Link href="/">{t("checkout.confirmed.backHome")}</Link>
             </Button>
           </div>
         </div>
@@ -103,7 +106,7 @@ export default function CheckoutPage() {
           className="inline-flex items-center text-sm text-slate-600 hover:text-slate-900 mb-6"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Cart
+          {t("checkout.backToCart")}
         </Link>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -119,7 +122,7 @@ export default function CheckoutPage() {
                 >
                   {step === "shipping" ? "1" : <Check className="h-4 w-4" />}
                 </div>
-                <span className="font-medium">Shipping</span>
+                <span className="font-medium">{t("checkout.steps.shipping")}</span>
               </div>
               <div className="flex-1 h-px bg-slate-200" />
               <div className="flex items-center gap-2">
@@ -131,7 +134,7 @@ export default function CheckoutPage() {
                   2
                 </div>
                 <span className={step === "payment" ? "font-medium" : "text-slate-600"}>
-                  Payment
+                  {t("checkout.steps.payment")}
                 </span>
               </div>
             </div>
@@ -140,46 +143,46 @@ export default function CheckoutPage() {
               <div className="bg-white border border-slate-200 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <Truck className="h-5 w-5 text-emerald-600" />
-                  <h2 className="text-lg font-semibold">Shipping Information</h2>
+                  <h2 className="text-lg font-semibold">{t("checkout.shipping.title")}</h2>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" placeholder="John" />
+                    <Label htmlFor="firstName">{t("checkout.shipping.firstName")}</Label>
+                    <Input id="firstName" placeholder={t("checkout.shipping.firstNamePlaceholder")} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" placeholder="Doe" />
+                    <Label htmlFor="lastName">{t("checkout.shipping.lastName")}</Label>
+                    <Input id="lastName" placeholder={t("checkout.shipping.lastNamePlaceholder")} />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">{t("checkout.shipping.email")}</Label>
                     <Input id="email" type="email" placeholder="john@example.com" />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="address">Address</Label>
-                    <Input id="address" placeholder="123 Main Street" />
+                    <Label htmlFor="address">{t("checkout.shipping.address")}</Label>
+                    <Input id="address" placeholder={t("checkout.shipping.addressPlaceholder")} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input id="city" placeholder="New York" />
+                    <Label htmlFor="city">{t("checkout.shipping.city")}</Label>
+                    <Input id="city" placeholder={t("checkout.shipping.cityPlaceholder")} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="state">State</Label>
-                    <Input id="state" placeholder="NY" />
+                    <Label htmlFor="state">{t("checkout.shipping.state")}</Label>
+                    <Input id="state" placeholder={t("checkout.shipping.statePlaceholder")} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="zip">ZIP Code</Label>
-                    <Input id="zip" placeholder="10001" />
+                    <Label htmlFor="zip">{t("checkout.shipping.zip")}</Label>
+                    <Input id="zip" placeholder={t("checkout.shipping.zipPlaceholder")} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input id="phone" placeholder="(555) 123-4567" />
+                    <Label htmlFor="phone">{t("checkout.shipping.phone")}</Label>
+                    <Input id="phone" placeholder={t("checkout.shipping.phonePlaceholder")} />
                   </div>
                 </div>
 
                 <Button onClick={handleContinue} className="w-full mt-6" size="lg">
-                  Continue to Payment
+                  {t("checkout.actions.continueToPayment")}
                 </Button>
               </div>
             )}
@@ -188,7 +191,7 @@ export default function CheckoutPage() {
               <div className="bg-white border border-slate-200 rounded-xl p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <CreditCard className="h-5 w-5 text-emerald-600" />
-                  <h2 className="text-lg font-semibold">Payment Method</h2>
+                  <h2 className="text-lg font-semibold">{t("checkout.payment.title")}</h2>
                 </div>
 
                 <div className="space-y-3 mb-6">
@@ -199,13 +202,13 @@ export default function CheckoutPage() {
                       name="payment"
                       value="card"
                       checked={paymentMethod === "card"}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="h-4 w-4 text-emerald-600"
-                    />
-                    <Label htmlFor="card" className="flex-1 cursor-pointer">
-                      Credit / Debit Card
-                    </Label>
-                  </div>
+                      onChange={(e) => setPaymentMethod(e.target.value as "card")}
+                    className="h-4 w-4 text-emerald-600"
+                  />
+                  <Label htmlFor="card" className="flex-1 cursor-pointer">
+                    {t("checkout.payment.card")}
+                  </Label>
+                </div>
                   <div className="flex items-center space-x-3 p-4 border border-slate-200 rounded-lg cursor-pointer hover:border-emerald-500/50 transition-colors">
                     <input
                       type="radio"
@@ -213,25 +216,39 @@ export default function CheckoutPage() {
                       name="payment"
                       value="paypal"
                       checked={paymentMethod === "paypal"}
-                      onChange={(e) => setPaymentMethod(e.target.value)}
-                      className="h-4 w-4 text-emerald-600"
-                    />
-                    <Label htmlFor="paypal" className="flex-1 cursor-pointer">
-                      PayPal
-                    </Label>
-                  </div>
+                      onChange={(e) => setPaymentMethod(e.target.value as "paypal")}
+                    className="h-4 w-4 text-emerald-600"
+                  />
+                  <Label htmlFor="paypal" className="flex-1 cursor-pointer">
+                    {t("checkout.payment.paypal")}
+                  </Label>
                 </div>
+                  <div className="flex items-center space-x-3 p-4 border border-slate-200 rounded-lg cursor-pointer hover:border-emerald-500/50 transition-colors">
+                    <input
+                      type="radio"
+                      id="installments"
+                      name="payment"
+                      value="installments"
+                      checked={paymentMethod === "installments"}
+                      onChange={(e) => setPaymentMethod(e.target.value as "installments")}
+                    className="h-4 w-4 text-emerald-600"
+                  />
+                  <Label htmlFor="installments" className="flex-1 cursor-pointer">
+                    {t("checkout.payment.installments")}
+                  </Label>
+                </div>
+              </div>
 
                 {paymentMethod === "card" && (
                   <div className="space-y-4 mb-6">
                     <div className="space-y-2">
-                      <Label htmlFor="cardNumber">Card Number</Label>
-                      <Input id="cardNumber" placeholder="1234 5678 9012 3456" />
+                      <Label htmlFor="cardNumber">{t("checkout.payment.cardNumber")}</Label>
+                      <Input id="cardNumber" placeholder={t("checkout.payment.cardNumberPlaceholder")} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="expiry">Expiry Date</Label>
-                        <Input id="expiry" placeholder="MM/YY" />
+                        <Label htmlFor="expiry">{t("checkout.payment.expiry")}</Label>
+                        <Input id="expiry" placeholder={t("checkout.payment.expiryPlaceholder")} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="cvc">CVC</Label>
@@ -239,23 +256,23 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="cardName">Name on Card</Label>
-                      <Input id="cardName" placeholder="John Doe" />
+                      <Label htmlFor="cardName">{t("checkout.payment.cardName")}</Label>
+                      <Input id="cardName" placeholder={t("checkout.payment.cardNamePlaceholder")} />
                     </div>
                   </div>
                 )}
 
                 <div className="flex items-center gap-2 text-sm text-slate-600 mb-6">
                   <Shield className="h-4 w-4" />
-                  <span>Your payment information is encrypted and secure</span>
+                  <span>{t("checkout.payment.secureNote")}</span>
                 </div>
 
                 <div className="flex gap-4">
                   <Button variant="outline" onClick={() => setStep("shipping")} className="flex-1">
-                    Back
+                    {t("checkout.actions.back")}
                   </Button>
                   <Button onClick={handleContinue} className="flex-1" size="lg">
-                    Place Order
+                    {t("checkout.actions.placeOrder")}
                   </Button>
                 </div>
               </div>
@@ -265,7 +282,7 @@ export default function CheckoutPage() {
           {/* Order Summary */}
           <div className="lg:col-span-1">
             <div className="bg-white border border-slate-200 rounded-xl p-6 sticky top-24">
-              <h2 className="text-lg font-semibold mb-4">Order Summary</h2>
+              <h2 className="text-lg font-semibold mb-4">{t("checkout.summary.title")}</h2>
 
               <div className="space-y-3 mb-4">
                 {items.map((item) => (
@@ -273,34 +290,38 @@ export default function CheckoutPage() {
                     <span className="text-slate-600">
                       {item.productTitle} × {item.qty}
                     </span>
-                    <span>${(Number(item.price) * item.qty).toFixed(2)}</span>
+                    <span>
+                      {formatCurrencyAmount(Number(item.price) * item.qty, DEFAULT_CURRENCY_CODE)}
+                    </span>
                   </div>
                 ))}
               </div>
 
               <div className="border-t border-slate-200 pt-4 space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span className="text-slate-600">{t("checkout.summary.subtotal")}</span>
+                  <span>{formatCurrencyAmount(subtotal, DEFAULT_CURRENCY_CODE)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Shipping</span>
+                  <span className="text-slate-600">{t("checkout.summary.shipping")}</span>
                   <span>
                     {shipping === 0 ? (
-                      <span className="text-emerald-600">Free</span>
+                      <span className="text-emerald-600">{t("checkout.summary.free")}</span>
                     ) : (
-                      `$${shipping.toFixed(2)}`
+                      formatCurrencyAmount(shipping, DEFAULT_CURRENCY_CODE)
                     )}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600">Tax</span>
-                  <span>${tax.toFixed(2)}</span>
-                </div>
+                {paymentMethod === "installments" && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-600">{t("checkout.summary.installmentFee")}</span>
+                    <span>{formatCurrencyAmount(installmentCommission, DEFAULT_CURRENCY_CODE)}</span>
+                  </div>
+                )}
                 <div className="border-t border-slate-200 pt-3 mt-3">
                   <div className="flex justify-between text-base font-semibold">
-                    <span>Total</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>{t("checkout.summary.total")}</span>
+                    <span>{formatCurrencyAmount(total, DEFAULT_CURRENCY_CODE)}</span>
                   </div>
                 </div>
               </div>
