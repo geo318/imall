@@ -1,14 +1,7 @@
 import { promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
 import { Elysia } from "elysia";
-import { resolveUploadsDir } from "../storage/uploads-dir";
-
-/**
- * Get the uploads directory path
- */
-function getUploadsDir(): string {
-  return resolveUploadsDir();
-}
+import { resolveUploadsDirs } from "../storage/uploads-dir";
 
 /**
  * Image serving route
@@ -32,23 +25,34 @@ export const imageRoutes = new Elysia({
       return { error: "Invalid image path" };
     }
 
-    // Build file path: uploads/shopSlug/productId/filename.webp
-    const uploadsDir = getUploadsDir();
-    const filePath = join(uploadsDir, imagePath);
-
-    // Security: Ensure the resolved path is within uploads directory
-    const resolvedPath = resolve(filePath);
-    const resolvedUploadsDir = resolve(uploadsDir);
-
-    if (!resolvedPath.startsWith(resolvedUploadsDir)) {
-      set.status = 403;
-      return { error: "Forbidden: Invalid path" };
+    const normalizedPath = imagePath.replace(/^\/+/, "");
+    const pathSegments = normalizedPath.split("/").filter(Boolean);
+    if (pathSegments.length === 0 || pathSegments.some((segment) => segment === "." || segment === "..")) {
+      set.status = 400;
+      return { error: "Invalid image path" };
     }
 
-    // Check if file exists
-    try {
-      await fs.access(resolvedPath);
-    } catch {
+    const uploadsDirs = resolveUploadsDirs();
+    let resolvedPath: string | null = null;
+
+    for (const uploadsDir of uploadsDirs) {
+      const candidatePath = resolve(join(uploadsDir, ...pathSegments));
+      const resolvedUploadsDir = resolve(uploadsDir);
+
+      if (!candidatePath.startsWith(resolvedUploadsDir)) {
+        continue;
+      }
+
+      try {
+        await fs.access(candidatePath);
+        resolvedPath = candidatePath;
+        break;
+      } catch {
+        // Try the next fallback upload directory.
+      }
+    }
+
+    if (!resolvedPath) {
       set.status = 404;
       return { error: "Image not found" };
     }

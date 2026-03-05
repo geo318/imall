@@ -5,6 +5,10 @@ services:
     region: frankfurt
     dockerfilePath: ./Dockerfile.api
     autoDeploy: true
+    disk:
+      name: imall-api-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: DATABASE_URL
         sync: false

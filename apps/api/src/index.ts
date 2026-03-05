@@ -14,7 +14,7 @@ import { inventoryRoutes } from "./routes/inventory";
 import { allProductsRoutes, productsRoutes } from "./routes/products";
 import { shopsRoutes } from "./routes/shops";
 import { superadminRoutes } from "./routes/superadmin";
-import { resolveUploadsDir } from "./storage/uploads-dir";
+import { resolveUploadsDir, summarizeUploadsDirs } from "./storage/uploads-dir";
 import { startProductStatsQueue } from "./utils/product-stats-queue";
 
 // Verify cartRoutes is loaded
@@ -53,6 +53,7 @@ async function logStartupDiagnostics(port: number) {
   console.log("[API][BOOT] NEXT_PUBLIC_DOMAIN set:", Boolean(env.NEXT_PUBLIC_DOMAIN));
   console.log("[API][BOOT] DATABASE_URL:", summarizeDatabaseUrl(env.DATABASE_URL));
   console.log("[API][BOOT] UPLOADS_PATH:", resolveUploadsDir());
+  console.log("[API][BOOT] UPLOADS_CANDIDATES:", summarizeUploadsDirs());
 
   console.log("[API][BOOT] Step 2/4: Database probe");
   try {

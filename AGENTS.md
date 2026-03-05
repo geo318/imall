@@ -10,6 +10,7 @@ This file is a lightweight log for AI copilots. Keep entries terse and update wh
 
 ## Recent changes
 
+- Production image 404 hardening: upload dir resolution now supports ordered candidates (`/var/data/uploads` first when mounted, legacy `apps/api/src/uploads` fallback), image serving checks all candidates before 404, startup diagnostics log upload-dir candidates/existence, and `render.yaml` now declares a persistent API disk mount at `/var/data` to avoid losing images across restarts/deploys.
 - Home "Why iMall" block was refined for a cleaner look and simpler tone: removed forced uppercase eyebrow styling, tightened typography/cards/list styling, and rewrote Georgian (`ka`) copy to concise messaging for `home.why`, `home.valueProps`, and `home.forVendors`.
 - Product price filter slider now uses a local draft range and commits to parent state only on `onValueCommit` (thumb release), preventing rapid API refetch spam while dragging; slider labels now use GEL symbol (`₾`) instead of `$`.
 - Featured products section is now fully i18n-driven (title/subtitle/loading/error/empty in EN/KA/RU), and marketing auction timer text is localized (`endsIn`/`endsSoon`) so locale pages no longer show English copy in cards.
