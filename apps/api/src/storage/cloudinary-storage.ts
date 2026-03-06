@@ -139,9 +139,14 @@ export class CloudinaryStorage implements IStorage {
     this.apiSecret = credentials.apiSecret;
     this.credentialsSource = credentials.source;
     this.baseFolder = sanitizePathSegment(env.CLOUDINARY_BASE_FOLDER || "imall");
-    this.deliveryTransformation = (env.CLOUDINARY_DELIVERY_TRANSFORMATION || "f_auto,q_auto")
-      .trim()
-      .replace(/^\/+|\/+$/g, "");
+    const rawTransformation = (env.CLOUDINARY_DELIVERY_TRANSFORMATION || "f_auto,q_auto").trim();
+    const normalizedTransformation = rawTransformation
+      .replace(/^\/+|\/+$/g, "")
+      .split(/[\/,]/)
+      .map((segment) => segment.trim())
+      .filter((segment) => segment.length > 0)
+      .join("/");
+    this.deliveryTransformation = normalizedTransformation || "f_auto/q_auto";
   }
 
   getDiagnostics() {
