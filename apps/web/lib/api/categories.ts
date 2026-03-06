@@ -38,6 +38,7 @@ export function flattenCategoryNames(nodes: CategoryTreeNode[]): string[] {
 
 export type CategoryOption = {
   key: string;
+  slug: string;
   label: string;
   fallbackName: string;
 };
@@ -51,6 +52,7 @@ export function flattenCategoryOptions(nodes: CategoryTreeNode[]): CategoryOptio
     visited.add(node.id);
     options.push({
       key: node.key,
+      slug: node.slug,
       label: node.name,
       fallbackName: node.fallbackName,
     });

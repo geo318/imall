@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { slugify } from "@repo/shared";
+import { parseImageUrls, slugify } from "@repo/shared";
 import { Button } from "@repo/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo/ui/card";
 import { Checkbox } from "@repo/ui/checkbox";
@@ -78,6 +78,7 @@ type TenantVariantOptionItem = {
 
 type FlatCategoryOption = {
   key: string;
+  slug: string;
   label: string;
   fallbackName: string;
 };
@@ -132,13 +133,16 @@ const resolveCategoryValue = (
 
   const match = options.find((option) => {
     const key = option.key.trim();
+    const slug = option.slug.trim();
     const fallback = option.fallbackName.trim();
     const label = option.label.trim();
     return (
       key === normalized ||
+      slug === normalized ||
       fallback === normalized ||
       label === normalized ||
       key.toLowerCase() === normalized.toLowerCase() ||
+      slug.toLowerCase() === normalized.toLowerCase() ||
       fallback.toLowerCase() === normalized.toLowerCase() ||
       label.toLowerCase() === normalized.toLowerCase()
     );
@@ -187,8 +191,10 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
 
   const isAuction = watch("isAuction");
   const watchedTitle = watch("title");
+  const watchedCategory = watch("category");
   const [isSlugDirty, setIsSlugDirty] = useState(false);
   const previousAuctionRef = useRef(isAuction);
+  const hydratedProductIdRef = useRef<string | null>(null);
 
   // Load product data if editing
   const { data: productData, isLoading } = useQuery<ProductFormResponse | undefined>({
@@ -204,6 +210,11 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       return response.json();
     },
     enabled: !!productId,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: false,
   });
 
   const { data: categoryTree = [] } = useQuery({
@@ -234,10 +245,19 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       value: category.key,
       label: category.label,
     }));
+    const currentFormCategory = resolveCategoryValue(watchedCategory, flatCategoryOptions);
     const resolvedCurrentCategory = resolveCategoryValue(
       productData?.category,
       flatCategoryOptions,
     );
+
+    if (
+      currentFormCategory &&
+      !options.some((category) => category.value === currentFormCategory)
+    ) {
+      options.push({ value: currentFormCategory, label: currentFormCategory });
+    }
+
     if (
       resolvedCurrentCategory &&
       !options.some((category) => category.value === resolvedCurrentCategory)
@@ -245,7 +265,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       options.push({ value: resolvedCurrentCategory, label: resolvedCurrentCategory });
     }
     return options;
-  }, [flatCategoryOptions, productData?.category]);
+  }, [flatCategoryOptions, productData?.category, watchedCategory]);
 
   const variantErrors = useMemo(() => {
     const source = errors.variants;
@@ -312,9 +332,18 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
   useEffect(() => {
     let isActive = true;
 
+    if (productId && !productData) {
+      return () => {
+        isActive = false;
+      };
+    }
+
     const resetFormState = () => {
       const hasProduct = Boolean(productId && productData);
-      const normalizedCategory = resolveCategoryValue(productData?.category, flatCategoryOptions);
+      if (hasProduct && hydratedProductIdRef.current === productId) {
+        return;
+      }
+      const normalizedCategory = productData?.category?.trim() ?? "";
       const normalizedVariants = (productData?.variants as VariantWithExtras[] | undefined)?.map(
         (variant) => {
           const auction = variant.auction;
@@ -356,16 +385,12 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
 
       reset(formValues);
       setIsSlugDirty(hasProduct);
+      hydratedProductIdRef.current = hasProduct ? (productId ?? null) : null;
 
       const urlsFromImages = Array.isArray(productData?.images)
         ? productData.images.map((img: { url?: string | null }) => img.url).filter(Boolean)
         : [];
-      const urlsFromImageUrls = productData?.imageUrls
-        ? productData.imageUrls
-            .split(",")
-            .map((url: string) => url.trim())
-            .filter((url: string) => url.length > 0)
-        : [];
+      const urlsFromImageUrls = parseImageUrls(productData?.imageUrls);
       const imageUrls = urlsFromImageUrls.length > 0 ? urlsFromImageUrls : urlsFromImages;
 
       if (!hasProduct || imageUrls.length === 0) {
@@ -389,7 +414,26 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     return () => {
       isActive = false;
     };
-  }, [flatCategoryOptions, productData, productId, reset]);
+  }, [productData, productId, reset]);
+
+  useEffect(() => {
+    if (!productId || !productData) {
+      return;
+    }
+
+    const currentValue = watchedCategory?.trim() ?? "";
+    const sourceValue = currentValue || productData.category || "";
+    const resolvedValue = resolveCategoryValue(sourceValue, flatCategoryOptions);
+    if (!resolvedValue || resolvedValue === currentValue) {
+      return;
+    }
+
+    setValue("category", resolvedValue, {
+      shouldValidate: false,
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+  }, [flatCategoryOptions, productData, productId, setValue, watchedCategory]);
 
   const isNewProduct = !productId;
 
@@ -641,7 +685,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
               control={control}
               name="category"
               render={({ field }) => (
-                <Select value={field.value} onValueChange={(value) => field.onChange(value)}>
+                <Select value={field.value ?? ""} onValueChange={field.onChange}>
                   <SelectTrigger
                     id="category"
                     className={errors.category ? "border-destructive" : ""}
