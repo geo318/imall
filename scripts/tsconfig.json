@@ -23,5 +23,5 @@
       "drizzle-orm/*": ["./packages/db/node_modules/drizzle-orm/*"]
     }
   },
-  "include": ["./seed.ts"]
+  "include": ["./seed.ts", "./cleanup-image-storage.ts"]
 }

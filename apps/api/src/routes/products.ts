@@ -29,6 +29,7 @@ import {
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { getAvailableStockMap, listQuerySchema } from "../context";
+import { sanitizePersistedImageUrls } from "../utils/image-urls";
 import { logger } from "../utils/logger";
 import { withCachedResponse } from "../utils/response-cache";
 
@@ -291,7 +292,7 @@ export const productsRoutes = new Elysia({
         >();
         for (const row of rows) {
           if (row.imageUrls) {
-            const imageUrls = parseImageUrls(row.imageUrls);
+            const imageUrls = sanitizePersistedImageUrls(parseImageUrls(row.imageUrls));
 
             imagesByProduct.set(
               row.id,
@@ -488,11 +489,13 @@ export const productsRoutes = new Elysia({
       });
 
       // Get images from comma-delimited string
-      const images = parseImageUrls(product.imageUrls).map((url, index) => ({
-        id: `img-${index}`,
-        url,
-        isPrimary: index === 0, // First image is primary
-      }));
+      const images = sanitizePersistedImageUrls(parseImageUrls(product.imageUrls)).map(
+        (url, index) => ({
+          id: `img-${index}`,
+          url,
+          isPrimary: index === 0, // First image is primary
+        }),
+      );
 
       set.headers["Cache-Control"] = "public, max-age=10, s-maxage=10, stale-while-revalidate=30";
 
@@ -835,7 +838,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         >();
         for (const row of orderedRows) {
           if (row.imageUrls) {
-            const imageUrls = parseImageUrls(row.imageUrls);
+            const imageUrls = sanitizePersistedImageUrls(parseImageUrls(row.imageUrls));
 
             imagesByProduct.set(
               row.id,
@@ -1077,11 +1080,13 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
       });
 
       // Get images from comma-delimited string
-      const images = parseImageUrls(product.imageUrls).map((url, index) => ({
-        id: `img-${index}`,
-        url,
-        isPrimary: index === 0, // First image is primary
-      }));
+      const images = sanitizePersistedImageUrls(parseImageUrls(product.imageUrls)).map(
+        (url, index) => ({
+          id: `img-${index}`,
+          url,
+          isPrimary: index === 0, // First image is primary
+        }),
+      );
 
       set.headers["Cache-Control"] = "public, max-age=10, s-maxage=10, stale-while-revalidate=30";
 

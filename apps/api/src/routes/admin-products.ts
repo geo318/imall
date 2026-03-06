@@ -32,6 +32,7 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import { authPlugin, getTenantIdBySlug, isSuperadminRequest } from "../context";
 import { getStorage } from "../storage";
+import { sanitizePersistedImageUrls } from "../utils/image-urls";
 import { invalidateCachedResponsesByPrefixes } from "../utils/response-cache";
 import { ensureAuth, requireAuth, verifyTenantAccess } from "../utils/auth";
 
@@ -601,11 +602,13 @@ export const adminProductsRoutes = new Elysia({
             };
 
         // Get images from comma-delimited string
-        const images = parseImageUrls(product.imageUrls).map((url: string, index: number) => ({
-          id: `img-${index}`,
-          url,
-          isPrimary: index === 0,
-        }));
+        const images = sanitizePersistedImageUrls(parseImageUrls(product.imageUrls)).map(
+          (url: string, index: number) => ({
+            id: `img-${index}`,
+            url,
+            isPrimary: index === 0,
+          }),
+        );
 
         return {
           ...product,
@@ -836,11 +839,13 @@ export const adminProductsRoutes = new Elysia({
       }
 
       // Get images from comma-delimited string
-      const images = parseImageUrls(product.imageUrls).map((url: string, index: number) => ({
-        id: `img-${index}`,
-        url,
-        isPrimary: index === 0,
-      }));
+      const images = sanitizePersistedImageUrls(parseImageUrls(product.imageUrls)).map(
+        (url: string, index: number) => ({
+          id: `img-${index}`,
+          url,
+          isPrimary: index === 0,
+        }),
+      );
 
       return {
         ...product,
@@ -972,6 +977,8 @@ export const adminProductsRoutes = new Elysia({
           }
         }
 
+        const sanitizedImageUrls = sanitizePersistedImageUrls(imageUrls);
+
         // Create product with image URLs
         const [product] = await tx
           .insert(products)
@@ -981,7 +988,7 @@ export const adminProductsRoutes = new Elysia({
             title: validated.title,
             description: validated.description || null,
             category: validated.category,
-            imageUrls: imageUrls.length > 0 ? imageUrls.join(",") : null,
+            imageUrls: sanitizedImageUrls.length > 0 ? sanitizedImageUrls.join(",") : null,
             status: "active",
             draft: validated.draft ?? false,
           })
@@ -1212,6 +1219,8 @@ export const adminProductsRoutes = new Elysia({
           }
         }
 
+        const sanitizedImageUrls = sanitizePersistedImageUrls(imageUrls);
+
         // Update product (only if not soft-deleted)
         await tx
           .update(products)
@@ -1220,7 +1229,7 @@ export const adminProductsRoutes = new Elysia({
             description: validated.description || null,
             category: validated.category,
             slug: slugToStore,
-            imageUrls: imageUrls.length > 0 ? imageUrls.join(",") : null,
+            imageUrls: sanitizedImageUrls.length > 0 ? sanitizedImageUrls.join(",") : null,
             draft: validated.draft ?? false,
           })
           .where(

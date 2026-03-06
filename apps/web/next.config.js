@@ -30,6 +30,83 @@ function loadRootEnv() {
 // Ensure Next picks up monorepo-root env files (including Clerk keys) in dev/build.
 loadRootEnv();
 
+function resolveCloudinaryCloudName() {
+  const rawCloudinaryUrl = process.env.CLOUDINARY_URL?.trim();
+  if (rawCloudinaryUrl) {
+    try {
+      const parsed = new URL(rawCloudinaryUrl);
+      if (parsed.protocol === "cloudinary:") {
+        return parsed.hostname.replace(/\.cloudinary\.com$/i, "").trim() || null;
+      }
+    } catch {
+      // Ignore here; Cloudinary validation is handled in shared env/API startup.
+    }
+  }
+
+  return process.env.CLOUDINARY_CLOUD_NAME?.trim() || null;
+}
+
+function urlToRemotePattern(rawUrl) {
+  if (!rawUrl) return null;
+
+  try {
+    const parsed = new URL(rawUrl);
+    return {
+      protocol: parsed.protocol.replace(":", ""),
+      hostname: parsed.hostname,
+      port: parsed.port || undefined,
+      pathname: "/**",
+    };
+  } catch {
+    return null;
+  }
+}
+
+const cloudinaryCloudName = resolveCloudinaryCloudName();
+const dynamicBackendPatterns = [
+  urlToRemotePattern(process.env.BACKEND_URL),
+  urlToRemotePattern(process.env.NEXT_PUBLIC_BACKEND_URL),
+  urlToRemotePattern(process.env.NEXT_PUBLIC_DOMAIN),
+].filter(Boolean);
+
+const remotePatterns = [
+  {
+    protocol: "https",
+    hostname: "picsum.photos",
+  },
+  {
+    protocol: "https",
+    hostname: "via.placeholder.com",
+  },
+  {
+    protocol: "http",
+    hostname: "localhost",
+    port: "3001",
+    pathname: "/**",
+  },
+  {
+    protocol: "http",
+    hostname: "localhost",
+    port: "3000",
+    pathname: "/**",
+  },
+  cloudinaryCloudName
+    ? {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: `/${cloudinaryCloudName}/**`,
+      }
+    : {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
+  ...dynamicBackendPatterns,
+];
+
+const dedupedRemotePatterns = Array.from(
+  new Map(remotePatterns.map((pattern) => [JSON.stringify(pattern), pattern])).values(),
+);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Enable Cache Components for PPR (Partial Prerendering)
@@ -37,31 +114,7 @@ const nextConfig = {
   cacheComponents: true,
   turbopack: {},
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "picsum.photos",
-      },
-      {
-        protocol: "http",
-        hostname: "localhost",
-        port: "3001",
-        pathname: "/**",
-      },
-      {
-        protocol: "http",
-        hostname: "localhost",
-        port: "3000",
-      },
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-      {
-        protocol: "http",
-        hostname: "**",
-      },
-    ],
+    remotePatterns: dedupedRemotePatterns,
   },
 };
 

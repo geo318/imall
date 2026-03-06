@@ -33,6 +33,47 @@ function summarizeDatabaseUrl(value) {
   }
 }
 
+function parseCloudinaryCredentials() {
+  const rawUrl = process.env.CLOUDINARY_URL?.trim();
+  if (rawUrl) {
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.protocol === "cloudinary:") {
+        const cloudName = parsed.hostname.replace(/\.cloudinary\.com$/i, "").trim();
+        const apiKey = decodeURIComponent(parsed.username || "").trim();
+        const apiSecret = decodeURIComponent(parsed.password || "").trim();
+        if (cloudName && apiKey && apiSecret) {
+          return {
+            configured: true,
+            source: "cloudinary_url",
+            cloudName,
+          };
+        }
+      }
+    } catch {
+      // Keep entrypoint tolerant; API startup env validation will fail with details.
+    }
+  }
+
+  if (
+    process.env.CLOUDINARY_CLOUD_NAME &&
+    process.env.CLOUDINARY_API_KEY &&
+    process.env.CLOUDINARY_API_SECRET
+  ) {
+    return {
+      configured: true,
+      source: "segment_env",
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+    };
+  }
+
+  return {
+    configured: false,
+    source: null,
+    cloudName: null,
+  };
+}
+
 function runChecked(step, command, args) {
   const startedAt = Date.now();
   log(step, `Running: ${[command, ...args].join(" ")}`);
@@ -47,6 +88,7 @@ function runChecked(step, command, args) {
 }
 
 log("1/4", "Container startup diagnostics");
+const cloudinary = parseCloudinaryCredentials();
 log("1/4", "Runtime env", {
   nodeEnv: process.env.NODE_ENV ?? null,
   port: process.env.PORT ?? null,
@@ -57,6 +99,10 @@ log("1/4", "Runtime env", {
   domainSet: Boolean(process.env.DOMAIN),
   nextPublicDomainSet: Boolean(process.env.NEXT_PUBLIC_DOMAIN),
   databaseUrl: summarizeDatabaseUrl(process.env.DATABASE_URL),
+  imageStorageProvider: process.env.IMAGE_STORAGE_PROVIDER ?? null,
+  cloudinaryConfigured: cloudinary.configured,
+  cloudinarySource: cloudinary.source,
+  cloudinaryCloudName: cloudinary.cloudName,
 });
 
 log("2/4", "Running database migrations (db:push:ci, non-interactive)");

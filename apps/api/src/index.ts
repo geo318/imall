@@ -14,6 +14,8 @@ import { inventoryRoutes } from "./routes/inventory";
 import { allProductsRoutes, productsRoutes } from "./routes/products";
 import { shopsRoutes } from "./routes/shops";
 import { superadminRoutes } from "./routes/superadmin";
+import { resolveStorageProvider } from "./storage";
+import { resolveCloudinaryCredentials } from "./storage/cloudinary-storage";
 import { resolveUploadsDir, summarizeUploadsDirs } from "./storage/uploads-dir";
 import { startProductStatsQueue } from "./utils/product-stats-queue";
 
@@ -52,8 +54,16 @@ async function logStartupDiagnostics(port: number) {
   console.log("[API][BOOT] DOMAIN set:", Boolean(env.DOMAIN));
   console.log("[API][BOOT] NEXT_PUBLIC_DOMAIN set:", Boolean(env.NEXT_PUBLIC_DOMAIN));
   console.log("[API][BOOT] DATABASE_URL:", summarizeDatabaseUrl(env.DATABASE_URL));
+  console.log("[API][BOOT] IMAGE_STORAGE_PROVIDER:", resolveStorageProvider());
   console.log("[API][BOOT] UPLOADS_PATH:", resolveUploadsDir());
   console.log("[API][BOOT] UPLOADS_CANDIDATES:", summarizeUploadsDirs());
+  const cloudinaryCredentials = resolveCloudinaryCredentials({ tolerant: true });
+  console.log("[API][BOOT] CLOUDINARY:", {
+    configured: Boolean(cloudinaryCredentials),
+    source: cloudinaryCredentials?.source ?? null,
+    cloudName: cloudinaryCredentials?.cloudName ?? null,
+    baseFolder: env.CLOUDINARY_BASE_FOLDER || "imall",
+  });
 
   console.log("[API][BOOT] Step 2/4: Database probe");
   try {

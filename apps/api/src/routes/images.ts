@@ -1,7 +1,13 @@
 import { promises as fs } from "node:fs";
 import { join, resolve } from "node:path";
+import { assets, db } from "@repo/db";
+import { eq } from "drizzle-orm";
 import { Elysia } from "elysia";
+import { getStorage } from "../storage";
 import { resolveUploadsDirs } from "../storage/uploads-dir";
+
+const UUID_V4_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function buildPathVariants(pathSegments: string[]): string[][] {
   const variants: string[][] = [pathSegments];
@@ -91,6 +97,48 @@ async function findByFilenameFallback(
   return null;
 }
 
+async function resolveRemoteFallbackUrl(pathSegments: string[]): Promise<string | null> {
+  if (pathSegments.length === 0) {
+    return null;
+  }
+
+  const storage = getStorage();
+  const requestedStorageKey = pathSegments.join("/");
+
+  const [assetByStorageKey] = await db
+    .select({
+      storageKey: assets.storageKey,
+    })
+    .from(assets)
+    .where(eq(assets.storageKey, requestedStorageKey))
+    .limit(1);
+
+  if (assetByStorageKey) {
+    const url = storage.getUrl(assetByStorageKey.storageKey);
+    return url.startsWith("http://") || url.startsWith("https://") ? url : null;
+  }
+
+  const candidateId = pathSegments.find((segment) => UUID_V4_RE.test(segment));
+  if (!candidateId) {
+    return null;
+  }
+
+  const [assetById] = await db
+    .select({
+      storageKey: assets.storageKey,
+    })
+    .from(assets)
+    .where(eq(assets.id, candidateId))
+    .limit(1);
+
+  if (!assetById) {
+    return null;
+  }
+
+  const url = storage.getUrl(assetById.storageKey);
+  return url.startsWith("http://") || url.startsWith("https://") ? url : null;
+}
+
 /**
  * Image serving route
  * Serves images from the uploads directory
@@ -163,6 +211,10 @@ export const imageRoutes = new Elysia({
     }
 
     if (!resolvedPath) {
+      const fallbackUrl = await resolveRemoteFallbackUrl(pathSegments);
+      if (fallbackUrl) {
+        return Response.redirect(fallbackUrl, 307);
+      }
       set.status = 404;
       return { error: "Image not found" };
     }

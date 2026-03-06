@@ -30,6 +30,14 @@ services:
         sync: false
       - key: SEED_CATEGORIES
         sync: false
+      - key: IMAGE_STORAGE_PROVIDER
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
+      - key: CLOUDINARY_BASE_FOLDER
+        sync: false
+      - key: CLOUDINARY_DELIVERY_TRANSFORMATION
+        sync: false
 
   - type: web
     name: imall

@@ -17,6 +17,13 @@ const serverSchema = {
   SEED_SHOP_NAME: z.string().default("Demo Shop"),
   SUPERADMIN_EMAIL: z.string().email(),
   SUPERADMIN_PASSWORD: z.string().min(1),
+  IMAGE_STORAGE_PROVIDER: z.enum(["local", "cloudinary"]).optional(),
+  CLOUDINARY_URL: z.string().optional(),
+  CLOUDINARY_CLOUD_NAME: z.string().optional(),
+  CLOUDINARY_API_KEY: z.string().optional(),
+  CLOUDINARY_API_SECRET: z.string().optional(),
+  CLOUDINARY_BASE_FOLDER: z.string().optional(),
+  CLOUDINARY_DELIVERY_TRANSFORMATION: z.string().optional(),
   BACKEND_URL: z.preprocess(
     (value) => {
       if (typeof value === "string" && value.length > 0 && !/^https?:\/\//i.test(value)) {
@@ -55,6 +62,13 @@ const runtimeEnv: RuntimeEnv = {
   SEED_SHOP_NAME: process.env.SEED_SHOP_NAME,
   SUPERADMIN_EMAIL: process.env.SUPERADMIN_EMAIL,
   SUPERADMIN_PASSWORD: process.env.SUPERADMIN_PASSWORD,
+  IMAGE_STORAGE_PROVIDER: process.env.IMAGE_STORAGE_PROVIDER,
+  CLOUDINARY_URL: process.env.CLOUDINARY_URL,
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
+  CLOUDINARY_BASE_FOLDER: process.env.CLOUDINARY_BASE_FOLDER,
+  CLOUDINARY_DELIVERY_TRANSFORMATION: process.env.CLOUDINARY_DELIVERY_TRANSFORMATION,
   BACKEND_URL: process.env.BACKEND_URL,
   NEXT_PUBLIC_DOMAIN: process.env.NEXT_PUBLIC_DOMAIN,
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
