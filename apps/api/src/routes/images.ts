@@ -21,6 +21,76 @@ function buildPathVariants(pathSegments: string[]): string[][] {
   return variants;
 }
 
+async function findByFilenameFallback(
+  uploadsDirs: string[],
+  shopSlug: string,
+  fileNames: string[],
+): Promise<string | null> {
+  for (const uploadsDir of uploadsDirs) {
+    const resolvedUploadsDir = resolve(uploadsDir);
+    const shopDir = resolve(join(uploadsDir, shopSlug));
+    if (!shopDir.startsWith(resolvedUploadsDir)) {
+      continue;
+    }
+
+    // 1) try /uploads/{shopSlug}/{filename}
+    for (const fileName of fileNames) {
+      const shopFilePath = resolve(join(shopDir, fileName));
+      if (!shopFilePath.startsWith(shopDir)) {
+        continue;
+      }
+      try {
+        await fs.access(shopFilePath);
+        return shopFilePath;
+      } catch {
+        // keep searching
+      }
+    }
+
+    // 2) try one nested level: /uploads/{shopSlug}/{anyDir}/{filename}
+    let entries: string[];
+    try {
+      entries = await fs.readdir(shopDir);
+    } catch {
+      continue;
+    }
+
+    for (const entryName of entries) {
+      const entryPath = resolve(join(shopDir, entryName));
+      if (!entryPath.startsWith(shopDir)) {
+        continue;
+      }
+
+      let isDirectory = false;
+      try {
+        const stats = await fs.stat(entryPath);
+        isDirectory = stats.isDirectory();
+      } catch {
+        isDirectory = false;
+      }
+
+      if (!isDirectory) {
+        continue;
+      }
+
+      for (const fileName of fileNames) {
+        const candidatePath = resolve(join(shopDir, entryName, fileName));
+        if (!candidatePath.startsWith(shopDir)) {
+          continue;
+        }
+        try {
+          await fs.access(candidatePath);
+          return candidatePath;
+        } catch {
+          // try next candidate
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 /**
  * Image serving route
  * Serves images from the uploads directory
@@ -74,6 +144,21 @@ export const imageRoutes = new Elysia({
 
       if (resolvedPath) {
         break;
+      }
+    }
+
+    if (!resolvedPath) {
+      const shopSlug = pathSegments[0];
+      if (shopSlug) {
+        const filenameCandidates = Array.from(
+          new Set(
+            pathVariants
+              .map((segments) => segments.at(-1))
+              .filter((fileName): fileName is string => Boolean(fileName)),
+          ),
+        );
+
+        resolvedPath = await findByFilenameFallback(uploadsDirs, shopSlug, filenameCandidates);
       }
     }
 
