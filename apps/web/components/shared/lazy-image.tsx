@@ -1,7 +1,7 @@
 "use client";
 
 import Image, { type ImageProps, type StaticImageData } from "next/image";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { twMerge } from "tailwind-merge";
 import { getImage, isValidImageUrl } from "@/lib/utils/images";
 
@@ -17,11 +17,30 @@ export default function LazyImage({
   src: string | null | undefined | StaticImageData;
 }) {
   const [isLoaded, setIsLoaded] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  const imageUrl = getImage(src as string);
+  const [failedSources, setFailedSources] = useState<Set<string>>(() => new Set());
+  const imageSrc = useMemo(() => {
+    if (!src) return "";
+    if (typeof src === "string") {
+      return getImage(src);
+    }
+    return src;
+  }, [src]);
+  const imageSrcKey = useMemo(
+    () => (typeof imageSrc === "string" ? imageSrc : imageSrc.src),
+    [imageSrc],
+  );
+
+  useEffect(() => {
+    // Reset loading state when source changes.
+    setIsLoaded(false);
+  }, [imageSrcKey]);
+
+  const isValidSource =
+    typeof imageSrc === "string" ? isValidImageUrl(imageSrc) : Boolean(imageSrc);
+  const hasCurrentSourceError = imageSrcKey ? failedSources.has(imageSrcKey) : false;
 
   // Don't render Image component if URL is invalid
-  if (!isValidImageUrl(imageUrl) || hasError) {
+  if (!isValidSource || hasCurrentSourceError) {
     return (
       <div
         className={twMerge(
@@ -35,72 +54,58 @@ export default function LazyImage({
   }
 
   // Check if image is from API (localhost) - use unoptimized for API images
-  const isApiImage = imageUrl.includes("localhost") || imageUrl.includes("/api/image/");
+  const isApiImage =
+    typeof imageSrc === "string" &&
+    (imageSrc.includes("localhost") || imageSrc.includes("/api/image/"));
 
   return (
     <div className={twMerge("relative h-full w-full", wrapperContainerStyles)}>
-      {isApiImage ? (
-        // Use Next.js Image with unoptimized flag for API-served images
-        <>
-          <Image
-            src={imageUrl}
-            alt={alt ?? ""}
-            width={2}
-            height={2}
-            priority={true}
-            unoptimized
-            className={twMerge(
-              "absolute inset-0 w-full h-full object-cover blur-lg transition-opacity duration-500",
-              isLoaded ? "opacity-0" : "opacity-100",
-            )}
-            onError={() => setHasError(true)}
-          />
-          <Image
-            src={imageUrl}
-            alt={alt ?? ""}
-            width={width ?? 1}
-            height={height ?? 1}
-            unoptimized
-            onLoad={() => setIsLoaded(true)}
-            onError={() => setHasError(true)}
-            className={twMerge(
-              "relative w-full h-full object-cover transition-opacity duration-500",
-              isLoaded ? "opacity-100" : "opacity-0",
-              props.className,
-            )}
-            style={{ width: "100%", height: "100%" }}
-          />
-        </>
-      ) : (
-        // Use Next.js Image for other images (non-API images)
-        <>
-          <Image
-            src={imageUrl}
-            alt={alt ?? ""}
-            width={2}
-            height={2}
-            priority={true}
-            className={twMerge(
-              "absolute inset-0 w-full h-full object-cover blur-lg transition-opacity duration-500",
-              isLoaded ? "opacity-0" : "opacity-100",
-            )}
-            onError={() => setHasError(true)}
-          />
-          <Image
-            {...props}
-            src={imageUrl}
-            alt={alt ?? ""}
-            width={width}
-            height={height}
-            onLoad={() => setIsLoaded(true)}
-            onError={() => setHasError(true)}
-            className={twMerge(
-              "relative w-full h-full object-cover transition-opacity duration-500",
-              isLoaded ? "opacity-100" : "opacity-0",
-              props.className,
-            )}
-          />
-        </>
+      <Image
+        key={imageSrcKey}
+        {...props}
+        src={imageSrc}
+        alt={alt ?? ""}
+        width={width ?? 1}
+        height={height ?? 1}
+        loading={props.loading ?? "lazy"}
+        unoptimized={isApiImage ? true : props.unoptimized}
+        onLoad={(event) => {
+          setIsLoaded(true);
+          setFailedSources((previous) => {
+            if (!previous.has(imageSrcKey)) {
+              return previous;
+            }
+            const next = new Set(previous);
+            next.delete(imageSrcKey);
+            return next;
+          });
+          props.onLoad?.(event);
+        }}
+        onError={(event) => {
+          setFailedSources((previous) => {
+            if (previous.has(imageSrcKey)) {
+              return previous;
+            }
+            const next = new Set(previous);
+            next.add(imageSrcKey);
+            return next;
+          });
+          props.onError?.(event);
+        }}
+        className={twMerge(
+          "relative w-full h-full object-cover transition-opacity duration-300",
+          isLoaded ? "opacity-100" : "opacity-0",
+          props.className,
+        )}
+        style={{
+          width: "100%",
+          height: "100%",
+          ...(props.style ?? {}),
+        }}
+      />
+
+      {!isLoaded && (
+        <div className="absolute inset-0 animate-pulse bg-slate-200" aria-hidden />
       )}
     </div>
   );

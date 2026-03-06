@@ -40,6 +40,11 @@ export function getImage(url: string | null | undefined): string {
 
   const normalizedUrl = normalizeCorruptedImageUrl(url);
 
+  // Browser-local/object URLs and inline data URIs should pass through untouched.
+  if (normalizedUrl.startsWith("blob:") || normalizedUrl.startsWith("data:")) {
+    return normalizedUrl;
+  }
+
   // If it's already a full URL (http:// or https://), return as-is
   if (normalizedUrl.startsWith("http://") || normalizedUrl.startsWith("https://")) {
     return normalizedUrl;

@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import LazyImage from "@/components/shared/lazy-image";
 import { Link } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 
@@ -268,9 +269,11 @@ export function VariantOptionsManager({ shopSlug }: Props) {
                                   className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
                                 >
                                   {valueItem.thumbnailUrl ? (
-                                    <img
+                                    <LazyImage
                                       src={valueItem.thumbnailUrl}
                                       alt={valueItem.value}
+                                      width={16}
+                                      height={16}
                                       className="h-4 w-4 rounded object-cover"
                                     />
                                   ) : null}

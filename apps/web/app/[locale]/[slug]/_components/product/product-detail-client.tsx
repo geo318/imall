@@ -12,7 +12,7 @@ import {
   Star,
   Truck,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import LazyImage from "@/components/shared/lazy-image";
 import { MarkdownContent } from "@/components/shared/markdown-content";
 import { Link } from "@/i18n/navigation.client";
@@ -52,12 +52,28 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
   const shopName = product.tenantName ?? shopSlug;
   const hasSellerInfo = Boolean(product.sellerEmail || product.sellerPhone || product.sellerRules);
 
-  // Use actual product images, filter out invalid URLs
-  const productImages = product.images
-    ? product.images
-        .map((img) => img.url)
-        .filter((url): url is string => Boolean(url && url.trim() !== ""))
-    : [];
+  const productImages = useMemo(() => {
+    const invalidTokens = new Set(["null", "undefined", "none", "no image"]);
+
+    if (!product.images) {
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        product.images
+          .map((img) => img.url?.trim() ?? "")
+          .filter((url) => url.length > 0 && !invalidTokens.has(url.toLowerCase())),
+      ),
+    );
+  }, [product.images]);
+
+  useEffect(() => {
+    if (selectedImage < productImages.length) {
+      return;
+    }
+    setSelectedImage(0);
+  }, [productImages.length, selectedImage]);
 
   return (
     <div className="container py-6">
@@ -78,47 +94,50 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         {/* Static: Images */}
         <div className="space-y-4">
-          <div className="relative aspect-square overflow-hidden rounded-2xl bg-secondary">
-            <LazyImage
-              src={productImages[selectedImage]}
-              alt={product.title}
-              width={800}
-              height={800}
-              className="h-full w-full"
-            />
+          <div className="flex flex-col-reverse gap-3 md:flex-row md:items-start md:gap-4">
+            {productImages.length > 1 ? (
+              <div className="flex gap-3 overflow-x-auto pb-2 md:max-h-[560px] md:w-24 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pb-0 md:pr-1">
+                {productImages.map((image, index) => (
+                  <button
+                    key={image}
+                    type="button"
+                    onClick={() => setSelectedImage(index)}
+                    className={cn(
+                      "flex-shrink-0 h-20 w-20 rounded-xl overflow-hidden border-2 transition-colors",
+                      selectedImage === index
+                        ? "border-primary"
+                        : "border-transparent opacity-70 hover:opacity-100",
+                    )}
+                  >
+                    <LazyImage
+                      src={image}
+                      alt={`${product.title} - Image ${index + 1}`}
+                      width={80}
+                      height={80}
+                      className="h-full w-full"
+                    />
+                  </button>
+                ))}
+              </div>
+            ) : null}
 
-            {auction && (
-              <Badge className="absolute top-4 left-4 bg-warning text-warning-foreground gap-1 z-10">
-                <Gavel className="h-3 w-3" />
-                {t("productDetail.liveAuction")}
-              </Badge>
-            )}
-          </div>
-          {productImages.length > 1 && (
-            <div className="flex gap-3 overflow-x-auto pb-2">
-              {productImages.map((image, index) => (
-                <button
-                  key={image}
-                  type="button"
-                  onClick={() => setSelectedImage(index)}
-                  className={cn(
-                    "flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 transition-colors",
-                    selectedImage === index
-                      ? "border-primary"
-                      : "border-transparent opacity-60 hover:opacity-100",
-                  )}
-                >
-                  <LazyImage
-                    src={image}
-                    alt={`${product.title} - Image ${index + 1}`}
-                    width={80}
-                    height={80}
-                    className="h-full w-full"
-                  />
-                </button>
-              ))}
+            <div className="relative aspect-square flex-1 overflow-hidden rounded-2xl bg-secondary">
+              <LazyImage
+                src={productImages[selectedImage]}
+                alt={product.title}
+                width={800}
+                height={800}
+                className="h-full w-full"
+              />
+
+              {auction && (
+                <Badge className="absolute top-4 left-4 bg-warning text-warning-foreground gap-1 z-10">
+                  <Gavel className="h-3 w-3" />
+                  {t("productDetail.liveAuction")}
+                </Badge>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Static: Details Container */}
@@ -176,9 +195,11 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
                     >
                       <span className="inline-flex items-center gap-2">
                         {variantThumb?.optionThumbnail ? (
-                          <img
+                          <LazyImage
                             src={variantThumb.optionThumbnail}
                             alt={variantThumb.optionValue || t("productDetail.variantFallback")}
+                            width={16}
+                            height={16}
                             className="h-4 w-4 rounded object-cover border border-slate-200"
                           />
                         ) : null}
@@ -198,9 +219,11 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
                 {selectedVariantOptionPairs.map((pair) => (
                   <Badge key={`${pair.optionKey}-${pair.optionValue}`} variant="outline">
                     {pair.optionThumbnail ? (
-                      <img
+                      <LazyImage
                         src={pair.optionThumbnail}
                         alt={pair.optionValue}
+                        width={12}
+                        height={12}
                         className="mr-1 h-3 w-3 rounded object-cover"
                       />
                     ) : null}

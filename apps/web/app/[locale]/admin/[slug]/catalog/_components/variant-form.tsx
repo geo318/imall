@@ -7,6 +7,7 @@ import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { Plus, X } from "lucide-react";
+import LazyImage from "@/components/shared/lazy-image";
 import { DEFAULT_CURRENCY_CODE } from "@/lib/utils/currency";
 import type { VariantFormData, VariantOptionPairFormData } from "./product-form.schema";
 
@@ -365,9 +366,11 @@ export function VariantForm({
                             placeholder="Thumbnail URL (optional)"
                           />
                           {pair.optionThumbnail ? (
-                            <img
+                            <LazyImage
                               src={pair.optionThumbnail}
                               alt={`${pair.optionValue || "Option"} thumbnail`}
+                              width={32}
+                              height={32}
                               className="h-8 w-8 rounded object-cover border border-slate-200"
                             />
                           ) : null}

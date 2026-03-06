@@ -19,10 +19,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@repo/ui/button";
 import { GripVertical, Star, Upload, X } from "lucide-react";
-import Image from "next/image";
 import { useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
+import LazyImage from "@/components/shared/lazy-image";
 import { type ImageItem, imageFileSchema } from "./product-form.schema";
 
 type Props = {
@@ -191,7 +191,7 @@ function SortableImageItem({
   return (
     <div ref={setNodeRef} style={style} className="relative group">
       <div className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200 bg-slate-100">
-        <Image
+        <LazyImage
           src={image.url}
           alt={`Product image ${index + 1}`}
           width={200}
