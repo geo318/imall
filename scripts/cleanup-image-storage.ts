@@ -381,7 +381,7 @@ async function main() {
       nextUrls.push(nextUrl);
     }
 
-    const nextImageUrls = nextUrls.length > 0 ? nextUrls.join(",") : null;
+    const nextImageUrls = nextUrls.length > 0 ? nextUrls.join("\n") : null;
     if (changed || nextImageUrls !== originalRaw) {
       productUpdates.push({ id: product.id, imageUrls: nextImageUrls });
     }

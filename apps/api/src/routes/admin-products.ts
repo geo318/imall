@@ -988,7 +988,7 @@ export const adminProductsRoutes = new Elysia({
             title: validated.title,
             description: validated.description || null,
             category: validated.category,
-            imageUrls: sanitizedImageUrls.length > 0 ? sanitizedImageUrls.join(",") : null,
+            imageUrls: sanitizedImageUrls.length > 0 ? sanitizedImageUrls.join("\n") : null,
             status: "active",
             draft: validated.draft ?? false,
           })
@@ -1229,7 +1229,7 @@ export const adminProductsRoutes = new Elysia({
             description: validated.description || null,
             category: validated.category,
             slug: slugToStore,
-            imageUrls: sanitizedImageUrls.length > 0 ? sanitizedImageUrls.join(",") : null,
+            imageUrls: sanitizedImageUrls.length > 0 ? sanitizedImageUrls.join("\n") : null,
             draft: validated.draft ?? false,
           })
           .where(

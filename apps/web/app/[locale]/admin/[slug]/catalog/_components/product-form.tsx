@@ -15,7 +15,9 @@ import { toast } from "sonner";
 import { Link } from "@/i18n/navigation.client";
 import { useLocale } from "@/i18n/provider";
 import { fetchCategoryTree, flattenCategoryOptions } from "@/lib/api/categories";
+import { CACHE_TAGS } from "@/lib/constants";
 import { normalizeMarkdownInput } from "@/lib/markdown";
+import { revalidateClient } from "@/lib/revalidate-client";
 import { DEFAULT_CURRENCY_CODE } from "@/lib/utils/currency";
 import { getImage } from "@/lib/utils/images";
 import { ImageGalleryUpload } from "./image-gallery-upload";
@@ -513,11 +515,34 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
 
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (saved: { slug?: string } | undefined) => {
       queryClient.invalidateQueries({ queryKey: ["admin-products", shopSlug] });
       queryClient.invalidateQueries({ queryKey: ["tenant-variant-options", shopSlug] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["shop-products", shopSlug] });
+
+      const resolvedSlug =
+        (typeof saved?.slug === "string" && saved.slug.length > 0
+          ? saved.slug
+          : (getValues("slug")?.trim() ?? "")) || undefined;
+      const productIdentifier = resolvedSlug ? `${shopSlug}/${resolvedSlug}` : undefined;
+
+      const revalidateTags = [
+        CACHE_TAGS.PRODUCTS,
+        CACHE_TAGS.PRODUCT,
+        CACHE_TAGS.SHOP,
+        `${CACHE_TAGS.SHOP}-${shopSlug}`,
+        ...(productIdentifier ? [`${CACHE_TAGS.PRODUCT}-${productIdentifier}`] : []),
+      ];
+
+      const revalidatePaths = [
+        "/",
+        "/products",
+        `/${shopSlug}`,
+        ...(resolvedSlug ? [`/${shopSlug}/${resolvedSlug}`] : []),
+      ];
+
+      void revalidateClient(revalidateTags, revalidatePaths);
       toast.success(productId ? "Product updated successfully" : "Product created successfully");
       onSuccess();
     },
