@@ -36,6 +36,19 @@ export default function LazyImage({
     typeof imageSrc === "string" ? isValidImageUrl(imageSrc) : Boolean(imageSrc);
   const hasCurrentSourceError = imageSrcKey ? failedSources.has(imageSrcKey) : false;
   const isLoaded = loadedSourceKey === imageSrcKey;
+  const isApiImage =
+    typeof imageSrc === "string" &&
+    (imageSrc.includes("localhost") || imageSrc.includes("/api/image/"));
+  const isCloudinaryImage =
+    typeof imageSrc === "string" &&
+    imageSrc.includes("res.cloudinary.com/") &&
+    imageSrc.includes("/image/upload/");
+  const cloudinaryPreviewSrc = useMemo(() => {
+    if (!isCloudinaryImage || typeof imageSrc !== "string") {
+      return null;
+    }
+    return imageSrc.replace("/image/upload/", "/image/upload/w_24,e_blur:1000,q_1,f_auto/");
+  }, [imageSrc, isCloudinaryImage]);
 
   // Don't render Image component if URL is invalid
   if (!isValidSource || hasCurrentSourceError) {
@@ -51,31 +64,16 @@ export default function LazyImage({
     );
   }
 
-  // Check if image is from API (localhost) - use unoptimized for API images
-  const isApiImage =
-    typeof imageSrc === "string" &&
-    (imageSrc.includes("localhost") || imageSrc.includes("/api/image/"));
-  const isCloudinaryImage =
-    typeof imageSrc === "string" &&
-    imageSrc.includes("res.cloudinary.com/") &&
-    imageSrc.includes("/image/upload/");
-  const cloudinaryPreviewSrc = useMemo(() => {
-    if (!isCloudinaryImage || typeof imageSrc !== "string") {
-      return null;
-    }
-    return imageSrc.replace(
-      "/image/upload/",
-      "/image/upload/w_24,e_blur:1000,q_1,f_auto/",
-    );
-  }, [imageSrc, isCloudinaryImage]);
-
   return (
     <div className={twMerge("relative h-full w-full", wrapperContainerStyles)}>
       {!isLoaded && blurOnLoad && cloudinaryPreviewSrc ? (
-        <img
+        <Image
           src={cloudinaryPreviewSrc}
           alt=""
           aria-hidden
+          fill
+          sizes="100vw"
+          unoptimized
           loading="eager"
           className="absolute inset-0 h-full w-full object-contain opacity-80 blur-xl"
         />
