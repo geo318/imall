@@ -4,7 +4,6 @@ import { Button } from "@repo/ui/button";
 import { Checkbox } from "@repo/ui/checkbox";
 import { Label } from "@repo/ui/label";
 import { RangeSlider } from "@repo/ui/range-slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/i18n/provider";
@@ -29,11 +28,10 @@ type Props = {
   onCategoriesChange: (categories: string[]) => void;
   listingType: ListingType;
   onListingTypeChange: (type: ListingType) => void;
-  sortBy: SortKey;
-  onSortByChange: (sort: SortKey) => void;
   onClearFilters: () => void;
   showCategories?: boolean;
   showListingType?: boolean;
+  priceMin?: number;
   priceMax?: number;
 };
 
@@ -67,11 +65,10 @@ export function ProductFilterSidebar({
   onCategoriesChange,
   listingType,
   onListingTypeChange,
-  sortBy,
-  onSortByChange,
   onClearFilters,
   showCategories = true,
   showListingType = true,
+  priceMin = 0,
   priceMax = 500,
 }: Props) {
   const t = useTranslations();
@@ -80,7 +77,6 @@ export function ProductFilterSidebar({
     price: true,
     categories: true,
     listingType: true,
-    sorting: true,
   });
   const gelSymbol = useMemo(() => currencySymbol(DEFAULT_CURRENCY_CODE), []);
   const priceRangeHandlers = useMemo(
@@ -161,18 +157,13 @@ export function ProductFilterSidebar({
   );
 
   const hasActiveFilters =
-    priceRange[0] > 0 ||
+    priceRange[0] > priceMin ||
     priceRange[1] < priceMax ||
     selectedCategories.length > 0 ||
     listingType !== "all";
 
-  // Map frontend sort keys to display labels
-  const sortOptions = [
-    { value: "newest", label: t("products.filtersNewest") },
-    // { value: "oldest", label: "Oldest First" },
-    // { value: "price-asc", label: "Price: Low to High" },
-    // { value: "price-desc", label: "Price: High to Low" },
-  ];
+  const priceSpan = Math.max(0, priceMax - priceMin);
+  const minRange = Math.min(20, priceSpan);
 
   return (
     <aside className={cn("space-y-6", className)}>
@@ -208,10 +199,10 @@ export function ProductFilterSidebar({
               value={draftPriceRange}
               onValueChange={(value) => priceRangeHandlers.onDraftChange(value as PriceRange)}
               onValueCommit={(value) => priceRangeHandlers.onCommit(value as PriceRange)}
-              min={0}
+              min={priceMin}
               max={priceMax}
-              step={10}
-              minRange={20}
+              step={1}
+              minRange={minRange}
               className="w-full"
             />
             <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -323,37 +314,6 @@ export function ProductFilterSidebar({
         </div>
       )}
 
-      {/* Sorting */}
-      <div className="space-y-3">
-        <button
-          type="button"
-          onClick={() => toggleSection("sorting")}
-          className="flex items-center justify-between w-full text-sm font-semibold"
-        >
-          {t("products.filtersSortBy")}
-          {expandedSections.sorting ? (
-            <ChevronUp className="h-4 w-4" />
-          ) : (
-            <ChevronDown className="h-4 w-4" />
-          )}
-        </button>
-        {expandedSections.sorting && (
-          <div className="pt-2">
-            <Select value={sortBy} onValueChange={(value) => onSortByChange(value as SortKey)}>
-              <SelectTrigger className="w-full text-left">
-                <SelectValue placeholder={t("products.filtersSortPlaceholder")} />
-              </SelectTrigger>
-              <SelectContent>
-                {sortOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-      </div>
     </aside>
   );
 }

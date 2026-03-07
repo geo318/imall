@@ -81,6 +81,36 @@
         "Built-in buyer messaging and trust signals coming soon."
       ],
       "openAdmin": "Open admin"
+    },
+    "whyImall": {
+      "title": "Why <highlight>iMall</highlight>?",
+      "subtitle": "The smarter way to shop online — here is what sets us apart",
+      "items": {
+        "sellers": {
+          "title": "Thousands of Sellers",
+          "description": "Browse products from verified independent sellers all in one place."
+        },
+        "protection": {
+          "title": "Buyer Protection",
+          "description": "Every purchase is backed by our money-back guarantee for peace of mind."
+        },
+        "checkout": {
+          "title": "One Cart, One Checkout",
+          "description": "Shop from multiple vendors and pay once with a seamless unified checkout."
+        },
+        "delivery": {
+          "title": "Fast & Tracked Delivery",
+          "description": "Real-time order tracking from dispatch to your doorstep."
+        },
+        "quality": {
+          "title": "Quality Guaranteed",
+          "description": "Curated sellers and product reviews ensure top-notch quality every time."
+        },
+        "support": {
+          "title": "24/7 Support",
+          "description": "Our dedicated team is always here to help with any questions or issues."
+        }
+      }
     }
   },
   "categoryBanner": {
@@ -279,6 +309,13 @@
     "filtersSortBy": "Sort by",
     "filtersSortPlaceholder": "Sort by...",
     "filtersNewest": "Newest first",
+    "sortLabel": "Sort",
+    "sortNewest": "Newest",
+    "sortOldest": "Oldest",
+    "sortPriceAsc": "Price: Low to High",
+    "sortPriceDesc": "Price: High to Low",
+    "activeFilters": "Active filters",
+    "filterSearch": "Search: {query}",
     "loadingMore": "Loading more products...",
     "showingCount": "Showing {count} products",
     "emptyBody": "No products found matching your criteria."

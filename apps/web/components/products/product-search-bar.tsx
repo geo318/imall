@@ -16,15 +16,15 @@ export function ProductSearchBar({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") || "");
+  const urlSearch = searchParams.get("search") || "";
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
 
   // Sync search query with URL params
   useEffect(() => {
-    const urlSearch = searchParams.get("search") || "";
     if (urlSearch !== searchQuery) {
       setSearchQuery(urlSearch);
     }
-  }, [searchParams, searchQuery]);
+  }, [urlSearch]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
