@@ -552,6 +552,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           slug: string;
           title: string;
           description: string | null;
+          imageUrls: string | null;
           createdAt: Date;
           tenantSlug: string;
           tenantName: string;
@@ -571,6 +572,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
             slug: products.slug,
             title: products.title,
             description: products.description,
+            imageUrls: products.imageUrls,
             createdAt: products.createdAt,
             tenantSlug: tenants.shopSlug,
             tenantName: tenants.name,
@@ -589,6 +591,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
               slug: products.slug,
               title: products.title,
               description: products.description,
+              imageUrls: products.imageUrls,
               createdAt: products.createdAt,
               tenantSlug: tenants.shopSlug,
               tenantName: tenants.name,
@@ -665,6 +668,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         return rows.map((row) => {
           const v = variantByProduct.get(row.id);
           const auction = v ? auctionByVariant.get(v.id) : undefined;
+          const imageUrls = sanitizePersistedImageUrls(parseImageUrls(row.imageUrls));
 
           const serializedAuction = auction
             ? {
@@ -694,6 +698,11 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
                   },
                 ]
               : [],
+            images: imageUrls.map((url, index) => ({
+              id: `img-${index}`,
+              url,
+              isPrimary: index === 0,
+            })),
           };
         });
       });

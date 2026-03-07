@@ -11,7 +11,7 @@ import {
   type SortKey,
 } from "@/components/products/product-filter-sidebar";
 import { ProductSearchBar } from "@/components/products/product-search-bar";
-import { ProductGridSkeleton } from "@/components/skeletons/product-card-skeleton";
+import { ProductsWithSidebarSkeleton } from "@/components/skeletons/products-with-sidebar-skeleton";
 import { useSearchParams } from "@/i18n/navigation.client";
 import { useLocale, useTranslations } from "@/i18n/provider";
 import { fetchCategoryTree } from "@/lib/api/categories";
@@ -241,7 +241,12 @@ export function ShopProducts({ shopSlug }: Props) {
   };
 
   if (isLoading) {
-    return <ProductGridSkeleton count={8} />;
+    return (
+      <ProductsWithSidebarSkeleton
+        count={8}
+        gridClassName="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      />
+    );
   }
 
   return (

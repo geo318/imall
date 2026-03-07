@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { getTranslations } from "@/i18n/server";
 import type { Locale } from "@/i18n/config";
-import { ProductGridSkeleton } from "@/components/skeletons/product-card-skeleton";
+import { ProductsWithSidebarSkeleton } from "@/components/skeletons/products-with-sidebar-skeleton";
 import { ProductsExplorerClient } from "./_components/products-explorer-client";
 
 export const metadata = {
@@ -31,7 +31,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ local
       <Suspense
         fallback={
           <div className="container py-8">
-            <ProductGridSkeleton count={12} />
+            <ProductsWithSidebarSkeleton count={12} />
           </div>
         }
       >
