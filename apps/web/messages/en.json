@@ -19,7 +19,8 @@
     "clearSearch": "Clear search",
     "viewCart": "View cart",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "savedAddresses": "Saved addresses"
   },
   "home": {
     "hero": {
@@ -328,6 +329,7 @@
   },
   "sellerInfo": {
     "title": "Seller contact",
+    "legalName": "Name",
     "email": "Email",
     "phone": "Mobile",
     "rules": "Personal rules"
@@ -340,6 +342,8 @@
     "options": "Options",
     "defaultVariant": "Default",
     "description": "Description",
+    "showMore": "See more",
+    "showLess": "See less",
     "freeShipping": "Free shipping",
     "securePayment": "Secure payment",
     "qualityGuaranteed": "Quality guaranteed",
@@ -467,26 +471,45 @@
     "shipping": {
       "title": "Shipping information",
       "firstName": "First name",
-      "firstNamePlaceholder": "John",
+      "firstNamePlaceholder": "Enter first name",
       "lastName": "Last name",
-      "lastNamePlaceholder": "Doe",
+      "lastNamePlaceholder": "Enter last name",
       "email": "Email",
       "address": "Address",
-      "addressPlaceholder": "123 Main Street",
+      "addressPlaceholder": "Enter address",
       "city": "City",
-      "cityPlaceholder": "New York",
+      "cityPlaceholder": "Enter city",
       "state": "State",
-      "statePlaceholder": "NY",
+      "statePlaceholder": "Enter region",
       "zip": "ZIP code",
-      "zipPlaceholder": "10001",
+      "zipPlaceholder": "Enter ZIP / postal code",
       "phone": "Phone",
-      "phonePlaceholder": "(555) 123-4567"
+      "phonePlaceholder": "Enter phone number",
+      "savedAddresses": "Saved addresses",
+      "manageAddresses": "Manage all",
+      "loadingAddresses": "Loading addresses…",
+      "noSavedAddresses": "No saved addresses yet.",
+      "defaultBadge": "Default",
+      "saveAddress": "Save this address",
+      "saveValidation": "Fill first name, last name, address, and city before saving.",
+      "savedSuccess": "Address saved.",
+      "alreadySaved": "This address is already saved.",
+      "saveFailedDefault": "Failed to save address."
     },
     "payment": {
       "title": "Payment method",
       "card": "Credit / Debit card",
       "paypal": "PayPal",
       "installments": "Installments (12% commission)",
+      "installmentProviderLabel": "Choose installment provider",
+      "credoProvider": "Online flow",
+      "crystalProvider": "Manual invoice flow",
+      "credoLogoAlt": "Credo.ge",
+      "crystalLogoAlt": "Crystal.ge",
+      "registerManualSale": "Register manual sale in shop records",
+      "registerManualSaleHint": "Use this after confirming the customer started Crystal paperwork.",
+      "manualSaleComment": "Manual sale comment",
+      "manualSaleCommentPlaceholder": "Add context: branch, manager, case details...",
       "cardNumber": "Card number",
       "cardNumberPlaceholder": "1234 5678 9012 3456",
       "expiry": "Expiry date",
@@ -498,7 +521,9 @@
     "actions": {
       "continueToPayment": "Continue to payment",
       "back": "Back",
-      "placeOrder": "Place order"
+      "placeOrder": "Place order",
+      "processing": "Processing...",
+      "goToInstallments": "Continue with installments"
     },
     "summary": {
       "title": "Order summary",
@@ -507,6 +532,25 @@
       "installmentFee": "Installment commission (12%)",
       "total": "Total",
       "free": "Free"
+    },
+    "installments": {
+      "pendingOrderCode": "Installment request is pending. Check status after returning from the bank.",
+      "checkStatus": "Check installment status",
+      "checkingStatus": "Checking status...",
+      "clearPending": "Clear pending request",
+      "statusWithLabel": "Current installment status: {status}",
+      "statusUnknown": "Unable to detect installment status right now.",
+      "notFound": "No installment request was found at the bank yet. Please wait a bit and retry.",
+      "invalidRequest": "Installment request details are invalid. Please start a new installment request.",
+      "syncFailed": "Failed to sync installment status. Please try again.",
+      "manual": {
+        "invoiceGenerated": "Crystal invoice opened. Print it and continue in bank branch.",
+        "registered": "Manual installment sale registered.",
+        "commentRequired": "Add a short comment before registering manual installment sale."
+      }
+    },
+    "errors": {
+      "default": "Something went wrong. Please try again."
     }
   },
   "productAvailability": {
@@ -530,6 +574,7 @@
   "productButtons": {
     "addToCart": "Add to cart",
     "buyNow": "Buy now",
+    "buyWithInstallments": "Buy with installments",
     "soldOut": "Sold out",
     "toasts": {
       "added": "Added to cart",
@@ -948,6 +993,36 @@
       "subject": "Subject",
       "status": "Status",
       "sent": "Sent"
+    }
+  },
+  "accountAddresses": {
+    "title": "Saved addresses",
+    "back": "Back to home",
+    "loading": "Loading addresses…",
+    "empty": "No addresses yet. Add one to speed up checkout.",
+    "defaultBadge": "Default",
+    "actions": {
+      "makeDefault": "Set default",
+      "delete": "Delete"
+    },
+    "form": {
+      "title": "Add address",
+      "label": "Label (optional)",
+      "labelPlaceholder": "e.g. Home",
+      "save": "Save address",
+      "saving": "Saving…"
+    },
+    "errors": {
+      "load": "Failed to load addresses.",
+      "required": "Fill first name, last name, address, and city.",
+      "save": "Failed to save address.",
+      "updateDefault": "Failed to set default address.",
+      "delete": "Failed to delete address."
+    },
+    "success": {
+      "created": "Address saved.",
+      "defaultUpdated": "Default address updated.",
+      "deleted": "Address removed."
     }
   }
 }

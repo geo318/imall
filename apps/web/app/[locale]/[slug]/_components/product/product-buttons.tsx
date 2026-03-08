@@ -56,20 +56,34 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
         throw err;
       }
     },
-    onSuccess: async (cartId) => {
-      // Invalidate React Query cache for the cart
+  });
+
+  const addVariantAndNavigate = async (destination: "cart" | "checkout" | "checkoutInstallments") => {
+    if (!selectedVariantId) return;
+
+    try {
+      const cartId = await cartMutation.mutateAsync({ variantId: selectedVariantId });
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
-      // Also invalidate server-side cache
       await revalidateCartClient();
-      toast.success(t("productButtons.toasts.added"));
-      router.push("/cart");
-    },
-    onError: (err) => {
+
+      if (destination === "cart") {
+        toast.success(t("productButtons.toasts.added"));
+        router.push("/cart");
+        return;
+      }
+
+      if (destination === "checkoutInstallments") {
+        router.push("/checkout?payment=installments&provider=credo");
+        return;
+      }
+
+      router.push("/checkout");
+    } catch (err) {
       toast.error(t("productButtons.toasts.addFailed"), {
         description: err instanceof Error ? err.message : t("productButtons.toasts.addFailed"),
       });
-    },
-  });
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -77,16 +91,27 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
         className="w-full"
         size="lg"
         disabled={isDisabled || cartMutation.isPending}
-        onClick={() => {
-          if (selectedVariantId) {
-            cartMutation.mutate({ variantId: selectedVariantId });
-          }
-        }}
+        onClick={() => void addVariantAndNavigate("cart")}
       >
         {isSoldOut ? t("productButtons.soldOut") : t("productButtons.addToCart")}
       </Button>
-      <Button className="w-full" size="lg" variant="outline" disabled={isDisabled}>
+      <Button
+        className="w-full"
+        size="lg"
+        variant="outline"
+        disabled={isDisabled || cartMutation.isPending}
+        onClick={() => void addVariantAndNavigate("checkout")}
+      >
         {t("productButtons.buyNow")}
+      </Button>
+      <Button
+        className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+        size="lg"
+        variant="outline"
+        disabled={isDisabled || cartMutation.isPending}
+        onClick={() => void addVariantAndNavigate("checkoutInstallments")}
+      >
+        {t("productButtons.buyWithInstallments")}
       </Button>
     </div>
   );

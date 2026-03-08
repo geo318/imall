@@ -19,7 +19,8 @@
     "clearSearch": "ძიების გასუფთავება",
     "viewCart": "კალათის გახსნა",
     "openMenu": "მენიუს გახსნა",
-    "closeMenu": "მენიუს დახურვა"
+    "closeMenu": "მენიუს დახურვა",
+    "savedAddresses": "შენახული მისამართები"
   },
   "home": {
     "hero": {
@@ -328,6 +329,7 @@
   },
   "sellerInfo": {
     "title": "გამყიდველის კონტაქტი",
+    "legalName": "სახელი",
     "email": "ელ-ფოსტა",
     "phone": "მობილური",
     "rules": "პირადი წესები"
@@ -340,6 +342,8 @@
     "options": "ოფციები",
     "defaultVariant": "ნაგულისხმევი",
     "description": "აღწერა",
+    "showMore": "მეტის ნახვა",
+    "showLess": "დაკეცვა",
     "freeShipping": "უფასო მიწოდება",
     "securePayment": "უსაფრთხო გადახდა",
     "qualityGuaranteed": "ხარისხის გარანტია",
@@ -467,26 +471,45 @@
     "shipping": {
       "title": "მიწოდების ინფორმაცია",
       "firstName": "სახელი",
-      "firstNamePlaceholder": "გიორგი",
+      "firstNamePlaceholder": "შეიყვანეთ სახელი",
       "lastName": "გვარი",
-      "lastNamePlaceholder": "ლომიძე",
+      "lastNamePlaceholder": "შეიყვანეთ გვარი",
       "email": "ელ-ფოსტა",
       "address": "მისამართი",
-      "addressPlaceholder": "მაგ: კოსტავას 10",
+      "addressPlaceholder": "შეიყვანეთ მისამართი",
       "city": "ქალაქი",
-      "cityPlaceholder": "თბილისი",
+      "cityPlaceholder": "შეიყვანეთ ქალაქი",
       "state": "რეგიონი",
-      "statePlaceholder": "თბილისი",
+      "statePlaceholder": "შეიყვანეთ რეგიონი",
       "zip": "ინდექსი",
-      "zipPlaceholder": "0108",
+      "zipPlaceholder": "შეიყვანეთ საფოსტო ინდექსი",
       "phone": "ტელეფონი",
-      "phonePlaceholder": "+995 5XX XXX XXX"
+      "phonePlaceholder": "შეიყვანეთ ტელეფონის ნომერი",
+      "savedAddresses": "შენახული მისამართები",
+      "manageAddresses": "ყველას მართვა",
+      "loadingAddresses": "მისამართები იტვირთება…",
+      "noSavedAddresses": "მისამართები ჯერ არ გაქვს შენახული.",
+      "defaultBadge": "ძირითადი",
+      "saveAddress": "ამ მისამართის შენახვა",
+      "saveValidation": "შენახვამდე შეავსე სახელი, გვარი, მისამართი და ქალაქი.",
+      "savedSuccess": "მისამართი შეინახა.",
+      "alreadySaved": "ეს მისამართი უკვე შენახულია.",
+      "saveFailedDefault": "მისამართის შენახვა ვერ მოხერხდა."
     },
     "payment": {
       "title": "გადახდის მეთოდი",
       "card": "ბარათი",
       "paypal": "PayPal",
       "installments": "განვადება (12% საკომისიო)",
+      "installmentProviderLabel": "აირჩიეთ განვადების პროვაიდერი",
+      "credoProvider": "ონლაინ",
+      "crystalProvider": "ინვოისი",
+      "credoLogoAlt": "Credo.ge",
+      "crystalLogoAlt": "Crystal.ge",
+      "registerManualSale": "დარეგისტრირდეს გაყიდვა",
+      "registerManualSaleHint": "ჩართეთ, თუ Crystal-ის განაცხადი რეალურად დაიწყეთ ფილიალში.",
+      "manualSaleComment": "კომენტარი",
+      "manualSaleCommentPlaceholder": "მიუთითეთ კონტექსტი: ფილიალი, მენეჯერი, დეტალები...",
       "cardNumber": "ბარათის ნომერი",
       "cardNumberPlaceholder": "1234 5678 9012 3456",
       "expiry": "მოქმედების ვადა",
@@ -498,7 +521,9 @@
     "actions": {
       "continueToPayment": "გაგრძელება",
       "back": "უკან",
-      "placeOrder": "შეკვეთის გაფორმება"
+      "placeOrder": "შეკვეთის გაფორმება",
+      "processing": "მუშავდება...",
+      "goToInstallments": "გაგრძელება განვადებით"
     },
     "summary": {
       "title": "შეჯამება",
@@ -507,6 +532,25 @@
       "installmentFee": "განვადების საკომისიო (12%)",
       "total": "სულ",
       "free": "უფასო"
+    },
+    "installments": {
+      "pendingOrderCode": "განვადების განაცხადი გაგზავნილია. ბანკიდან დაბრუნების შემდეგ შეამოწმეთ სტატუსი.",
+      "checkStatus": "სტატუსის შემოწმება",
+      "checkingStatus": "სტატუსის შემოწმება...",
+      "clearPending": "მოლოდინის წაშლა",
+      "statusWithLabel": "მიმდინარე სტატუსი: {status}",
+      "statusUnknown": "სტატუსის შემოწმება დროებით ვერ ხერხდება.",
+      "notFound": "ბანკში განაცხადი ჯერ არ ჩანს. ცოტა ხანში სცადეთ თავიდან.",
+      "invalidRequest": "განვადების მოთხოვნის მონაცემები არასწორია. დაიწყეთ ახალი განაცხადი.",
+      "syncFailed": "განვადების სტატუსის სინქრონიზაცია ვერ მოხერხდა. სცადეთ თავიდან.",
+      "manual": {
+        "invoiceGenerated": "Crystal-ის ინვოისი გაიხსნა. დაბეჭდეთ და მიიტანეთ ფილიალში.",
+        "registered": "ხელით განვადების გაყიდვა დარეგისტრირდა.",
+        "commentRequired": "ხელით გაყიდვის დასარეგისტრირებლად კომენტარი აუცილებელია."
+      }
+    },
+    "errors": {
+      "default": "დაფიქსირდა შეცდომა. სცადეთ თავიდან."
     }
   },
   "productAvailability": {
@@ -530,6 +574,7 @@
   "productButtons": {
     "addToCart": "კალათაში დამატება",
     "buyNow": "ახლავე ყიდვა",
+    "buyWithInstallments": "იყიდე განვადებით",
     "soldOut": "ამოწურულია",
     "toasts": {
       "added": "დამატებულია კალათაში",
@@ -948,6 +993,36 @@
       "subject": "თემა",
       "status": "სტატუსი",
       "sent": "გაგზავნილი"
+    }
+  },
+  "accountAddresses": {
+    "title": "შენახული მისამართები",
+    "back": "მთავარზე დაბრუნება",
+    "loading": "მისამართები იტვირთება…",
+    "empty": "მისამართები არ არის. დაამატე, რომ შეკვეთა სწრაფი იყოს.",
+    "defaultBadge": "ძირითადი",
+    "actions": {
+      "makeDefault": "ძირითადად მონიშვნა",
+      "delete": "წაშლა"
+    },
+    "form": {
+      "title": "მისამართის დამატება",
+      "label": "ლეიბლი (არასავალდებულო)",
+      "labelPlaceholder": "მაგ.: სახლი",
+      "save": "მისამართის შენახვა",
+      "saving": "ინახება…"
+    },
+    "errors": {
+      "load": "მისამართების ჩატვირთვა ვერ მოხერხდა.",
+      "required": "შეავსე სახელი, გვარი, მისამართი და ქალაქი.",
+      "save": "მისამართის შენახვა ვერ მოხერხდა.",
+      "updateDefault": "ძირითადი მისამართის განახლება ვერ მოხერხდა.",
+      "delete": "მისამართის წაშლა ვერ მოხერხდა."
+    },
+    "success": {
+      "created": "მისამართი შეინახა.",
+      "defaultUpdated": "ძირითადი მისამართი განახლდა.",
+      "deleted": "მისამართი წაიშალა."
     }
   }
 }

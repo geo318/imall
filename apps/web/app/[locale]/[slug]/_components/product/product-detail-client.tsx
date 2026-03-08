@@ -1,25 +1,16 @@
 "use client";
 
 import { Badge } from "@repo/ui/badge";
-import {
-  ArrowLeft,
-  CheckCircle,
-  Gavel,
-  Heart,
-  Mail,
-  Phone,
-  ShieldCheck,
-  Star,
-  Truck,
-} from "lucide-react";
+import { ArrowLeft, CheckCircle, Gavel, Heart, ShieldCheck, Star, Truck } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import LazyImage from "@/components/shared/lazy-image";
 import { MarkdownContent } from "@/components/shared/markdown-content";
+import { ShopBusinessCard } from "@/components/shared/shop-business-card";
 import { Link } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
-import { formatCurrencyAmount } from "@/lib/utils/currency";
 import { cn } from "@/lib/utils";
+import { formatCurrencyAmount } from "@/lib/utils/currency";
 import {
   ProductActionsSlot,
   ProductAvailabilitySlot,
@@ -44,13 +35,17 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
     product.variants[0]?.id ?? null,
   );
   const [selectedImage, setSelectedImage] = useState(0);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
   const auction = selectedVariant?.auction ?? null;
   const selectedVariantOptionPairs = selectedVariant?.optionPairs ?? [];
   const shopSlug = product.tenantSlug ?? "demo-shop";
   const shopName = product.tenantName ?? shopSlug;
-  const hasSellerInfo = Boolean(product.sellerEmail || product.sellerPhone || product.sellerRules);
+  const hasSellerInfo = Boolean(
+    shopName || product.sellerEmail || product.sellerPhone || product.sellerRules,
+  );
+  const hasLongDescription = (product.description?.trim().length ?? 0) > 420;
 
   const productImages = useMemo(() => {
     const invalidTokens = new Set(["null", "undefined", "none", "no image"]);
@@ -75,6 +70,10 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
     setSelectedImage(0);
   }, [productImages.length, selectedImage]);
 
+  useEffect(() => {
+    setIsDescriptionExpanded(false);
+  }, [product.id, product.description]);
+
   return (
     <div className="container py-6">
       {/* Track product view */}
@@ -94,7 +93,7 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
       <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
         {/* Static: Images */}
         <div className="space-y-4">
-          <div className="flex flex-col-reverse gap-3 md:flex-row md:items-start md:gap-4">
+          <div className="flex flex-col-reverse gap-3 md:flex-row md:items-start md:gap-4 sticky top-20">
             {productImages.length > 1 ? (
               <div className="flex gap-3 overflow-x-auto pb-2 md:max-h-[560px] md:w-24 md:flex-col md:overflow-x-hidden md:overflow-y-auto md:pb-0 md:pr-1">
                 {productImages.map((image, index) => (
@@ -246,44 +245,51 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
             />
           )}
 
-          {/* Auction section - rendered above description */}
-          {auction && (
-            <ProductActionsSlot
-              product={product}
-              selectedVariantId={selectedVariantId}
-              productIdentifier={productIdentifier}
-            />
-          )}
+          {/* Buy section */}
+          <ProductActionsSlot
+            product={product}
+            selectedVariantId={selectedVariantId}
+            productIdentifier={productIdentifier}
+          />
 
-          {/* Static: Description */}
-          {product.description && (
+          {/* Description below buy section */}
+          {product.description ? (
             <div className="space-y-2">
               <h3 className="font-semibold">{t("productDetail.description")}</h3>
-              <MarkdownContent content={product.description} className="prose-sm" />
+              <div className="relative rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div
+                  className={cn(
+                    "overflow-hidden transition-[max-height] duration-300",
+                    hasLongDescription && !isDescriptionExpanded ? "max-h-56" : "max-h-[1200px]",
+                  )}
+                >
+                  <MarkdownContent content={product.description} className="prose-sm max-w-none" />
+                </div>
+                {hasLongDescription && !isDescriptionExpanded ? (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-slate-50 to-transparent" />
+                ) : null}
+              </div>
+              {hasLongDescription ? (
+                <button
+                  type="button"
+                  onClick={() => setIsDescriptionExpanded((prev) => !prev)}
+                  className="text-sm font-medium text-emerald-700 transition-colors hover:text-emerald-800"
+                >
+                  {isDescriptionExpanded
+                    ? t("productDetail.showLess")
+                    : t("productDetail.showMore")}
+                </button>
+              ) : null}
             </div>
-          )}
+          ) : null}
 
           {hasSellerInfo ? (
             <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <h3 className="font-semibold text-slate-900">{t("sellerInfo.title")}</h3>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {product.sellerEmail ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-700">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {t("sellerInfo.email")}: {product.sellerEmail}
-                    </span>
-                  </div>
-                ) : null}
-                {product.sellerPhone ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-700">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      {t("sellerInfo.phone")}: {product.sellerPhone}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
+              <ShopBusinessCard
+                legalName={shopName}
+                email={product.sellerEmail ?? null}
+                mobile={product.sellerPhone ?? null}
+              />
               {product.sellerRules ? (
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -316,15 +322,6 @@ export function ProductDetailClient({ product, productIdentifier }: Props) {
               <span className="text-muted-foreground">{t("productDetail.qualityGuaranteed")}</span>
             </div>
           </div>
-
-          {/* Action Buttons (uses React Query for fresh data) - only for non-auction products */}
-          {!auction && (
-            <ProductActionsSlot
-              product={product}
-              selectedVariantId={selectedVariantId}
-              productIdentifier={productIdentifier}
-            />
-          )}
 
           {/* Favorite Button */}
           <ProductFavoriteButton productId={product.id} />

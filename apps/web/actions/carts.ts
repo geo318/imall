@@ -60,6 +60,40 @@ async function backendRequest(
   return response;
 }
 
+async function extractBackendError(response: Response, fallback: string, context: string): Promise<string> {
+  const raw = await response.text();
+  let message = fallback;
+  let parsedBody: Record<string, unknown> | null = null;
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    parsedBody = parsed;
+    const parsedError = typeof parsed.error === "string" ? parsed.error : null;
+    const parsedMessage = typeof parsed.message === "string" ? parsed.message : null;
+    message = parsedError || parsedMessage || message;
+
+    // Prefer specific backend message when the top-level error is generic.
+    if (parsedError?.startsWith("Failed to ") && parsedMessage) {
+      message = parsedMessage;
+    }
+  } catch {
+    message = raw || message;
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    console.error(`[carts.actions] ${context} failed`, {
+      url: response.url,
+      status: response.status,
+      statusText: response.statusText,
+      body: raw || null,
+      parsedBody,
+      parsedMessage: message,
+    });
+  }
+
+  return message;
+}
+
 /**
  * Create a new cart
  */
@@ -208,4 +242,108 @@ export async function checkoutCart(cartId: string): Promise<void> {
 
     throw new Error(errorMessage);
   }
+}
+
+export type StartInstallmentCheckoutInput = {
+  installmentLength?: number;
+  clientFullName?: string;
+  mobile?: string;
+  email?: string;
+  factAddress?: string;
+};
+
+export type StartInstallmentCheckoutResult = {
+  orderCode: string;
+  redirectUrl: string;
+};
+
+export async function startInstallmentCheckout(
+  cartId: string,
+  payload: StartInstallmentCheckoutInput,
+): Promise<StartInstallmentCheckoutResult> {
+  const response = await backendRequest(`/carts/${cartId}/checkout/installments/start`, {
+    method: "POST",
+    body: payload,
+  });
+
+  if (!response.ok) {
+    const errorMessage = await extractBackendError(
+      response,
+      "Failed to start installment checkout",
+      "startInstallmentCheckout",
+    );
+    if (response.status === 404 && errorMessage === "NOT_FOUND") {
+      throw new Error("Installment API endpoint not found. Restart API dev server and retry.");
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+export type InstallmentStatusResult = {
+  orderCode: string;
+  statusId: number | null;
+  statusName: string;
+  checkoutCompleted: boolean;
+};
+
+export async function syncInstallmentCheckoutStatus(
+  cartId: string,
+  orderCode: string,
+): Promise<InstallmentStatusResult> {
+  const response = await backendRequest(`/carts/${cartId}/checkout/installments/status`, {
+    method: "POST",
+    body: { orderCode },
+  });
+
+  if (!response.ok) {
+    const errorMessage = await extractBackendError(
+      response,
+      "Failed to check installment status",
+      "syncInstallmentCheckoutStatus",
+    );
+    if (response.status === 404 && errorMessage === "NOT_FOUND") {
+      throw new Error("Installment status endpoint not found. Restart API dev server and retry.");
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
+
+export type RegisterManualInstallmentSaleInput = {
+  provider: "crystal";
+  comment?: string;
+};
+
+export type RegisterManualInstallmentSaleResult = {
+  checkoutCompleted: boolean;
+  orders?: Array<{
+    orderId: string;
+    tenantId: string;
+    total: number;
+    currency: string;
+  }> | null;
+};
+
+export async function registerManualInstallmentSale(
+  cartId: string,
+  payload: RegisterManualInstallmentSaleInput,
+): Promise<RegisterManualInstallmentSaleResult> {
+  const response = await backendRequest(`/carts/${cartId}/checkout/installments/manual`, {
+    method: "POST",
+    body: payload,
+  });
+
+  if (!response.ok) {
+    const errorMessage = await extractBackendError(
+      response,
+      "Failed to register manual installment sale",
+      "registerManualInstallmentSale",
+    );
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
 }

@@ -19,7 +19,8 @@
     "clearSearch": "Очистить поиск",
     "viewCart": "Открыть корзину",
     "openMenu": "Открыть меню",
-    "closeMenu": "Закрыть меню"
+    "closeMenu": "Закрыть меню",
+    "savedAddresses": "Сохранённые адреса"
   },
   "home": {
     "hero": {
@@ -328,6 +329,7 @@
   },
   "sellerInfo": {
     "title": "Контакты продавца",
+    "legalName": "Имя",
     "email": "Эл. почта",
     "phone": "Мобильный",
     "rules": "Личные правила"
@@ -340,6 +342,8 @@
     "options": "Опции",
     "defaultVariant": "По умолчанию",
     "description": "Описание",
+    "showMore": "Показать больше",
+    "showLess": "Скрыть",
     "freeShipping": "Бесплатная доставка",
     "securePayment": "Безопасная оплата",
     "qualityGuaranteed": "Гарантия качества",
@@ -467,26 +471,45 @@
     "shipping": {
       "title": "Данные доставки",
       "firstName": "Имя",
-      "firstNamePlaceholder": "Иван",
+      "firstNamePlaceholder": "Введите имя",
       "lastName": "Фамилия",
-      "lastNamePlaceholder": "Иванов",
+      "lastNamePlaceholder": "Введите фамилию",
       "email": "Email",
       "address": "Адрес",
-      "addressPlaceholder": "ул. Пример 10",
+      "addressPlaceholder": "Введите адрес",
       "city": "Город",
-      "cityPlaceholder": "Тбилиси",
+      "cityPlaceholder": "Введите город",
       "state": "Регион",
-      "statePlaceholder": "Тбилиси",
+      "statePlaceholder": "Введите регион",
       "zip": "Индекс",
-      "zipPlaceholder": "0108",
+      "zipPlaceholder": "Введите почтовый индекс",
       "phone": "Телефон",
-      "phonePlaceholder": "+995 5XX XXX XXX"
+      "phonePlaceholder": "Введите номер телефона",
+      "savedAddresses": "Сохранённые адреса",
+      "manageAddresses": "Управление",
+      "loadingAddresses": "Загрузка адресов…",
+      "noSavedAddresses": "Сохранённых адресов пока нет.",
+      "defaultBadge": "Основной",
+      "saveAddress": "Сохранить этот адрес",
+      "saveValidation": "Перед сохранением заполните имя, фамилию, адрес и город.",
+      "savedSuccess": "Адрес сохранён.",
+      "alreadySaved": "Этот адрес уже сохранён.",
+      "saveFailedDefault": "Не удалось сохранить адрес."
     },
     "payment": {
       "title": "Способ оплаты",
       "card": "Банковская карта",
       "paypal": "PayPal",
       "installments": "Рассрочка (комиссия 12%)",
+      "installmentProviderLabel": "Выберите провайдера рассрочки",
+      "credoProvider": "Онлайн-процесс",
+      "crystalProvider": "Ручной счёт",
+      "credoLogoAlt": "Credo.ge",
+      "crystalLogoAlt": "Crystal.ge",
+      "registerManualSale": "Зарегистрировать ручную продажу",
+      "registerManualSaleHint": "Включайте, когда клиент реально подал заявку в отделении Crystal.",
+      "manualSaleComment": "Комментарий",
+      "manualSaleCommentPlaceholder": "Добавьте контекст: отделение, менеджер, детали...",
       "cardNumber": "Номер карты",
       "cardNumberPlaceholder": "1234 5678 9012 3456",
       "expiry": "Срок действия",
@@ -498,7 +521,9 @@
     "actions": {
       "continueToPayment": "Далее",
       "back": "Назад",
-      "placeOrder": "Оформить заказ"
+      "placeOrder": "Оформить заказ",
+      "processing": "Обработка...",
+      "goToInstallments": "Продолжить в рассрочку"
     },
     "summary": {
       "title": "Итог",
@@ -507,6 +532,25 @@
       "installmentFee": "Комиссия рассрочки (12%)",
       "total": "Итого",
       "free": "Бесплатно"
+    },
+    "installments": {
+      "pendingOrderCode": "Заявка на рассрочку отправлена. Проверьте статус после возврата из банка.",
+      "checkStatus": "Проверить статус рассрочки",
+      "checkingStatus": "Проверяем статус...",
+      "clearPending": "Очистить ожидание",
+      "statusWithLabel": "Текущий статус рассрочки: {status}",
+      "statusUnknown": "Сейчас не удалось получить статус рассрочки.",
+      "notFound": "Заявка пока не найдена в банке. Подождите немного и проверьте снова.",
+      "invalidRequest": "Некорректные данные заявки на рассрочку. Запустите новую заявку.",
+      "syncFailed": "Не удалось синхронизировать статус рассрочки. Попробуйте снова.",
+      "manual": {
+        "invoiceGenerated": "Счёт Crystal открыт. Распечатайте и обратитесь в отделение банка.",
+        "registered": "Ручная продажа в рассрочку зарегистрирована.",
+        "commentRequired": "Перед регистрацией ручной продажи добавьте комментарий."
+      }
+    },
+    "errors": {
+      "default": "Произошла ошибка. Попробуйте снова."
     }
   },
   "productAvailability": {
@@ -530,6 +574,7 @@
   "productButtons": {
     "addToCart": "კალათაში დამატება",
     "buyNow": "ახლავე ყიდვა",
+    "buyWithInstallments": "Купить в рассрочку",
     "soldOut": "ამოწურულია",
     "toasts": {
       "added": "დამატებულია კალათაში",
@@ -948,6 +993,36 @@
       "subject": "Subject",
       "status": "Status",
       "sent": "Sent"
+    }
+  },
+  "accountAddresses": {
+    "title": "Сохранённые адреса",
+    "back": "Назад на главную",
+    "loading": "Загрузка адресов…",
+    "empty": "Адресов пока нет. Добавьте адрес для быстрого оформления.",
+    "defaultBadge": "Основной",
+    "actions": {
+      "makeDefault": "Сделать основным",
+      "delete": "Удалить"
+    },
+    "form": {
+      "title": "Добавить адрес",
+      "label": "Название (необязательно)",
+      "labelPlaceholder": "например, Дом",
+      "save": "Сохранить адрес",
+      "saving": "Сохранение…"
+    },
+    "errors": {
+      "load": "Не удалось загрузить адреса.",
+      "required": "Заполните имя, фамилию, адрес и город.",
+      "save": "Не удалось сохранить адрес.",
+      "updateDefault": "Не удалось обновить основной адрес.",
+      "delete": "Не удалось удалить адрес."
+    },
+    "success": {
+      "created": "Адрес сохранён.",
+      "defaultUpdated": "Основной адрес обновлён.",
+      "deleted": "Адрес удалён."
     }
   }
 }

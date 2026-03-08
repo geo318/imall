@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   LogOut,
+  MapPin,
   Menu,
   Search,
   Settings,
@@ -261,6 +262,12 @@ export function Header({
                       {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
                     </Link>
                   </DropdownItem>
+                  <DropdownItem asChild>
+                    <Link href="/account/addresses" className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      {t("nav.savedAddresses")}
+                    </Link>
+                  </DropdownItem>
                   <DropdownSeparator />
                   <DropdownItem
                     onClick={() => {
@@ -451,6 +458,16 @@ export function Header({
                   <Button variant="outline" className="w-full">
                     <Settings className="h-4 w-4 mr-2" />
                     {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
+                  </Button>
+                </Link>
+                <Link
+                  href="/account/addresses"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="w-full"
+                >
+                  <Button variant="outline" className="w-full">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    {t("nav.savedAddresses")}
                   </Button>
                 </Link>
                 <Button
