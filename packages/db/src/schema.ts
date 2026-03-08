@@ -119,6 +119,40 @@ export const users = pgTable(
   }),
 );
 
+// User shipping addresses are persisted per account and reused in checkout.
+export const userShippingAddresses = pgTable(
+  "user_shipping_addresses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    label: varchar("label", { length: 128 }),
+    firstName: varchar("first_name", { length: 128 }).notNull(),
+    lastName: varchar("last_name", { length: 128 }).notNull(),
+    email: varchar("email", { length: 256 }),
+    phone: varchar("phone", { length: 64 }),
+    addressLine1: varchar("address_line1", { length: 256 }).notNull(),
+    city: varchar("city", { length: 128 }).notNull(),
+    region: varchar("region", { length: 128 }),
+    postalCode: varchar("postal_code", { length: 32 }),
+    country: varchar("country", { length: 64 }).default("GE").notNull(),
+    isDefault: boolean("is_default").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    userCreatedIdx: index("user_shipping_addresses_user_created_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+    userDefaultIdx: index("user_shipping_addresses_user_default_idx").on(
+      table.userId,
+      table.isDefault,
+    ),
+  }),
+);
+
 // Memberships table links users to tenants with a role. A user can belong
 // to multiple tenants.
 export const memberships = pgTable(
@@ -409,6 +443,9 @@ export const orders = pgTable("orders", {
     .notNull(),
   userId: uuid("user_id").references(() => users.id),
   status: varchar("status", { length: 32 }).default("pending"),
+  paymentMethod: varchar("payment_method", { length: 32 }).default("card").notNull(),
+  manualSale: boolean("manual_sale").default(false).notNull(),
+  manualSaleComment: text("manual_sale_comment"),
   total: numeric("total", { precision: 12, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 8 }).default("USD").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

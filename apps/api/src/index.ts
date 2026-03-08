@@ -14,6 +14,7 @@ import { inventoryRoutes } from "./routes/inventory";
 import { allProductsRoutes, productsRoutes } from "./routes/products";
 import { shopsRoutes } from "./routes/shops";
 import { superadminRoutes } from "./routes/superadmin";
+import { userAddressRoutes } from "./routes/user-addresses";
 import { resolveStorageProvider } from "./storage";
 import { resolveCloudinaryCredentials } from "./storage/cloudinary-storage";
 import { resolveUploadsDir, summarizeUploadsDirs } from "./storage/uploads-dir";
@@ -63,6 +64,12 @@ async function logStartupDiagnostics(port: number) {
     source: cloudinaryCredentials?.source ?? null,
     cloudName: cloudinaryCredentials?.cloudName ?? null,
     baseFolder: env.CLOUDINARY_BASE_FOLDER || "imall",
+  });
+  console.log("[API][BOOT] CREDO_INSTALLMENTS:", {
+    merchantId: env.CREDO_MERCHANT_ID || null,
+    orderUrl: env.CREDO_WIDGET_ORDER_URL || "https://ganvadeba.credo.ge/widget_api/order.php",
+    statusUrl: env.CREDO_WIDGET_STATUS_URL || "https://ganvadeba.credo.ge/widget/api.php",
+    enabled: Boolean(env.CREDO_MERCHANT_ID && env.CREDO_SHARED_SECRET),
   });
 
   console.log("[API][BOOT] Step 2/4: Database probe");
@@ -162,6 +169,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(inventoryRoutes)
   .use(auctionsRoutes)
   .use(favoritesRoutes)
+  .use(userAddressRoutes)
   .use(adminProductsRoutes)
   .use(adminShopRoutes)
   .use(adminUploadRoutes)
@@ -172,8 +180,10 @@ const app = new Elysia({ prefix: "/api" })
     console.log("[API]   - /api/categories/tree");
     console.log("[API]   - /api/products");
     console.log("[API]   - /api/carts");
+    console.log("[API]   - /api/carts/:cartId/checkout/installments/*");
     console.log("[API]   - /api/inventory");
     console.log("[API]   - /api/auctions");
+    console.log("[API]   - /api/users/me/addresses");
   });
 
 async function bootstrapApi() {
@@ -196,6 +206,10 @@ async function bootstrapApi() {
   console.log("[API]   GET  /api/carts/:cartId");
   console.log("[API]   POST /api/carts/:cartId/items");
   console.log("[API]   POST /api/carts/:cartId/checkout");
+  console.log("[API]   POST /api/carts/:cartId/checkout/installments/start");
+  console.log("[API]   POST /api/carts/:cartId/checkout/installments/status");
+  console.log("[API]   GET  /api/users/me/addresses");
+  console.log("[API]   POST /api/users/me/addresses");
 }
 
 if (env.NODE_ENV !== "test") {

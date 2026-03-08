@@ -13,6 +13,11 @@ const serverSchema = {
   DB_POOL_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PAYMENT_KEEPZ_API_KEY: z.string().optional(),
   PAYMENT_WEBHOOK_SECRET: z.string().optional(),
+  CREDO_MERCHANT_ID: z.string().optional(),
+  CREDO_SHARED_SECRET: z.string().optional(),
+  CREDO_WIDGET_ORDER_URL: z.string().url().optional(),
+  CREDO_WIDGET_STATUS_URL: z.string().url().optional(),
+  CREDO_INSTALLMENT_DEFAULT_MONTHS: z.coerce.number().int().positive().max(60).default(12),
   SEED_SHOP_SLUG: z.string().default("demo-shop"),
   SEED_SHOP_NAME: z.string().default("Demo Shop"),
   SUPERADMIN_EMAIL: z.string().email(),
@@ -24,15 +29,12 @@ const serverSchema = {
   CLOUDINARY_API_SECRET: z.string().optional(),
   CLOUDINARY_BASE_FOLDER: z.string().optional(),
   CLOUDINARY_DELIVERY_TRANSFORMATION: z.string().optional(),
-  BACKEND_URL: z.preprocess(
-    (value) => {
-      if (typeof value === "string" && value.length > 0 && !/^https?:\/\//i.test(value)) {
-        return `http://${value}`;
-      }
-      return value;
-    },
-    z.string().url().default("http://localhost:3001"),
-  ),
+  BACKEND_URL: z.preprocess((value) => {
+    if (typeof value === "string" && value.length > 0 && !/^https?:\/\//i.test(value)) {
+      return `http://${value}`;
+    }
+    return value;
+  }, z.string().url().default("http://localhost:3001")),
 } as const;
 
 const clientSchema = {
@@ -58,6 +60,11 @@ const runtimeEnv: RuntimeEnv = {
   DB_POOL_CONNECTION_TIMEOUT_MS: process.env.DB_POOL_CONNECTION_TIMEOUT_MS,
   PAYMENT_KEEPZ_API_KEY: process.env.PAYMENT_KEEPZ_API_KEY,
   PAYMENT_WEBHOOK_SECRET: process.env.PAYMENT_WEBHOOK_SECRET,
+  CREDO_MERCHANT_ID: process.env.CREDO_MERCHANT_ID,
+  CREDO_SHARED_SECRET: process.env.CREDO_SHARED_SECRET,
+  CREDO_WIDGET_ORDER_URL: process.env.CREDO_WIDGET_ORDER_URL,
+  CREDO_WIDGET_STATUS_URL: process.env.CREDO_WIDGET_STATUS_URL,
+  CREDO_INSTALLMENT_DEFAULT_MONTHS: process.env.CREDO_INSTALLMENT_DEFAULT_MONTHS,
   SEED_SHOP_SLUG: process.env.SEED_SHOP_SLUG,
   SEED_SHOP_NAME: process.env.SEED_SHOP_NAME,
   SUPERADMIN_EMAIL: process.env.SUPERADMIN_EMAIL,

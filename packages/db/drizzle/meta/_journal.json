@@ -127,6 +127,13 @@
       "when": 1772659050137,
       "tag": "0017_tense_owl",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1772726400000,
+      "tag": "0021_manual_installment_sales",
+      "breakpoints": true
     }
   ]
 }

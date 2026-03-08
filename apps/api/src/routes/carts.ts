@@ -19,7 +19,192 @@ import {
   getAvailableStockMap,
   INVENTORY_REASONS,
 } from "../context";
+import {
+  type CredoInstallmentProduct,
+  createCredoInstallmentApplication,
+  fetchCredoInstallmentStatus,
+  isInstallmentCheckoutReadyStatus,
+  validateOrderCodeForCart,
+} from "../integrations/credo-installments";
 import { sanitizePersistedImageUrls } from "../utils/image-urls";
+import { logger } from "../utils/logger";
+
+const installmentStartSchema = z.object({
+  installmentLength: z.coerce.number().int().positive().max(60).optional(),
+  clientFullName: z.string().trim().max(128).optional(),
+  mobile: z.string().trim().max(32).optional(),
+  email: z.string().email().max(256).optional(),
+  factAddress: z.string().trim().max(256).optional(),
+});
+
+const installmentStatusSchema = z.object({
+  orderCode: z.string().trim().min(16).max(50),
+});
+
+const manualInstallmentCheckoutSchema = z.object({
+  provider: z.enum(["crystal"]),
+  comment: z.string().trim().max(2000).optional(),
+});
+
+type CheckoutResult = {
+  orders: Array<{
+    orderId: string;
+    tenantId: string;
+    total: number;
+    currency: string;
+  }>;
+};
+
+type CompleteCartCheckoutOptions = {
+  paymentMethod?: string;
+  manualSale?: boolean;
+  manualSaleComment?: string | null;
+};
+
+async function completeCartCheckout(
+  cartId: string,
+  authUserId: string | null,
+  options: CompleteCartCheckoutOptions = {},
+): Promise<CheckoutResult> {
+  return db.transaction(async (tx) => {
+    // Get cart and all items
+    const cartWithItems = await tx
+      .select({
+        cartId: carts.id,
+        status: carts.status,
+        userId: carts.userId,
+        variantId: cartItems.variantId,
+        tenantId: cartItems.tenantId, // Each item's tenant
+        qty: cartItems.qty,
+        price: variants.price,
+        currency: variants.currency,
+        productId: variants.productId,
+      })
+      .from(carts)
+      .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
+      .leftJoin(variants, eq(cartItems.variantId, variants.id))
+      .where(eq(carts.id, cartId));
+
+    if (cartWithItems.length === 0) {
+      throw new Response("Cart not found", { status: 404 });
+    }
+
+    // Authorization: If cart has a userId, ensure the authenticated user matches
+    const cartUserId = cartWithItems[0]?.userId;
+    if (cartUserId && authUserId !== cartUserId) {
+      throw new Response("Forbidden: You don't have access to this cart", {
+        status: 403,
+      });
+    }
+
+    if (cartWithItems[0]?.status !== "open") {
+      throw new Response("Cart is not open", { status: 409 });
+    }
+
+    const items = cartWithItems.filter(
+      (
+        row,
+      ): row is (typeof cartWithItems)[number] & {
+        variantId: string;
+        tenantId: string;
+        qty: number;
+        price: string;
+      } => Boolean(row.variantId && row.tenantId && row.qty !== null && row.price !== null),
+    );
+    if (items.length === 0) {
+      throw new Response("Cart is empty", { status: 400 });
+    }
+
+    // Check stock for each item (using batched lookups per tenant)
+    const variantIdsByTenant = new Map<string, Set<string>>();
+    for (const item of items) {
+      if (!item.variantId || !item.tenantId) continue;
+      const tenantVariants = variantIdsByTenant.get(item.tenantId) ?? new Set<string>();
+      tenantVariants.add(item.variantId);
+      variantIdsByTenant.set(item.tenantId, tenantVariants);
+    }
+
+    const stockByTenant = new Map<string, Map<string, number>>();
+    await Promise.all(
+      Array.from(variantIdsByTenant.entries()).map(async ([tenantId, variantIds]) => {
+        stockByTenant.set(tenantId, await getAvailableStockMap(tenantId, Array.from(variantIds)));
+      }),
+    );
+
+    for (const item of items) {
+      const available = stockByTenant.get(item.tenantId)?.get(item.variantId) ?? 0;
+      if (available < (item.qty ?? 0)) {
+        throw new Response("Insufficient stock", { status: 409 });
+      }
+    }
+
+    // Group items by tenant for creating separate orders
+    const itemsByTenant = new Map<string, typeof items>();
+    for (const item of items) {
+      const tenantItems = itemsByTenant.get(item.tenantId) ?? [];
+      tenantItems.push(item);
+      itemsByTenant.set(item.tenantId, tenantItems);
+    }
+
+    // Create orders for each tenant
+    const createdOrders = [];
+    for (const [tenantId, tenantItems] of itemsByTenant.entries()) {
+      const currency = tenantItems[0]?.currency ?? "USD";
+      const total = tenantItems.reduce((sum, item) => {
+        const priceNumber = Number(item.price ?? 0);
+        return sum + priceNumber * (item.qty ?? 0);
+      }, 0);
+
+      const [order] = await tx
+        .insert(orders)
+        .values({
+          id: crypto.randomUUID(),
+          tenantId,
+          status: "pending",
+          paymentMethod: options.paymentMethod ?? "card",
+          manualSale: options.manualSale ?? false,
+          manualSaleComment: options.manualSaleComment?.trim() || null,
+          total: String(total),
+          currency,
+        })
+        .returning({ id: orders.id });
+      if (!order) {
+        throw new Response("Order creation failed", { status: 500 });
+      }
+
+      for (const item of tenantItems) {
+        await tx.insert(orderItems).values({
+          id: crypto.randomUUID(),
+          tenantId,
+          orderId: order.id,
+          variantId: item.variantId,
+          qty: item.qty,
+          unitPrice: item.price,
+        });
+
+        await tx.insert(inventoryLedger).values({
+          id: crypto.randomUUID(),
+          tenantId,
+          variantId: item.variantId,
+          delta: -Math.abs(item.qty),
+          reason: INVENTORY_REASONS.SALE,
+          refType: "order",
+          refId: order.id,
+        });
+      }
+
+      createdOrders.push({ orderId: order.id, tenantId, total, currency });
+    }
+
+    // Mark cart as completed
+    await tx
+      .update(carts)
+      .set({ status: "completed", updatedAt: new Date() })
+      .where(eq(carts.id, cartId));
+
+    return { orders: createdOrders };
+  });
+}
 
 // Cart routes - single cart that can hold items from multiple shops
 export const cartRoutes = new Elysia({ prefix: "/carts" })
@@ -369,140 +554,8 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
     const { cartId } = params as { cartId: string };
 
     try {
-      const result = await db.transaction(async (tx) => {
-        // Get cart and all items
-        const cartWithItems = await tx
-          .select({
-            cartId: carts.id,
-            status: carts.status,
-            userId: carts.userId,
-            variantId: cartItems.variantId,
-            tenantId: cartItems.tenantId, // Each item's tenant
-            qty: cartItems.qty,
-            price: variants.price,
-            currency: variants.currency,
-            productId: variants.productId,
-          })
-          .from(carts)
-          .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
-          .leftJoin(variants, eq(cartItems.variantId, variants.id))
-          .where(eq(carts.id, cartId));
-
-        if (cartWithItems.length === 0) {
-          throw new Response("Cart not found", { status: 404 });
-        }
-
-        // Authorization: If cart has a userId, ensure the authenticated user matches
-        const cartUserId = cartWithItems[0]?.userId;
-        if (cartUserId && auth?.userId !== cartUserId) {
-          throw new Response("Forbidden: You don't have access to this cart", {
-            status: 403,
-          });
-        }
-
-        if (cartWithItems[0]?.status !== "open") {
-          throw new Response("Cart is not open", { status: 409 });
-        }
-
-        const items = cartWithItems.filter(
-          (
-            row,
-          ): row is (typeof cartWithItems)[number] & {
-            variantId: string;
-            tenantId: string;
-            qty: number;
-            price: string;
-          } => Boolean(row.variantId && row.tenantId && row.qty !== null && row.price !== null),
-        );
-        if (items.length === 0) {
-          throw new Response("Cart is empty", { status: 400 });
-        }
-
-        // Check stock for each item (using batched lookups per tenant)
-        const variantIdsByTenant = new Map<string, Set<string>>();
-        for (const item of items) {
-          if (!item.variantId || !item.tenantId) continue;
-          const tenantVariants = variantIdsByTenant.get(item.tenantId) ?? new Set<string>();
-          tenantVariants.add(item.variantId);
-          variantIdsByTenant.set(item.tenantId, tenantVariants);
-        }
-
-        const stockByTenant = new Map<string, Map<string, number>>();
-        await Promise.all(
-          Array.from(variantIdsByTenant.entries()).map(async ([tenantId, variantIds]) => {
-            stockByTenant.set(tenantId, await getAvailableStockMap(tenantId, Array.from(variantIds)));
-          }),
-        );
-
-        for (const item of items) {
-          const available = stockByTenant.get(item.tenantId)?.get(item.variantId) ?? 0;
-          if (available < (item.qty ?? 0)) {
-            throw new Response("Insufficient stock", { status: 409 });
-          }
-        }
-
-        // Group items by tenant for creating separate orders
-        const itemsByTenant = new Map<string, typeof items>();
-        for (const item of items) {
-          const tenantItems = itemsByTenant.get(item.tenantId) ?? [];
-          tenantItems.push(item);
-          itemsByTenant.set(item.tenantId, tenantItems);
-        }
-
-        // Create orders for each tenant
-        const createdOrders = [];
-        for (const [tenantId, tenantItems] of itemsByTenant.entries()) {
-          const currency = tenantItems[0]?.currency ?? "USD";
-          const total = tenantItems.reduce((sum, item) => {
-            const priceNumber = Number(item.price ?? 0);
-            return sum + priceNumber * (item.qty ?? 0);
-          }, 0);
-
-          const [order] = await tx
-            .insert(orders)
-            .values({
-              id: crypto.randomUUID(),
-              tenantId,
-              status: "pending",
-              total: String(total),
-              currency,
-            })
-            .returning({ id: orders.id });
-          if (!order) {
-            throw new Response("Order creation failed", { status: 500 });
-          }
-
-          for (const item of tenantItems) {
-            await tx.insert(orderItems).values({
-              id: crypto.randomUUID(),
-              tenantId,
-              orderId: order.id,
-              variantId: item.variantId,
-              qty: item.qty,
-              unitPrice: item.price,
-            });
-
-            await tx.insert(inventoryLedger).values({
-              id: crypto.randomUUID(),
-              tenantId,
-              variantId: item.variantId,
-              delta: -Math.abs(item.qty),
-              reason: INVENTORY_REASONS.SALE,
-              refType: "order",
-              refId: order.id,
-            });
-          }
-
-          createdOrders.push({ orderId: order.id, tenantId, total, currency });
-        }
-
-        // Mark cart as completed
-        await tx
-          .update(carts)
-          .set({ status: "completed", updatedAt: new Date() })
-          .where(eq(carts.id, cartId));
-
-        return { orders: createdOrders };
+      const result = await completeCartCheckout(cartId, auth?.userId ?? null, {
+        paymentMethod: "card",
       });
 
       set.status = 201;
@@ -515,6 +568,294 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       return {
         error: "Checkout failed",
         message: err instanceof Error ? err.message : String(err),
+      };
+    }
+  })
+  .post("/:cartId/checkout/installments/start", async ({ params, body, auth, set }) => {
+    const { cartId } = params as { cartId: string };
+
+    let payload: z.infer<typeof installmentStartSchema>;
+    try {
+      payload = installmentStartSchema.parse(body);
+    } catch (error) {
+      set.status = 400;
+      return {
+        error: "Invalid installment payload",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    try {
+      const rows = await db
+        .select({
+          cartId: carts.id,
+          status: carts.status,
+          userId: carts.userId,
+          variantId: cartItems.variantId,
+          tenantId: cartItems.tenantId,
+          qty: cartItems.qty,
+          price: variants.price,
+          productId: products.id,
+          productTitle: products.title,
+        })
+        .from(carts)
+        .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
+        .leftJoin(variants, eq(cartItems.variantId, variants.id))
+        .leftJoin(products, eq(variants.productId, products.id))
+        .where(eq(carts.id, cartId));
+
+      if (rows.length === 0) {
+        set.status = 404;
+        return { error: "Cart not found" };
+      }
+
+      const cartUserId = rows[0]?.userId;
+      if (cartUserId && auth?.userId !== cartUserId) {
+        set.status = 403;
+        return { error: "Forbidden: You don't have access to this cart" };
+      }
+
+      if (rows[0]?.status !== "open") {
+        set.status = 409;
+        return { error: "Cart is not open" };
+      }
+
+      const cartItemsForCredo = rows.filter(
+        (
+          row,
+        ): row is (typeof rows)[number] & {
+          variantId: string;
+          tenantId: string;
+          qty: number;
+          price: string;
+          productId: string;
+          productTitle: string;
+        } =>
+          Boolean(
+            row.variantId &&
+              row.tenantId &&
+              row.qty !== null &&
+              row.price !== null &&
+              row.productId &&
+              row.productTitle,
+          ),
+      );
+
+      if (cartItemsForCredo.length === 0) {
+        set.status = 400;
+        return { error: "Cart is empty" };
+      }
+
+      // Reuse stock checks from standard checkout to avoid sending impossible applications.
+      const variantIdsByTenant = new Map<string, Set<string>>();
+      for (const item of cartItemsForCredo) {
+        const tenantVariants = variantIdsByTenant.get(item.tenantId) ?? new Set<string>();
+        tenantVariants.add(item.variantId);
+        variantIdsByTenant.set(item.tenantId, tenantVariants);
+      }
+
+      const stockByTenant = new Map<string, Map<string, number>>();
+      await Promise.all(
+        Array.from(variantIdsByTenant.entries()).map(async ([tenantId, variantIds]) => {
+          stockByTenant.set(tenantId, await getAvailableStockMap(tenantId, Array.from(variantIds)));
+        }),
+      );
+
+      for (const item of cartItemsForCredo) {
+        const available = stockByTenant.get(item.tenantId)?.get(item.variantId) ?? 0;
+        if (available < item.qty) {
+          set.status = 409;
+          return {
+            error: "Insufficient stock",
+            message: `${item.productTitle} has only ${available} available`,
+          };
+        }
+      }
+
+      const credoProducts: CredoInstallmentProduct[] = cartItemsForCredo.map((item) => {
+        const unitPrice = Number(item.price);
+        return {
+          id: item.variantId,
+          title: item.productTitle,
+          amount: item.qty,
+          price: Math.max(1, Math.round(unitPrice * 100)),
+          type: 0,
+        };
+      });
+
+      // 12% commission is charged only for installments and must be included in Credo payload.
+      const subtotal = cartItemsForCredo.reduce(
+        (sum, item) => sum + Number(item.price) * item.qty,
+        0,
+      );
+      const commissionTetri = Math.round(subtotal * 0.12 * 100);
+      if (commissionTetri > 0) {
+        credoProducts.push({
+          id: `fee-${cartId.slice(0, 8)}`,
+          title: "Installment commission",
+          amount: 1,
+          price: commissionTetri,
+          type: 0,
+        });
+      }
+
+      const session = await createCredoInstallmentApplication({
+        cartId,
+        products: credoProducts,
+        installmentLength: payload.installmentLength,
+        clientFullName: payload.clientFullName,
+        mobile: payload.mobile,
+        email: payload.email,
+        factAddress: payload.factAddress,
+      });
+
+      logger.debug("[Cart Route] Created Credo installment session", {
+        cartId,
+        orderCode: session.orderCode,
+      });
+
+      return {
+        orderCode: session.orderCode,
+        redirectUrl: session.redirectUrl,
+      };
+    } catch (error) {
+      logger.error("[Cart Route] Failed to start installment checkout", {
+        cartId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      set.status = 500;
+      return {
+        error: "Failed to start installment checkout",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  })
+  .post("/:cartId/checkout/installments/manual", async ({ params, body, auth, set }) => {
+    const { cartId } = params as { cartId: string };
+
+    let payload: z.infer<typeof manualInstallmentCheckoutSchema>;
+    try {
+      payload = manualInstallmentCheckoutSchema.parse(body);
+    } catch (error) {
+      set.status = 400;
+      return {
+        error: "Invalid manual installment payload",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    try {
+      const [cart] = await db
+        .select({ id: carts.id, status: carts.status, userId: carts.userId })
+        .from(carts)
+        .where(eq(carts.id, cartId))
+        .limit(1);
+
+      if (!cart) {
+        set.status = 404;
+        return { error: "Cart not found" };
+      }
+
+      if (cart.userId && auth?.userId !== cart.userId) {
+        set.status = 403;
+        return { error: "Forbidden: You don't have access to this cart" };
+      }
+
+      if (cart.status !== "open") {
+        set.status = 409;
+        return { error: "Cart is not open" };
+      }
+
+      const checkoutResult = await completeCartCheckout(cartId, auth?.userId ?? null, {
+        paymentMethod: `installments_${payload.provider}`,
+        manualSale: true,
+        manualSaleComment: payload.comment?.trim() || null,
+      });
+
+      return {
+        checkoutCompleted: true,
+        orders: checkoutResult.orders,
+      };
+    } catch (error) {
+      logger.error("[Cart Route] Failed to register manual installment sale", {
+        cartId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      set.status = 500;
+      return {
+        error: "Failed to register manual installment sale",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  })
+  .post("/:cartId/checkout/installments/status", async ({ params, body, auth, set }) => {
+    const { cartId } = params as { cartId: string };
+
+    let payload: z.infer<typeof installmentStatusSchema>;
+    try {
+      payload = installmentStatusSchema.parse(body);
+    } catch (error) {
+      set.status = 400;
+      return {
+        error: "Invalid status payload",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    try {
+      const [cart] = await db
+        .select({ id: carts.id, status: carts.status, userId: carts.userId })
+        .from(carts)
+        .where(eq(carts.id, cartId))
+        .limit(1);
+
+      if (!cart) {
+        set.status = 404;
+        return { error: "Cart not found" };
+      }
+
+      if (cart.userId && auth?.userId !== cart.userId) {
+        set.status = 403;
+        return { error: "Forbidden: You don't have access to this cart" };
+      }
+
+      if (!validateOrderCodeForCart(payload.orderCode, cartId)) {
+        set.status = 400;
+        return { error: "Order code does not match this cart" };
+      }
+
+      const statusResult = await fetchCredoInstallmentStatus(payload.orderCode);
+      let checkoutCompleted = cart.status === "completed";
+      let checkoutResult: CheckoutResult | null = null;
+
+      if (
+        !checkoutCompleted &&
+        cart.status === "open" &&
+        isInstallmentCheckoutReadyStatus(statusResult.statusId)
+      ) {
+        checkoutResult = await completeCartCheckout(cartId, auth?.userId ?? null, {
+          paymentMethod: "installments_credo",
+        });
+        checkoutCompleted = true;
+      }
+
+      return {
+        orderCode: payload.orderCode,
+        statusId: statusResult.statusId,
+        statusName: statusResult.statusName,
+        checkoutCompleted,
+        orders: checkoutResult?.orders ?? null,
+        raw: statusResult.raw,
+      };
+    } catch (error) {
+      logger.error("[Cart Route] Failed to sync installment status", {
+        cartId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      set.status = 500;
+      return {
+        error: "Failed to sync installment status",
+        message: error instanceof Error ? error.message : String(error),
       };
     }
   });
