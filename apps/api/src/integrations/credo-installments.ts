@@ -22,6 +22,7 @@ export type StartCredoInstallmentInput = {
   mobile?: string;
   email?: string;
   factAddress?: string;
+  meta?: Record<string, string | number | boolean>;
 };
 
 export type CredoInstallmentStatusResult = {
@@ -218,6 +219,24 @@ export async function createCredoInstallmentApplication(
   if (input.mobile?.trim()) payload.mobile = normalizeText(input.mobile, 32);
   if (input.email?.trim()) payload.email = normalizeText(input.email, 256);
   if (input.factAddress?.trim()) payload.factAddress = normalizeText(input.factAddress, 256);
+
+  if (input.meta) {
+    const normalizedMeta = Object.entries(input.meta).reduce<Record<string, string>>(
+      (acc, [rawKey, rawValue]) => {
+        if (rawValue === null || rawValue === undefined) return acc;
+        const key = normalizeText(String(rawKey), 64);
+        const value = normalizeText(String(rawValue), 256);
+        if (!key || !value) return acc;
+        acc[key] = value;
+        return acc;
+      },
+      {},
+    );
+
+    if (Object.keys(normalizedMeta).length > 0) {
+      payload.meta = normalizedMeta;
+    }
+  }
 
   const response = await fetch(getOrderUrl(), {
     method: "POST",

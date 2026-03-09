@@ -6,6 +6,7 @@ import {
   orderItems,
   orders,
   products,
+  tenants,
   variants,
 } from "@repo/db";
 import { parseImageUrls } from "@repo/shared";
@@ -160,6 +161,7 @@ async function completeCartCheckout(
         .values({
           id: crypto.randomUUID(),
           tenantId,
+          userId: cartUserId ?? authUserId ?? null,
           status: "pending",
           paymentMethod: options.paymentMethod ?? "card",
           manualSale: options.manualSale ?? false,
@@ -646,6 +648,39 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         return { error: "Cart is empty" };
       }
 
+      const distinctTenantIds = new Set(cartItemsForCredo.map((item) => item.tenantId));
+      if (distinctTenantIds.size > 1) {
+        set.status = 409;
+        return {
+          error: "Online installments are available only for single-vendor carts",
+          code: "INSTALLMENTS_SINGLE_VENDOR_REQUIRED",
+        };
+      }
+
+      const firstCartItem = cartItemsForCredo[0];
+      if (!firstCartItem) {
+        set.status = 400;
+        return { error: "Cart is empty" };
+      }
+
+      const mediatorTenantId = firstCartItem.tenantId;
+      const [mediatorShop] = await db
+        .select({
+          shopId: tenants.id,
+          shopSlug: tenants.shopSlug,
+          shopName: tenants.name,
+        })
+        .from(tenants)
+        .where(eq(tenants.id, mediatorTenantId))
+        .limit(1);
+      const mediatorShopNumberMatch = mediatorShop?.shopSlug?.match(/\d+/);
+      const mediatorShopNumber = mediatorShopNumberMatch?.[0];
+      const credoMeta = {
+        mediatorShopName: mediatorShop?.shopName ?? "",
+        mediatorShopNumber: mediatorShopNumber ?? "",
+        mediatorShopId: mediatorShop?.shopId ?? mediatorTenantId,
+      };
+
       // Reuse stock checks from standard checkout to avoid sending impossible applications.
       const variantIdsByTenant = new Map<string, Set<string>>();
       for (const item of cartItemsForCredo) {
@@ -707,6 +742,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         mobile: payload.mobile,
         email: payload.email,
         factAddress: payload.factAddress,
+        meta: credoMeta,
       });
 
       logger.debug("[Cart Route] Created Credo installment session", {
