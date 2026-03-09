@@ -5,6 +5,9 @@ import { useMemo, useState } from "react";
 import { twMerge } from "tailwind-merge";
 import { getImage, isValidImageUrl } from "@/lib/utils/images";
 
+// Prevent blur/pulse flicker when the same URL remounts across route updates or list refreshes.
+const loadedImageSourceCache = new Set<string>();
+
 export default function LazyImage({
   alt,
   src,
@@ -35,7 +38,8 @@ export default function LazyImage({
   const isValidSource =
     typeof imageSrc === "string" ? isValidImageUrl(imageSrc) : Boolean(imageSrc);
   const hasCurrentSourceError = imageSrcKey ? failedSources.has(imageSrcKey) : false;
-  const isLoaded = loadedSourceKey === imageSrcKey;
+  const wasLoadedEarlier = imageSrcKey ? loadedImageSourceCache.has(imageSrcKey) : false;
+  const isLoaded = loadedSourceKey === imageSrcKey || wasLoadedEarlier;
   const isApiImage =
     typeof imageSrc === "string" &&
     (imageSrc.includes("localhost") || imageSrc.includes("/api/image/"));
@@ -88,6 +92,7 @@ export default function LazyImage({
         loading={props.loading ?? "lazy"}
         unoptimized={isApiImage || isCloudinaryImage ? true : props.unoptimized}
         onLoad={(event) => {
+          loadedImageSourceCache.add(imageSrcKey);
           setLoadedSourceKey(imageSrcKey);
           setFailedSources((previous) => {
             if (!previous.has(imageSrcKey)) {
