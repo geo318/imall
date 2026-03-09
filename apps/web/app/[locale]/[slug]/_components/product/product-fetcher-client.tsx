@@ -26,6 +26,8 @@ export function ProductFetcherClient({ productIdentifier }: Props) {
   } = useQuery<ApiProduct>({
     queryKey: ["product-with-auth", productIdentifier],
     queryFn: async () => {
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 8_000);
       const token = await getToken();
       const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -34,18 +36,31 @@ export function ProductFetcherClient({ productIdentifier }: Props) {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      const response = await fetch(`/api/products/${productIdentifier}`, {
-        headers,
-      });
+      try {
+        const response = await fetch(`/api/products/${productIdentifier}`, {
+          headers,
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error("not-found");
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("not-found");
+          }
+          if (response.status === 504) {
+            throw new Error("timeout");
+          }
+          throw new Error("Failed to load product");
         }
-        throw new Error("Failed to load product");
-      }
 
-      return response.json();
+        return response.json();
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error("timeout");
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
     },
     retry: false,
   });

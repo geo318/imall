@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import { toast } from "sonner";
-import { addToCart, createCart } from "@/actions/carts";
+import { addToCartSafe, createCartSafe } from "@/actions/carts";
 import { dispatchCartStorageUpdated, writeCartIdToStorage } from "@/lib/cart-storage";
 import { revalidateCartClient } from "@/lib/revalidate-client";
 
@@ -30,15 +30,21 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
       let cartId = isClient ? globalThis.window.localStorage.getItem(key) : null;
 
       if (!cartId) {
-        const { id } = await createCart();
-        cartId = id;
+        const createResult = await createCartSafe();
+        if (!createResult.ok) {
+          throw new Error(createResult.error);
+        }
+        cartId = createResult.data.id;
         if (isClient) {
           writeCartIdToStorage(cartId, key);
         }
       }
 
       try {
-        await addToCart(cartId, variantId, 1);
+        const addResult = await addToCartSafe(cartId, variantId, 1);
+        if (!addResult.ok) {
+          throw new Error(addResult.error);
+        }
         return cartId;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -46,12 +52,18 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
           if (isClient) {
             globalThis.window.localStorage.removeItem(key);
           }
-          const { id } = await createCart();
-          cartId = id;
+          const createResult = await createCartSafe();
+          if (!createResult.ok) {
+            throw new Error(createResult.error);
+          }
+          cartId = createResult.data.id;
           if (isClient) {
             writeCartIdToStorage(cartId, key);
           }
-          await addToCart(cartId, variantId, 1);
+          const retryAddResult = await addToCartSafe(cartId, variantId, 1);
+          if (!retryAddResult.ok) {
+            throw new Error(retryAddResult.error);
+          }
           return cartId;
         }
         throw err;

@@ -15,6 +15,7 @@ import { allProductsRoutes, productsRoutes } from "./routes/products";
 import { shopsRoutes } from "./routes/shops";
 import { superadminRoutes } from "./routes/superadmin";
 import { userAddressRoutes } from "./routes/user-addresses";
+import { userOrderRoutes } from "./routes/user-orders";
 import { resolveStorageProvider } from "./storage";
 import { resolveCloudinaryCredentials } from "./storage/cloudinary-storage";
 import { resolveUploadsDir, summarizeUploadsDirs } from "./storage/uploads-dir";
@@ -170,6 +171,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(auctionsRoutes)
   .use(favoritesRoutes)
   .use(userAddressRoutes)
+  .use(userOrderRoutes)
   .use(adminProductsRoutes)
   .use(adminShopRoutes)
   .use(adminUploadRoutes)
@@ -184,6 +186,7 @@ const app = new Elysia({ prefix: "/api" })
     console.log("[API]   - /api/inventory");
     console.log("[API]   - /api/auctions");
     console.log("[API]   - /api/users/me/addresses");
+    console.log("[API]   - /api/users/me/orders");
   });
 
 async function bootstrapApi() {
@@ -210,6 +213,7 @@ async function bootstrapApi() {
   console.log("[API]   POST /api/carts/:cartId/checkout/installments/status");
   console.log("[API]   GET  /api/users/me/addresses");
   console.log("[API]   POST /api/users/me/addresses");
+  console.log("[API]   GET  /api/users/me/orders");
 }
 
 if (env.NODE_ENV !== "test") {

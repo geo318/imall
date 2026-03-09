@@ -6,6 +6,7 @@ export type CartItem = {
   qty: number;
   availableQty?: number;
   variantId?: string;
+  tenantId?: string;
   productId: string;
   productTitle: string;
   productSlug: string;

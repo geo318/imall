@@ -20,7 +20,92 @@
     "viewCart": "Открыть корзину",
     "openMenu": "Открыть меню",
     "closeMenu": "Закрыть меню",
-    "savedAddresses": "Сохранённые адреса"
+    "savedAddresses": "Сохранённые адреса",
+    "account": "Аккаунт",
+    "myOrders": "Мои заказы"
+  },
+  "auth": {
+    "layout": {
+      "heroTitle": "Откройте лучшие товары и продавцов",
+      "heroDescription": "Присоединяйтесь к тысячам довольных покупателей, которые уверенно покупают на нашем надежном маркетплейсе.",
+      "rightsReserved": "© {year} iMall. Все права защищены.",
+      "features": {
+        "secure": {
+          "title": "Безопасные покупки",
+          "desc": "Ваши данные всегда защищены"
+        },
+        "fast": {
+          "title": "Быстрый чекаут",
+          "desc": "Быстрый и удобный процесс"
+        },
+        "favorites": {
+          "title": "Сохраняйте избранное",
+          "desc": "Соберите свой список желаний"
+        }
+      }
+    },
+    "errors": {
+      "oauthFailed": "Не удалось запустить вход через соцсеть. Попробуйте снова."
+    },
+    "validation": {
+      "required": "Это поле обязательно.",
+      "invalidEmail": "Введите корректный email.",
+      "nameMin": "Минимум {count} символа(ов).",
+      "usernameMin": "Имя пользователя должно содержать минимум {count} символа(ов).",
+      "passwordMin": "Пароль должен содержать минимум {count} символов.",
+      "otpFormat": "Введите корректный 6-значный код.",
+      "idNumberFormat": "Введите корректный 11-значный ID.",
+      "invalidBirthDate": "Введите корректную дату рождения.",
+      "birthDateMinAge": "Вам должно быть не менее {count} лет.",
+      "consentRequired": "Подтвердите согласие, чтобы продолжить."
+    },
+    "common": {
+      "orContinueWithEmail": "Или продолжить по email",
+      "emailAddress": "Email",
+      "emailPlaceholder": "name@example.com",
+      "continue": "Продолжить",
+      "back": "Назад",
+      "verificationCode": "Код подтверждения",
+      "verificationCodePlaceholder": "Введите 6-значный код",
+      "verify": "Подтвердить",
+      "password": "Пароль",
+      "showPassword": "Показать пароль",
+      "hidePassword": "Скрыть пароль"
+    },
+    "signIn": {
+      "title": "С возвращением",
+      "subtitle": "Введите данные для входа в аккаунт",
+      "google": "Google",
+      "facebook": "Facebook",
+      "noAccount": "Нет аккаунта?",
+      "signUpLink": "Зарегистрироваться",
+      "forgotPassword": "Забыли пароль?",
+      "passwordPlaceholder": "Введите пароль",
+      "submitPassword": "Войти",
+      "sendResetLink": "Отправить ссылку для сброса"
+    },
+    "signUp": {
+      "title": "Создать аккаунт",
+      "subtitle": "Заполните данные, чтобы начать",
+      "google": "Google",
+      "facebook": "Facebook",
+      "firstName": "Имя",
+      "firstNamePlaceholder": "Иван",
+      "lastName": "Фамилия",
+      "lastNamePlaceholder": "Иванов",
+      "idNumber": "ID номер (необязательно)",
+      "idNumberPlaceholder": "11-значный ID",
+      "birthDate": "Дата рождения",
+      "birthDatePlaceholder": "Выберите дату рождения",
+      "consentLabel": "Подтверждаю, что указанные данные верны, и соглашаюсь продолжить регистрацию.",
+      "username": "Имя пользователя",
+      "usernamePlaceholder": "your.username",
+      "passwordPlaceholder": "Создайте пароль",
+      "haveAccount": "Уже есть аккаунт?",
+      "signInLink": "Войти",
+      "continueDescription": "Нужен ещё один шаг, чтобы завершить создание аккаунта.",
+      "restrictedMessage": "Регистрация сейчас ограничена. Попробуйте позже или обратитесь в поддержку."
+    }
   },
   "home": {
     "hero": {
@@ -506,6 +591,8 @@
       "crystalProvider": "Ручной счёт",
       "credoLogoAlt": "Credo.ge",
       "crystalLogoAlt": "Crystal.ge",
+      "onlineInstallmentsMultiVendorHint": "Онлайн-рассрочка недоступна, если в корзине товары из разных магазинов.",
+      "onlineInstallmentsMultiVendorError": "Для мультивендорной корзины используйте Crystal/ручной счёт или оплату картой.",
       "registerManualSale": "Зарегистрировать ручную продажу",
       "registerManualSaleHint": "Включайте, когда клиент реально подал заявку в отделении Crystal.",
       "manualSaleComment": "Комментарий",
@@ -1023,6 +1110,35 @@
       "created": "Адрес сохранён.",
       "defaultUpdated": "Основной адрес обновлён.",
       "deleted": "Адрес удалён."
+    }
+  },
+  "accountHome": {
+    "title": "Аккаунт",
+    "description": "Управляйте заказами, сохранёнными адресами и доступом к кабинету продавца.",
+    "back": "Назад на главную",
+    "cards": {
+      "orders": "Мои заказы",
+      "ordersDescription": "Проверяйте последние покупки и их статусы.",
+      "addresses": "Сохранённые адреса",
+      "addressesDescription": "Управляйте адресами доставки для быстрого оформления.",
+      "sellerAdmin": "Кабинет продавца",
+      "createShop": "Создать магазин",
+      "sellerDescription": "Откройте инструменты продавца или создайте свой магазин."
+    },
+    "footerHint": "Нужна помощь по заказу? Используйте ссылку контактов в футере."
+  },
+  "accountOrders": {
+    "title": "Мои заказы",
+    "back": "Назад в аккаунт",
+    "loading": "Загрузка заказов...",
+    "empty": "У вас пока нет заказов.",
+    "unknownStatus": "pending",
+    "orderNumber": "Заказ #{id}",
+    "shop": "Магазин: {shop}",
+    "items": "Товаров: {count}",
+    "paymentMethod": "Способ оплаты: {method}",
+    "errors": {
+      "load": "Не удалось загрузить заказы."
     }
   }
 }

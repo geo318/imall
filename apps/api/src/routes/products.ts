@@ -535,9 +535,8 @@ function parseProductIdentifier(identifier: string): { slug: string; shortId: st
   return { slug, shortId };
 }
 
-// Helper to get short ID from product UUID (first 8 chars, no dashes)
-function getShortId(productId: string): string {
-  return productId.replaceAll("-", "").substring(0, 8);
+function shortIdSqlCondition(shortId: string): SQL {
+  return sql`left(replace(cast(${products.id} as text), '-', ''), 8) = ${shortId}`;
 }
 
 export const allProductsRoutes = new Elysia({ prefix: "/products" })
@@ -928,7 +927,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
               draft: products.draft,
             })
             .from(products)
-            .where(eq(products.slug, slug))
+            .where(and(eq(products.slug, slug), shortIdSqlCondition(shortId)))
             .limit(1);
 
           if (productForTenant) {
@@ -947,13 +946,13 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
       }
 
       // Build where clause - include deleted/draft if owner
-      const whereConditions: SQL[] = [eq(products.slug, slug)];
+      const whereConditions: SQL[] = [eq(products.slug, slug), shortIdSqlCondition(shortId)];
       if (!includeDeleted) {
         whereConditions.push(isNull(products.deletedAt));
       }
 
-      // Find product by slug and verify short ID matches
-      const productRows = await db
+      // Find product by slug and short ID
+      const [product] = await db
         .select({
           id: products.id,
           slug: products.slug,
@@ -973,10 +972,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         .from(products)
         .innerJoin(tenants, eq(products.tenantId, tenants.id))
         .where(and(...whereConditions))
-        .limit(10); // Limit to avoid too many results
-
-      // Find the product where short ID matches
-      const product = productRows.find((p) => getShortId(p.id) === shortId);
+        .limit(1);
 
       if (!product) {
         set.status = 404;
@@ -1138,18 +1134,21 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
       } else {
         const { slug, shortId } = parsed;
 
-        // Find product by slug
-        const productRows = await db
+        // Find product by slug + short ID
+        const [product] = await db
           .select({
             id: products.id,
             slug: products.slug,
           })
           .from(products)
-          .where(and(eq(products.slug, slug), sql`${products.deletedAt} IS NULL`))
-          .limit(10);
-
-        // Find the product where short ID matches
-        const product = productRows.find((p) => getShortId(p.id) === shortId);
+          .where(
+            and(
+              eq(products.slug, slug),
+              shortIdSqlCondition(shortId),
+              sql`${products.deletedAt} IS NULL`,
+            ),
+          )
+          .limit(1);
 
         if (!product) {
           return { success: false, error: "Product not found" };

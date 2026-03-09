@@ -20,7 +20,92 @@
     "viewCart": "კალათის გახსნა",
     "openMenu": "მენიუს გახსნა",
     "closeMenu": "მენიუს დახურვა",
-    "savedAddresses": "შენახული მისამართები"
+    "savedAddresses": "მისამართები",
+    "account": "ანგარიში",
+    "myOrders": "ჩემი შეკვეთები"
+  },
+  "auth": {
+    "layout": {
+      "heroTitle": "აღმოაჩინე საუკეთესო პროდუქტები და გამყიდველები",
+      "heroDescription": "შეუერთდი ათასობით კმაყოფილ მომხმარებელს, ვინც ჩვენს სანდო მარკეტფლეისზე თავდაჯერებით ყიდულობს.",
+      "rightsReserved": "© {year} iMall. ყველა უფლება დაცულია.",
+      "features": {
+        "secure": {
+          "title": "უსაფრთხო შოპინგი",
+          "desc": "შენი მონაცემები ყოველთვის დაცულია"
+        },
+        "fast": {
+          "title": "სწრაფი გადახდა",
+          "desc": "მარტივი და სწრაფი პროცესი"
+        },
+        "favorites": {
+          "title": "რჩეულების შენახვა",
+          "desc": "შექმენი სასურველების სია"
+        }
+      }
+    },
+    "errors": {
+      "oauthFailed": "სოციალური ავტორიზაციის დაწყება ვერ მოხერხდა. სცადე თავიდან."
+    },
+    "validation": {
+      "required": "ეს ველი სავალდებულოა.",
+      "invalidEmail": "შეიყვანე სწორი ელფოსტის მისამართი.",
+      "nameMin": "მინიმუმ {count} სიმბოლოა საჭირო.",
+      "usernameMin": "იუზერნეიმი უნდა იყოს მინიმუმ {count} სიმბოლო.",
+      "passwordMin": "პაროლი უნდა იყოს მინიმუმ {count} სიმბოლო.",
+      "otpFormat": "შეიყვანე სწორი 6-ნიშნა კოდი.",
+      "idNumberFormat": "შეიყვანე სწორი 11-ნიშნა პირადი ნომერი.",
+      "invalidBirthDate": "შეიყვანე სწორი დაბადების თარიღი.",
+      "birthDateMinAge": "უნდა იყო მინიმუმ {count} წლის.",
+      "consentRequired": "გასაგრძელებლად დათანხმება სავალდებულოა."
+    },
+    "common": {
+      "orContinueWithEmail": "ან გააგრძელე ელფოსტით",
+      "emailAddress": "ელფოსტის მისამართი",
+      "emailPlaceholder": "name@example.com",
+      "continue": "გაგრძელება",
+      "back": "უკან",
+      "verificationCode": "დადასტურების კოდი",
+      "verificationCodePlaceholder": "შეიყვანე 6-ნიშნა კოდი",
+      "verify": "დადასტურება",
+      "password": "პაროლი",
+      "showPassword": "პაროლის ჩვენება",
+      "hidePassword": "პაროლის დამალვა"
+    },
+    "signIn": {
+      "title": "კეთილი დაბრუნება",
+      "subtitle": "ანგარიშზე შესასვლელად შეიყვანე მონაცემები",
+      "google": "Google",
+      "facebook": "Facebook",
+      "noAccount": "ანგარიში არ გაქვს?",
+      "signUpLink": "რეგისტრაცია",
+      "forgotPassword": "პაროლი დაგავიწყდა?",
+      "passwordPlaceholder": "შეიყვანე პაროლი",
+      "submitPassword": "შესვლა",
+      "sendResetLink": "აღდგენის ბმულის გაგზავნა"
+    },
+    "signUp": {
+      "title": "ანგარიშის შექმნა",
+      "subtitle": "დაიწყე რეგისტრაცია მონაცემების შევსებით",
+      "google": "Google",
+      "facebook": "Facebook",
+      "firstName": "სახელი",
+      "firstNamePlaceholder": "გიორგი",
+      "lastName": "გვარი",
+      "lastNamePlaceholder": "გელაშვილი",
+      "idNumber": "პირადი ნომერი (არასავალდებულო)",
+      "idNumberPlaceholder": "11-ნიშნა პირადი ნომერი",
+      "birthDate": "დაბადების თარიღი",
+      "birthDatePlaceholder": "აირჩიე დაბადების თარიღი",
+      "consentLabel": "ვადასტურებ, რომ შეყვანილი ინფორმაცია სწორია და ვეთანხმები რეგისტრაციის გაგრძელებას.",
+      "username": "იუზერნეიმი",
+      "usernamePlaceholder": "your.username",
+      "passwordPlaceholder": "შექმენი პაროლი",
+      "haveAccount": "უკვე გაქვს ანგარიში?",
+      "signInLink": "შესვლა",
+      "continueDescription": "ანგარიშის შესაქმნელად კიდევ ერთი ნაბიჯია საჭირო.",
+      "restrictedMessage": "რეგისტრაცია ამჟამად შეზღუდულია. სცადე მოგვიანებით ან დაუკავშირდი მხარდაჭერას."
+    }
   },
   "home": {
     "hero": {
@@ -506,6 +591,8 @@
       "crystalProvider": "ინვოისი",
       "credoLogoAlt": "Credo.ge",
       "crystalLogoAlt": "Crystal.ge",
+      "onlineInstallmentsMultiVendorHint": "სხვადასხვა მაღაზიების პროდუქტების კალათაზე ონლაინ განვადება გამორთულია.",
+      "onlineInstallmentsMultiVendorError": "აირჩიეთ Crystal/ინვოისი ან ბარათით გადახდა მრავალმაღაზიან კალათაზე.",
       "registerManualSale": "დარეგისტრირდეს გაყიდვა",
       "registerManualSaleHint": "ჩართეთ, თუ Crystal-ის განაცხადი რეალურად დაიწყეთ ფილიალში.",
       "manualSaleComment": "კომენტარი",
@@ -1023,6 +1110,35 @@
       "created": "მისამართი შეინახა.",
       "defaultUpdated": "ძირითადი მისამართი განახლდა.",
       "deleted": "მისამართი წაიშალა."
+    }
+  },
+  "accountHome": {
+    "title": "ანგარიში",
+    "description": "მართე შეკვეთები, შენახული მისამართები და გამყიდველის სივრცეზე წვდომა.",
+    "back": "მთავარზე დაბრუნება",
+    "cards": {
+      "orders": "ჩემი შეკვეთები",
+      "ordersDescription": "ნახე ბოლო შეკვეთები და მათი სტატუსები.",
+      "addresses": "შენახული მისამართები",
+      "addressesDescription": "მართე მიწოდების მისამართები სწრაფი ჩექაუთისთვის.",
+      "sellerAdmin": "გამყიდველის ადმინი",
+      "createShop": "მაღაზიის შექმნა",
+      "sellerDescription": "გახსენით გამყიდველის ხელსაწყოები ან შექმენით მაღაზიის სივრცე."
+    },
+    "footerHint": "შეკვეთასთან დახმარებისთვის გამოიყენე footer-ში კონტაქტის ბმული."
+  },
+  "accountOrders": {
+    "title": "ჩემი შეკვეთები",
+    "back": "ანგარიშზე დაბრუნება",
+    "loading": "შეკვეთები იტვირთება...",
+    "empty": "შეკვეთები ჯერ არ გაქვს.",
+    "unknownStatus": "მუშავდება",
+    "orderNumber": "შეკვეთა #{id}",
+    "shop": "მაღაზია: {shop}",
+    "items": "ნივთები: {count}",
+    "paymentMethod": "გადახდის მეთოდი: {method}",
+    "errors": {
+      "load": "შეკვეთების ჩატვირთვა ვერ მოხერხდა."
     }
   }
 }

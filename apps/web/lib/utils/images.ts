@@ -10,18 +10,10 @@ import { normalizeImageUrl } from "@repo/shared";
  * Get the API base URL from environment variables
  */
 function getApiBaseUrl(): string {
-  const normalize = (value: string) =>
-    value.startsWith("http://") || value.startsWith("https://") ? value : `http://${value}`;
-
-  if (typeof window !== "undefined") {
-    // Client-side: keep image URLs same-origin and rely on /api/image proxy.
-    // This avoids broken production URLs when NEXT_PUBLIC_* is a build-time placeholder.
-    return "";
-  }
-
-  // Server-side: use API base (for any server-side image URL normalization paths).
-  const raw = process.env.BACKEND_URL || process.env.DOMAIN || "http://localhost:3001";
-  return normalize(raw);
+  // Always use same-origin URLs and rely on Next /api/image proxy.
+  // Returning a backend absolute URL on SSR and a relative URL on client
+  // causes hydration mismatches for the same <img src>.
+  return "";
 }
 
 function normalizeCorruptedImageUrl(rawUrl: string): string {

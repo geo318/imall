@@ -38,7 +38,7 @@ export function ProductCard({
 }: MarketingProduct) {
   const t = useTranslations();
   return (
-    <Link href={href ?? "/products"} className="group block" prefetch>
+    <Link href={href ?? "/products"} className="group block" prefetch={false}>
       <div className="card-hover relative overflow-hidden rounded-2xl bg-card border border-border/50">
         {/* Image */}
         <div className="relative aspect-square overflow-hidden bg-secondary">

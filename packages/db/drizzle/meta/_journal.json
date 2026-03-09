@@ -134,6 +134,13 @@
       "when": 1772726400000,
       "tag": "0021_manual_installment_sales",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1773083449745,
+      "tag": "0019_flawless_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }

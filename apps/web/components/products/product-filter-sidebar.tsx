@@ -7,8 +7,8 @@ import { RangeSlider } from "@repo/ui/range-slider";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "@/i18n/provider";
-import { DEFAULT_CURRENCY_CODE, currencySymbol } from "@/lib/utils/currency";
 import { cn } from "@/lib/utils";
+import { currencySymbol, DEFAULT_CURRENCY_CODE } from "@/lib/utils/currency";
 
 export type SortKey = "newest" | "oldest" | "price-asc" | "price-desc";
 export type ListingType = "all" | "buy-now" | "auction";
@@ -72,6 +72,7 @@ export function ProductFilterSidebar({
   priceMax = 500,
 }: Props) {
   const t = useTranslations();
+  const [hasHydrated, setHasHydrated] = useState(false);
   const [draftPriceRange, setDraftPriceRange] = useState<PriceRange>(priceRange);
   const [expandedSections, setExpandedSections] = useState({
     price: true,
@@ -83,6 +84,10 @@ export function ProductFilterSidebar({
     () => createPriceRangeHandlers(setDraftPriceRange, onPriceRangeChange),
     [onPriceRangeChange],
   );
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   useEffect(() => {
     setDraftPriceRange((current) => resolveDraftPriceRange(current, priceRange));
@@ -162,6 +167,8 @@ export function ProductFilterSidebar({
     selectedCategories.length > 0 ||
     listingType !== "all";
 
+  const categoriesForRender = hasHydrated ? categories : [];
+
   const priceSpan = Math.max(0, priceMax - priceMin);
   const minRange = Math.min(20, priceSpan);
 
@@ -236,7 +243,7 @@ export function ProductFilterSidebar({
           </button>
           {expandedSections.categories && (
             <div className="space-y-2 pt-2">
-              {categories.map((category) => (
+              {categoriesForRender.map((category) => (
                 <div key={category.value}>
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -313,7 +320,6 @@ export function ProductFilterSidebar({
           )}
         </div>
       )}
-
     </aside>
   );
 }

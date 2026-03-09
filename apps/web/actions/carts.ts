@@ -94,6 +94,23 @@ async function extractBackendError(response: Response, fallback: string, context
   return message;
 }
 
+function extractActionError(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+}
+
+export type CartActionResult<T> =
+  | {
+      ok: true;
+      data: T;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
 /**
  * Create a new cart
  */
@@ -117,6 +134,22 @@ export async function createCart(): Promise<{ id: string }> {
   }
 
   return response.json();
+}
+
+/**
+ * Safe server action wrapper for client usage.
+ * Returns structured result instead of throwing to avoid hard 500 responses.
+ */
+export async function createCartSafe(): Promise<CartActionResult<{ id: string }>> {
+  try {
+    const cart = await createCart();
+    return { ok: true, data: cart };
+  } catch (error) {
+    return {
+      ok: false,
+      error: extractActionError(error, "Failed to create cart"),
+    };
+  }
 }
 
 /**
@@ -167,6 +200,26 @@ export async function addToCart(cartId: string, variantId: string, qty: number):
     }
 
     throw new Error(errorMessage);
+  }
+}
+
+/**
+ * Safe server action wrapper for client usage.
+ * Returns structured result instead of throwing to avoid hard 500 responses.
+ */
+export async function addToCartSafe(
+  cartId: string,
+  variantId: string,
+  qty: number,
+): Promise<CartActionResult<null>> {
+  try {
+    await addToCart(cartId, variantId, qty);
+    return { ok: true, data: null };
+  } catch (error) {
+    return {
+      ok: false,
+      error: extractActionError(error, "Failed to add to cart"),
+    };
   }
 }
 

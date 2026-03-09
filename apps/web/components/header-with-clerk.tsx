@@ -9,8 +9,8 @@ export function HeaderWithClerk() {
   const { signOut } = useClerk();
   const router = useRouter();
   const userDisplayName =
-    user?.username ??
     user?.firstName ??
+    user?.username ??
     user?.fullName ??
     user?.primaryEmailAddress?.emailAddress?.split("@")[0] ??
     null;

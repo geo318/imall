@@ -12,7 +12,7 @@ export function SignInSkeleton() {
           <div className="w-full border-t border-slate-200" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-white px-2 text-slate-500">Or continue with email</span>
+          <span className="h-3 w-32 rounded bg-slate-200" />
         </div>
       </div>
 

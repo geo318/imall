@@ -20,7 +20,92 @@
     "viewCart": "View cart",
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
-    "savedAddresses": "Saved addresses"
+    "savedAddresses": "Saved addresses",
+    "account": "Account",
+    "myOrders": "My orders"
+  },
+  "auth": {
+    "layout": {
+      "heroTitle": "Discover Amazing Products & Vendors",
+      "heroDescription": "Join thousands of happy customers who shop with confidence on our trusted marketplace.",
+      "rightsReserved": "© {year} iMall. All rights reserved.",
+      "features": {
+        "secure": {
+          "title": "Secure Shopping",
+          "desc": "Your data is always protected"
+        },
+        "fast": {
+          "title": "Fast Checkout",
+          "desc": "Quick and seamless experience"
+        },
+        "favorites": {
+          "title": "Save Favorites",
+          "desc": "Build your wishlist"
+        }
+      }
+    },
+    "errors": {
+      "oauthFailed": "Unable to start social sign-in. Please try again."
+    },
+    "validation": {
+      "required": "This field is required.",
+      "invalidEmail": "Enter a valid email address.",
+      "nameMin": "Use at least {count} characters.",
+      "usernameMin": "Username must be at least {count} characters.",
+      "passwordMin": "Password must be at least {count} characters.",
+      "otpFormat": "Enter a valid 6-digit code.",
+      "idNumberFormat": "Enter a valid 11-digit ID number.",
+      "invalidBirthDate": "Enter a valid birth date.",
+      "birthDateMinAge": "You must be at least {count} years old.",
+      "consentRequired": "You must agree before continuing."
+    },
+    "common": {
+      "orContinueWithEmail": "Or continue with email",
+      "emailAddress": "Email address",
+      "emailPlaceholder": "name@example.com",
+      "continue": "Continue",
+      "back": "Back",
+      "verificationCode": "Verification code",
+      "verificationCodePlaceholder": "Enter 6-digit code",
+      "verify": "Verify",
+      "password": "Password",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password"
+    },
+    "signIn": {
+      "title": "Welcome back",
+      "subtitle": "Enter your credentials to access your account",
+      "google": "Google",
+      "facebook": "Facebook",
+      "noAccount": "Don't have an account?",
+      "signUpLink": "Sign up",
+      "forgotPassword": "Forgot password?",
+      "passwordPlaceholder": "Enter your password",
+      "submitPassword": "Sign in",
+      "sendResetLink": "Send reset link"
+    },
+    "signUp": {
+      "title": "Create an account",
+      "subtitle": "Fill in your details to get started",
+      "google": "Google",
+      "facebook": "Facebook",
+      "firstName": "First name",
+      "firstNamePlaceholder": "John",
+      "lastName": "Last name",
+      "lastNamePlaceholder": "Doe",
+      "idNumber": "ID number (optional)",
+      "idNumberPlaceholder": "11-digit personal ID",
+      "birthDate": "Birth date",
+      "birthDatePlaceholder": "Select your birth date",
+      "consentLabel": "I confirm the provided information is correct and agree to continue registration.",
+      "username": "Username",
+      "usernamePlaceholder": "your.username",
+      "passwordPlaceholder": "Create a password",
+      "haveAccount": "Already have an account?",
+      "signInLink": "Sign in",
+      "continueDescription": "One more step is needed to finish creating your account.",
+      "restrictedMessage": "Sign-up is currently restricted. Please contact support or try again later."
+    }
   },
   "home": {
     "hero": {
@@ -506,6 +591,8 @@
       "crystalProvider": "Manual invoice flow",
       "credoLogoAlt": "Credo.ge",
       "crystalLogoAlt": "Crystal.ge",
+      "onlineInstallmentsMultiVendorHint": "Online installments are disabled when your cart has products from different shops.",
+      "onlineInstallmentsMultiVendorError": "Use Crystal/manual installment or card payment for multi-vendor carts.",
       "registerManualSale": "Register manual sale in shop records",
       "registerManualSaleHint": "Use this after confirming the customer started Crystal paperwork.",
       "manualSaleComment": "Manual sale comment",
@@ -1023,6 +1110,35 @@
       "created": "Address saved.",
       "defaultUpdated": "Default address updated.",
       "deleted": "Address removed."
+    }
+  },
+  "accountHome": {
+    "title": "Account",
+    "description": "Manage your orders, saved addresses, and seller workspace access.",
+    "back": "Back to home",
+    "cards": {
+      "orders": "My orders",
+      "ordersDescription": "Track your latest purchases and statuses.",
+      "addresses": "Saved addresses",
+      "addressesDescription": "Manage your shipping addresses for faster checkout.",
+      "sellerAdmin": "Seller admin",
+      "createShop": "Create shop",
+      "sellerDescription": "Open seller tools or create your shop workspace."
+    },
+    "footerHint": "Need help with an order? Contact support from the footer contact link."
+  },
+  "accountOrders": {
+    "title": "My orders",
+    "back": "Back to account",
+    "loading": "Loading orders...",
+    "empty": "You do not have any orders yet.",
+    "unknownStatus": "pending",
+    "orderNumber": "Order #{id}",
+    "shop": "Shop: {shop}",
+    "items": "Items: {count}",
+    "paymentMethod": "Payment method: {method}",
+    "errors": {
+      "load": "Failed to load orders."
     }
   }
 }

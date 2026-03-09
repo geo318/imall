@@ -1,19 +1,32 @@
 import { Heart, Shield, Zap } from "lucide-react";
 import { MarketHubLogo } from "@/assets";
+import type { Locale } from "@/i18n/config";
 import { Link } from "@/i18n/navigation.server";
+import { getTranslations } from "@/i18n/server";
+import { AuthCopyright } from "../../_components/auth-copyright";
 import { SignUpSlot } from "../../_components/sign-up-slot";
 
-const features = [
-  {
-    icon: Shield,
-    title: "Secure Shopping",
-    desc: "Your data is always protected",
-  },
-  { icon: Zap, title: "Fast Checkout", desc: "Quick and seamless experience" },
-  { icon: Heart, title: "Save Favorites", desc: "Build your wishlist" },
-];
+export default async function SignUpPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const t = await getTranslations(locale as Locale);
+  const features = [
+    {
+      icon: Shield,
+      title: t("auth.layout.features.secure.title"),
+      desc: t("auth.layout.features.secure.desc"),
+    },
+    {
+      icon: Zap,
+      title: t("auth.layout.features.fast.title"),
+      desc: t("auth.layout.features.fast.desc"),
+    },
+    {
+      icon: Heart,
+      title: t("auth.layout.features.favorites.title"),
+      desc: t("auth.layout.features.favorites.desc"),
+    },
+  ];
 
-export default function SignUpPage() {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Left Panel - Branding */}
@@ -28,25 +41,18 @@ export default function SignUpPage() {
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 xl:p-16 w-full">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
-              <MarketHubLogo className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold tracking-tight text-white">
-              <span className="font-extrabold text-emerald-100">i</span>Mall
-            </span>
+          <Link href="/" className="flex items-center gap-1 flex-shrink-0">
+            <MarketHubLogo width={32} height={32} className="h-8 w-8" />
+            <span className="-ml-1 whitespace-nowrap font-bold text-xl text-white">Mall</span>
           </Link>
 
           {/* Main Content */}
           <div className="space-y-8">
             <div className="space-y-4">
               <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight">
-                Discover Amazing <br /> Products & Vendors
+                {t("auth.layout.heroTitle")}
               </h1>
-              <p className="text-lg text-white/80 max-w-md">
-                Join thousands of happy customers who shop with confidence on our trusted
-                marketplace.
-              </p>
+              <p className="text-lg text-white/80 max-w-md">{t("auth.layout.heroDescription")}</p>
             </div>
 
             {/* Features */}
@@ -72,7 +78,7 @@ export default function SignUpPage() {
           </div>
 
           {/* Footer */}
-          <p className="text-white/60 text-sm">© 2024 iMall. All rights reserved.</p>
+          <AuthCopyright className="text-white/60 text-sm" />
         </div>
       </div>
 
@@ -80,13 +86,9 @@ export default function SignUpPage() {
       <div className="flex-1 flex flex-col min-h-screen overflow-y-auto">
         {/* Mobile Header */}
         <div className="lg:hidden p-6 border-b border-border flex-shrink-0">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center">
-              <MarketHubLogo className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-foreground">
-              <span className="font-extrabold text-emerald-600">i</span>Mall
-            </span>
+          <Link href="/" className="flex items-center gap-1 flex-shrink-0">
+            <MarketHubLogo width={32} height={32} className="h-8 w-8" />
+            <span className="-ml-1 whitespace-nowrap font-bold text-xl">Mall</span>
           </Link>
         </div>
 
@@ -96,9 +98,9 @@ export default function SignUpPage() {
             {/* Header */}
             <div className="space-y-2">
               <h2 className="text-3xl font-bold text-foreground tracking-tight">
-                Create an account
+                {t("auth.signUp.title")}
               </h2>
-              <p className="text-muted-foreground">Fill in your details to get started</p>
+              <p className="text-muted-foreground">{t("auth.signUp.subtitle")}</p>
             </div>
 
             <SignUpSlot />
@@ -107,9 +109,7 @@ export default function SignUpPage() {
 
         {/* Footer */}
         <div className="p-6 border-t border-border lg:hidden flex-shrink-0">
-          <p className="text-center text-sm text-muted-foreground">
-            © 2024 iMall. All rights reserved.
-          </p>
+          <AuthCopyright className="text-center text-sm text-muted-foreground" />
         </div>
       </div>
     </div>

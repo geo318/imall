@@ -45,6 +45,13 @@ export default clerkMiddleware(async (auth, req) => {
   });
   response.cookies.set("NEXT_LOCALE", detectedLocale, { path: "/" });
 
+  // App Router can issue non-GET requests (e.g. internal RSC/action posts) to
+  // page URLs. Keep locale/cookie enrichment but skip auth/route gating here
+  // to avoid turning internal navigations into 500s in dev.
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return response;
+  }
+
   const authResult = await auth();
   const normalizedPath = stripLocale(pathname) || "/";
 

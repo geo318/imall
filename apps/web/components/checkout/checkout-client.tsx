@@ -94,6 +94,7 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
                 onPaymentMethodChange={checkout.setPaymentMethod}
                 installmentProvider={checkout.installmentProvider}
                 onInstallmentProviderChange={checkout.setInstallmentProvider}
+                onlineInstallmentsAllowed={checkout.onlineInstallmentsAllowed}
                 onBack={() => checkout.setStep("shipping")}
                 onSubmit={checkout.handleContinue}
                 submitting={checkout.submitting}

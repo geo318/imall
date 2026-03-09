@@ -8,8 +8,8 @@ function resolveUserDisplayName(user: Awaited<ReturnType<typeof currentUser>>): 
   }
 
   return (
-    user.username ??
     user.firstName ??
+    user.username ??
     user.fullName ??
     user.primaryEmailAddress?.emailAddress?.split("@")[0] ??
     null
@@ -18,6 +18,13 @@ function resolveUserDisplayName(user: Awaited<ReturnType<typeof currentUser>>): 
 
 export async function getInitialHeaderAuth(): Promise<InitialHeaderAuth> {
   "use cache: private";
+
+  // In development, avoid request-bound auth reads in the shared layout header
+  // so route prerender metadata warnings stay quiet during local navigation.
+  // Client-side Clerk hydration still resolves signed-in state immediately after load.
+  if (process.env.NODE_ENV === "development") {
+    return { isSignedIn: false, userDisplayName: null };
+  }
 
   try {
     const { userId } = await auth();

@@ -38,16 +38,18 @@ export async function ProductServer({ productIdentifier, locale }: Props) {
       </>
     );
   } catch (error) {
-    // If server fetch fails (e.g., product is deleted/draft), try client-side with auth
-    if (error instanceof Error && error.message === "not-found") {
-      return (
-        <>
-          <ProductFetcherClient productIdentifier={productIdentifier} />
-          {/* Similar Products - skip for deleted/draft products */}
-        </>
-      );
+    // If server fetch fails, try client-side with auth-capable fallback.
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[ProductServer] Falling back to client fetch", {
+        productIdentifier,
+        reason: error instanceof Error ? error.message : String(error),
+      });
     }
-    // Re-throw other errors
-    throw error;
+    return (
+      <>
+        <ProductFetcherClient productIdentifier={productIdentifier} />
+        {/* Similar Products - skip in fallback mode */}
+      </>
+    );
   }
 }

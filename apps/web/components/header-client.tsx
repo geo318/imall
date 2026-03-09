@@ -35,8 +35,8 @@ export function HeaderClient({ initialHeaderAuth }: HeaderClientProps) {
 
   const primaryShopSlug = Array.isArray(shops) ? shops[0]?.slug : undefined;
   const liveUserDisplayName =
-    user?.username ??
     user?.firstName ??
+    user?.username ??
     user?.fullName ??
     user?.primaryEmailAddress?.emailAddress?.split("@")[0] ??
     null;

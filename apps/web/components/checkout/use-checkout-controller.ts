@@ -20,7 +20,6 @@ import {
 } from "@/lib/cart-storage";
 import type { CartItem } from "@/lib/api/cart";
 import { toast } from "sonner";
-import { printCrystalInstallmentInvoice } from "./crystal-installment-invoice";
 import {
   type CheckoutPaymentMethod,
   type CheckoutStep,
@@ -42,6 +41,30 @@ type PersistAddressOptions = {
 };
 
 const normalizeAddressValue = (value?: string | null) => (value ?? "").trim().toLowerCase();
+
+type CrystalInvoicePayload = {
+  buyer: ShippingFormState;
+  items: CartItem[];
+  subtotal: number;
+  shipping: number;
+  installmentCommission: number;
+  total: number;
+};
+
+type PrintCrystalInstallmentInvoice = (
+  input: CrystalInvoicePayload,
+) => Promise<void>;
+
+let crystalInvoicePrinterPromise: Promise<PrintCrystalInstallmentInvoice> | null = null;
+
+async function getCrystalInvoicePrinter(): Promise<PrintCrystalInstallmentInvoice> {
+  if (!crystalInvoicePrinterPromise) {
+    crystalInvoicePrinterPromise = import("./crystal-installment-invoice").then(
+      (module) => module.printCrystalInstallmentInvoice,
+    );
+  }
+  return crystalInvoicePrinterPromise;
+}
 
 function findDuplicateAddress(
   addresses: UserShippingAddress[],
@@ -160,9 +183,20 @@ export function useCheckoutController({
     () => items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0),
     [items],
   );
+  const uniqueVendorCount = useMemo(
+    () => new Set(items.map((item) => item.tenantId).filter(Boolean)).size,
+    [items],
+  );
+  const onlineInstallmentsAllowed = uniqueVendorCount <= 1;
   const shipping = subtotal > 100 ? 0 : 9.99;
   const installmentCommission = paymentMethod === "installments" ? subtotal * 0.12 : 0;
   const total = subtotal + shipping + installmentCommission;
+
+  useEffect(() => {
+    if (!onlineInstallmentsAllowed && installmentProvider === "credo") {
+      setInstallmentProvider("crystal");
+    }
+  }, [installmentProvider, onlineInstallmentsAllowed]);
 
   const clearInstallmentState = useCallback(() => {
     setPendingOrderCode(null);
@@ -298,7 +332,13 @@ export function useCheckoutController({
     setSubmitting(true);
     try {
       if (paymentMethod === "installments") {
+        if (!onlineInstallmentsAllowed && installmentProvider === "credo") {
+          setErrorMessage(t("checkout.payment.onlineInstallmentsMultiVendorError"));
+          return;
+        }
+
         if (installmentProvider === "crystal") {
+          const printCrystalInstallmentInvoice = await getCrystalInvoicePrinter();
           await printCrystalInstallmentInvoice({
             buyer: shippingForm,
             items,
@@ -344,6 +384,7 @@ export function useCheckoutController({
     installmentOrderCodeKey,
     installmentProvider,
     items,
+    onlineInstallmentsAllowed,
     paymentMethod,
     shipping,
     shippingForm,
@@ -380,6 +421,7 @@ export function useCheckoutController({
     checkingStatus,
     installmentProvider,
     setInstallmentProvider,
+    onlineInstallmentsAllowed,
     syncInstallmentStatus,
     clearInstallmentState,
     shippingForm,

@@ -1,5 +1,3 @@
-"use server";
-
 import { ProductCard } from "@/components/marketing/product-card";
 import type { Locale } from "@/i18n/config";
 import { getTranslations } from "@/i18n/server";

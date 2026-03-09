@@ -18,6 +18,7 @@ type PaymentStepProps = {
   onPaymentMethodChange: (method: CheckoutPaymentMethod) => void;
   installmentProvider: InstallmentProvider;
   onInstallmentProviderChange: (provider: InstallmentProvider) => void;
+  onlineInstallmentsAllowed: boolean;
   onBack: () => void;
   onSubmit: () => Promise<void> | void;
   submitting: boolean;
@@ -29,6 +30,7 @@ export function PaymentStep({
   onPaymentMethodChange,
   installmentProvider,
   onInstallmentProviderChange,
+  onlineInstallmentsAllowed,
   onBack,
   onSubmit,
   submitting,
@@ -97,11 +99,20 @@ export function PaymentStep({
           <p className="text-sm font-medium text-slate-700">
             {t("checkout.payment.installmentProviderLabel")}
           </p>
+          {!onlineInstallmentsAllowed ? (
+            <p className="text-xs text-amber-700">
+              {t("checkout.payment.onlineInstallmentsMultiVendorHint")}
+            </p>
+          ) : null}
           {(["credo", "crystal"] as const).map((provider) => (
             <label
               key={provider}
               htmlFor={`installment-provider-${provider}`}
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+              className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
+                provider === "credo" && !onlineInstallmentsAllowed
+                  ? "cursor-not-allowed opacity-55"
+                  : "cursor-pointer"
+              } ${
                 installmentProvider === provider
                   ? "border-emerald-500 bg-emerald-50/60"
                   : "border-slate-200 hover:border-emerald-300"
@@ -113,7 +124,13 @@ export function PaymentStep({
                 name="installmentProvider"
                 value={provider}
                 checked={installmentProvider === provider}
-                onChange={() => onInstallmentProviderChange(provider)}
+                onChange={() => {
+                  if (provider === "credo" && !onlineInstallmentsAllowed) {
+                    return;
+                  }
+                  onInstallmentProviderChange(provider);
+                }}
+                disabled={provider === "credo" && !onlineInstallmentsAllowed}
                 className="h-4 w-4 text-emerald-600"
               />
               <Image

@@ -11,15 +11,13 @@ import { useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
 import { cn } from "@/lib/utils";
 import { formatCurrencyAmount } from "@/lib/utils/currency";
-import {
-  ProductActionsSlot,
-  ProductAvailabilitySlot,
-  ProductFavoriteButton,
-  ProductPriceSlot,
-  ProductShareSlot,
-  ProductStatusBanner,
-  ProductViewTracker,
-} from "./";
+import { ProductActionsSlot } from "./product-actions-slot";
+import { ProductAvailabilitySlot } from "./product-availability-slot";
+import { ProductFavoriteButton } from "./product-favorite-button";
+import { ProductPriceSlot } from "./product-price-slot";
+import { ProductShareSlot } from "./product-share-slot";
+import { ProductStatusBanner } from "./product-status-banner";
+import { ProductViewTracker } from "./product-view-tracker";
 
 type Props = {
   product: ApiProduct;

@@ -23,12 +23,12 @@ import { MarketHubLogo } from "@/assets";
 import { Link, useRouter, useSearchParams } from "@/i18n/navigation.client";
 import { useLocale, useTranslations } from "@/i18n/provider";
 import type { CartItem } from "@/lib/api/cart";
+import { fetchCategoryTree } from "@/lib/api/categories";
 import {
   CART_STORAGE_KEY,
   CART_STORAGE_UPDATED_EVENT,
   readCartIdFromStorage,
 } from "@/lib/cart-storage";
-import { fetchCategoryTree } from "@/lib/api/categories";
 import { HeaderFavorites } from "./header-favorites";
 import { LanguageSwitcher } from "./language-switcher";
 import { MegaMenu } from "./mega-menu";
@@ -53,7 +53,8 @@ export function Header({
   const router = useRouter();
   const searchParams = useSearchParams();
   const qParam = searchParams.get("search") ?? searchParams.get("q") ?? "";
-  const adminHref = primaryShopSlug ? `/admin/${primaryShopSlug}` : "/sell";
+  const sellerActionHref = primaryShopSlug ? `/admin/${primaryShopSlug}` : "/sell";
+  const sellerActionLabel = primaryShopSlug ? t("nav.admin") : t("nav.createShop");
   const greeting = userDisplayName ? `${t("nav.greeting")}, ${userDisplayName}` : t("nav.greeting");
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -287,15 +288,28 @@ export function Header({
                     )}
                   </div>
                   <DropdownItem asChild>
-                    <Link href={adminHref} className="flex items-center gap-2">
-                      <Settings className="h-4 w-4" />
-                      {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
+                    <Link href="/account" className="flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      {t("nav.account")}
+                    </Link>
+                  </DropdownItem>
+                  <DropdownItem asChild>
+                    <Link href="/account/orders" className="flex items-center gap-2">
+                      <ShoppingBag className="h-4 w-4" />
+                      {t("nav.myOrders")}
                     </Link>
                   </DropdownItem>
                   <DropdownItem asChild>
                     <Link href="/account/addresses" className="flex items-center gap-2">
                       <MapPin className="h-4 w-4" />
                       {t("nav.savedAddresses")}
+                    </Link>
+                  </DropdownItem>
+                  <DropdownSeparator />
+                  <DropdownItem asChild>
+                    <Link href={sellerActionHref} className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      {sellerActionLabel}
                     </Link>
                   </DropdownItem>
                   <DropdownSeparator />
@@ -484,10 +498,20 @@ export function Header({
           <div className="pt-4 flex flex-col space-y-2">
             {isSignedIn ? (
               <>
-                <Link href={adminHref} onClick={() => setIsMenuOpen(false)} className="w-full">
+                <Link href="/account" onClick={() => setIsMenuOpen(false)} className="w-full">
                   <Button variant="outline" className="w-full">
-                    <Settings className="h-4 w-4 mr-2" />
-                    {primaryShopSlug ? t("nav.admin") : t("nav.createShop")}
+                    <User className="h-4 w-4 mr-2" />
+                    {t("nav.account")}
+                  </Button>
+                </Link>
+                <Link
+                  href="/account/orders"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="w-full"
+                >
+                  <Button variant="outline" className="w-full">
+                    <ShoppingBag className="h-4 w-4 mr-2" />
+                    {t("nav.myOrders")}
                   </Button>
                 </Link>
                 <Link
@@ -498,6 +522,16 @@ export function Header({
                   <Button variant="outline" className="w-full">
                     <MapPin className="h-4 w-4 mr-2" />
                     {t("nav.savedAddresses")}
+                  </Button>
+                </Link>
+                <Link
+                  href={sellerActionHref}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="w-full"
+                >
+                  <Button variant="outline" className="w-full">
+                    <Settings className="h-4 w-4 mr-2" />
+                    {sellerActionLabel}
                   </Button>
                 </Link>
                 <Button

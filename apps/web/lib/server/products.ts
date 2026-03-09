@@ -1,4 +1,4 @@
-"use server";
+import "server-only";
 
 import { env } from "@repo/shared";
 import { cacheLife, cacheTag } from "next/cache";
@@ -6,7 +6,39 @@ import type { Product } from "@/lib/types/products";
 import { CACHE_TAGS } from "../constants";
 import type { ProductSearchParams, ProductSearchResponse } from "../services/products.service";
 
-const API_BASE = env.BACKEND_URL || "http://localhost:3001";
+const DEFAULT_BACKEND_TIMEOUT_MS = 8_000;
+
+function resolveBackendBase() {
+  const raw = env.BACKEND_URL || "http://localhost:3001";
+  if (/^https?:\/\//i.test(raw)) {
+    return raw;
+  }
+  return `http://${raw}`;
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+async function fetchBackend(path: string, init: RequestInit = {}): Promise<Response> {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), DEFAULT_BACKEND_TIMEOUT_MS);
+
+  try {
+    return await fetch(`${resolveBackendBase()}${normalizedPath}`, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (isAbortError(error)) {
+      throw new Error("backend-timeout");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 /**
  * Server-side function to fetch products for a shop
@@ -19,7 +51,7 @@ export async function getShopProductsServer(shopSlug: string, limit = 20): Promi
   cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
 
   try {
-    const response = await fetch(`${API_BASE}/api/shops/${shopSlug}/products?limit=${limit}`);
+    const response = await fetchBackend(`/api/shops/${shopSlug}/products?limit=${limit}`);
     if (!response.ok) {
       if (response.status === 404) {
         throw new Error("not-found");
@@ -48,7 +80,7 @@ export async function getProductByIdentifierServer(productIdentifier: string): P
   cacheTag(CACHE_TAGS.PRODUCT);
   cacheTag(`${CACHE_TAGS.PRODUCT}-${productIdentifier}`);
 
-  const response = await fetch(`${API_BASE}/api/products/${productIdentifier}`);
+  const response = await fetchBackend(`/api/products/${productIdentifier}`);
 
   if (!response.ok) {
     if (response.status === 404) {
@@ -81,7 +113,7 @@ export async function searchProductsServer(
   if (params.offset) searchParams.set("offset", String(params.offset));
 
   try {
-    const response = await fetch(`${API_BASE}/api/products/search?${searchParams.toString()}`);
+    const response = await fetchBackend(`/api/products/search?${searchParams.toString()}`);
     if (!response.ok) {
       return { items: [], nextOffset: null };
     }
@@ -102,7 +134,7 @@ export async function getAnyProductsServer(limit = 20): Promise<Product[]> {
   cacheTag(CACHE_TAGS.PRODUCTS);
 
   try {
-    const response = await fetch(`${API_BASE}/api/products?limit=${limit}`);
+    const response = await fetchBackend(`/api/products?limit=${limit}`);
     if (!response.ok) {
       if (response.status === 404) {
         try {

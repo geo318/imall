@@ -3,6 +3,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { resolveBackendBase } from "../../_utils/backend";
 
 const API_BASE = resolveBackendBase();
+const PROXY_TIMEOUT_MS = 8_000;
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === "AbortError";
+}
 
 async function getAuthToken(): Promise<string | null> {
   try {
@@ -30,6 +35,9 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ productIdentifier: string }> },
 ) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
+
   try {
     const { productIdentifier } = await params;
     const token = await getAuthToken();
@@ -45,6 +53,7 @@ export async function GET(
     const response = await fetch(`${API_BASE}/api/products/${productIdentifier}`, {
       headers,
       cache: "no-store",
+      signal: controller.signal,
     });
     return new NextResponse(response.body, {
       status: response.status,
@@ -54,8 +63,13 @@ export async function GET(
       },
     });
   } catch (error) {
+    if (isAbortError(error)) {
+      return NextResponse.json({ error: "Request timed out" }, { status: 504 });
+    }
     console.error("[Products API] Error:", error);
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
