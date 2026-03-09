@@ -13,6 +13,11 @@ import {
   type UserShippingAddress,
 } from "@/actions/user-addresses";
 import { useTranslations } from "@/i18n/provider";
+import {
+  clearCartIdFromStorage,
+  readCartIdFromStorage,
+  writeCartIdToStorage,
+} from "@/lib/cart-storage";
 import type { CartItem } from "@/lib/api/cart";
 import { toast } from "sonner";
 import { printCrystalInstallmentInvoice } from "./crystal-installment-invoice";
@@ -105,7 +110,7 @@ export function useCheckoutController({
     let cancelled = false;
 
     async function loadCheckoutData() {
-      const cartId = globalThis.window ? localStorage.getItem(cartKey) : null;
+      const cartId = readCartIdFromStorage(cartKey);
       const savedOrderCode = globalThis.window
         ? localStorage.getItem(installmentOrderCodeKey)
         : null;
@@ -236,7 +241,7 @@ export function useCheckoutController({
   );
 
   const syncInstallmentStatus = useCallback(async () => {
-    const cartId = globalThis.window ? localStorage.getItem(cartKey) : null;
+    const cartId = readCartIdFromStorage(cartKey);
     if (!cartId || !pendingOrderCode) return;
 
     setCheckingStatus(true);
@@ -248,7 +253,7 @@ export function useCheckoutController({
       const statusLabel = status.statusName || `#${status.statusId ?? "unknown"}`;
 
       if (status.checkoutCompleted) {
-        localStorage.removeItem(cartKey);
+        clearCartIdFromStorage(cartKey);
         clearInstallmentState();
         setStep("confirmation");
         return;
@@ -287,7 +292,7 @@ export function useCheckoutController({
   }, [persistCurrentAddress, savedAddresses.length]);
 
   const submitCheckout = useCallback(async () => {
-    const cartId = globalThis.window ? localStorage.getItem(cartKey) : null;
+    const cartId = readCartIdFromStorage(cartKey);
     if (!cartId) return;
 
     setSubmitting(true);
@@ -316,13 +321,14 @@ export function useCheckoutController({
         });
 
         localStorage.setItem(installmentOrderCodeKey, session.orderCode);
+        writeCartIdToStorage(cartId, cartKey);
         setPendingOrderCode(session.orderCode);
         globalThis.window.location.assign(session.redirectUrl);
         return;
       }
 
       await checkoutCart(cartId);
-      localStorage.removeItem(cartKey);
+      clearCartIdFromStorage(cartKey);
       clearInstallmentState();
       setStep("confirmation");
     } catch (error) {

@@ -5,6 +5,7 @@ import { Button } from "@repo/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart } from "lucide-react";
 import { toast } from "sonner";
+import { dispatchFavoritesUpdated } from "@/lib/favorites-sync";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -48,7 +49,8 @@ export function ProductFavoriteButton({ productId }: Props) {
       queryClient.setQueryData(["favorite-check", productId], {
         isFavorited: favorited,
       });
-      queryClient.invalidateQueries({ queryKey: ["favorites"] });
+      queryClient.invalidateQueries({ queryKey: ["favorites"], refetchType: "active" });
+      dispatchFavoritesUpdated();
       toast.success(favorited ? "Added to favorites" : "Removed from favorites");
     },
     onError: (error) => {

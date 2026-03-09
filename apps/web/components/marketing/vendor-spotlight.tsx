@@ -42,12 +42,12 @@ export async function VendorSpotlight() {
               className="card-hover flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-4 text-center sm:p-6"
               prefetch
             >
-              <div className="relative mb-3 h-20 w-20 overflow-hidden rounded-full bg-slate-100">
+              <div className="relative mb-3 h-20 w-20 rounded-full bg-slate-100">
                 <Image
                   src={`https://picsum.photos/seed/${vendor.slug}/200/200`}
                   alt={vendor.name}
                   fill
-                  className="object-cover"
+                  className="object-cover rounded-full"
                   sizes="80px"
                 />
                 <span className="absolute -bottom-1 -right-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-semibold text-white shadow ring-2 ring-white">

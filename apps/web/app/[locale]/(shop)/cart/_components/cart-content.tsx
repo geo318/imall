@@ -15,6 +15,11 @@ import { getProductIdentifier } from "@/lib/api/products";
 import { revalidateCartClient } from "@/lib/revalidate-client";
 import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 import { cn } from "@/lib/utils";
+import {
+  clearCartIdFromStorage,
+  dispatchCartStorageUpdated,
+  readCartIdFromStorage,
+} from "@/lib/cart-storage";
 
 export function CartContent() {
   const t = useTranslations();
@@ -23,7 +28,7 @@ export function CartContent() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const id = globalThis.window ? globalThis.window.localStorage.getItem("cart") : null;
+    const id = readCartIdFromStorage("cart");
     setCartId(id);
     setIsLoadingCartId(false);
   }, []);
@@ -55,10 +60,8 @@ export function CartContent() {
       const msg = error instanceof Error ? error.message : t("cart.toasts.loadFailed");
       // If cart not found, clear the invalid cart ID from localStorage
       if (msg.toLowerCase().includes("not found")) {
-        if (globalThis.window) {
-          globalThis.window.localStorage.removeItem("cart");
-          setCartId(null);
-        }
+        clearCartIdFromStorage("cart");
+        setCartId(null);
         toast.error(t("cart.toasts.notFound"), {
           description: t("cart.toasts.notFoundDescription"),
         });
@@ -98,6 +101,7 @@ export function CartContent() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
+      dispatchCartStorageUpdated(cartId, "cart");
       await revalidateCartClient();
       toast.success(t("cart.toasts.qtyUpdated"));
     },
@@ -117,6 +121,7 @@ export function CartContent() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
+      dispatchCartStorageUpdated(cartId, "cart");
       await revalidateCartClient();
       toast.success(t("cart.toasts.itemRemoved"));
     },

@@ -1,4 +1,5 @@
 import { assets, db, favorites, productImages, products, tenants, users, variants } from "@repo/db";
+import { parseImageUrls } from "@repo/shared";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { authPlugin } from "../context";
@@ -72,6 +73,7 @@ export const favoritesRoutes = new Elysia({
           slug: products.slug,
           title: products.title,
           description: products.description,
+          imageUrls: products.imageUrls,
           tenantId: products.tenantId,
           tenantSlug: tenants.shopSlug,
           tenantName: tenants.name,
@@ -132,9 +134,9 @@ export const favoritesRoutes = new Elysia({
           const primaryAsset = primaryAssetId
             ? assetRows.find((a) => a && a.id === primaryAssetId)
             : null;
-          const imageUrl = primaryAsset?.storageKey
-            ? storage.getUrl(primaryAsset.storageKey)
-            : null;
+          const fallbackImageUrl = parseImageUrls(product.imageUrls ?? "")[0] ?? null;
+          const rawImageUrl = primaryAsset?.storageKey ?? fallbackImageUrl;
+          const imageUrl = rawImageUrl ? storage.getUrl(rawImageUrl) : null;
 
           return {
             id: product.id,

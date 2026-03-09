@@ -45,6 +45,7 @@ async function backendRequest(
 
   const response = await fetch(`${API_BASE}/api${path}`, {
     method: options.method || "GET",
+    cache: "no-store",
     headers,
   });
 
@@ -66,24 +67,30 @@ export async function POST(
       console.error("[Favorites API] Backend error:", response.status, errorText);
       return NextResponse.json(
         { error: errorText || "Failed to add favorite" },
-        { status: response.status },
+        { status: response.status, headers: { "Cache-Control": "no-store" } },
       );
     }
 
     const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
     if (errorMessage.includes("Unauthorized")) {
       return NextResponse.json(
         { error: "Authentication required. Please sign in to add favorites." },
-        { status: 401 },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
       );
     }
 
     console.error("[Favorites API] Error:", error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }
 
@@ -102,12 +109,15 @@ export async function DELETE(
       console.error("[Favorites API] Backend error:", response.status, errorText);
       return NextResponse.json(
         { error: errorText || "Failed to remove favorite" },
-        { status: response.status },
+        { status: response.status, headers: { "Cache-Control": "no-store" } },
       );
     }
 
     const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
@@ -116,12 +126,15 @@ export async function DELETE(
         {
           error: "Authentication required. Please sign in to remove favorites.",
         },
-        { status: 401 },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
       );
     }
 
     console.error("[Favorites API] Error:", error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }
 
@@ -138,20 +151,29 @@ export async function GET(
       console.error("[Favorites API] Backend error:", response.status, errorText);
       return NextResponse.json(
         { error: errorText || "Failed to check favorite" },
-        { status: response.status },
+        { status: response.status, headers: { "Cache-Control": "no-store" } },
       );
     }
 
     const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
     if (errorMessage.includes("Unauthorized")) {
-      return NextResponse.json({ isFavorited: false }, { status: 200 });
+      return NextResponse.json(
+        { isFavorited: false },
+        { status: 200, headers: { "Cache-Control": "no-store" } },
+      );
     }
 
     console.error("[Favorites API] Error:", error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

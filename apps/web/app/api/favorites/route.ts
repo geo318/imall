@@ -46,6 +46,7 @@ async function backendRequest(
 
   const response = await fetch(`${API_BASE}/api${path}`, {
     method: options.method || "GET",
+    cache: "no-store",
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
@@ -66,11 +67,17 @@ export async function GET(_request: NextRequest) {
         errorData = { error: errorText || "Failed to fetch favorites" };
       }
       console.error("[Favorites API] Backend error:", response.status, errorData);
-      return NextResponse.json(errorData, { status: response.status });
+      return NextResponse.json(errorData, {
+        status: response.status,
+        headers: { "Cache-Control": "no-store" },
+      });
     }
 
     const data = await response.json();
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
 
@@ -79,11 +86,14 @@ export async function GET(_request: NextRequest) {
         {
           error: "Authentication required. Please sign in to access favorites.",
         },
-        { status: 401 },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
       );
     }
 
     console.error("[Favorites API] Error:", error);
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

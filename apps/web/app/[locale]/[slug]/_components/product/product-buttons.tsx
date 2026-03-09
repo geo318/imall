@@ -6,6 +6,7 @@ import { useRouter } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import { toast } from "sonner";
 import { addToCart, createCart } from "@/actions/carts";
+import { dispatchCartStorageUpdated, writeCartIdToStorage } from "@/lib/cart-storage";
 import { revalidateCartClient } from "@/lib/revalidate-client";
 
 type Props = {
@@ -32,7 +33,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
         const { id } = await createCart();
         cartId = id;
         if (isClient) {
-          globalThis.window.localStorage.setItem(key, cartId);
+          writeCartIdToStorage(cartId, key);
         }
       }
 
@@ -48,7 +49,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
           const { id } = await createCart();
           cartId = id;
           if (isClient) {
-            globalThis.window.localStorage.setItem(key, cartId);
+            writeCartIdToStorage(cartId, key);
           }
           await addToCart(cartId, variantId, 1);
           return cartId;
@@ -64,6 +65,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
     try {
       const cartId = await cartMutation.mutateAsync({ variantId: selectedVariantId });
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
+      dispatchCartStorageUpdated(cartId, "cart");
       await revalidateCartClient();
 
       if (destination === "cart") {

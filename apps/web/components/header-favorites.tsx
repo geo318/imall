@@ -3,11 +3,13 @@
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@repo/ui/button";
 import { Dropdown, DropdownItem } from "@repo/ui/dropdown";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Heart } from "lucide-react";
+import { useEffect } from "react";
 import LazyImage from "@/components/shared/lazy-image";
-import { Link } from "@/i18n/navigation.client";
+import { useRouter } from "@/i18n/navigation.client";
 import { getProductIdentifier } from "@/lib/api/products";
+import { FAVORITES_UPDATED_EVENT } from "@/lib/favorites-sync";
 import { formatCurrencyAmount } from "@/lib/utils/currency";
 
 type FavoriteItem = {
@@ -25,12 +27,14 @@ type FavoriteItem = {
 
 export function HeaderFavorites() {
   const { isSignedIn } = useUser();
+  const queryClient = useQueryClient();
+  const router = useRouter();
 
   const { data: favoritesData } = useQuery<{ items: FavoriteItem[] }>({
     queryKey: ["favorites"],
     queryFn: async () => {
       try {
-        const response = await fetch("/api/favorites");
+        const response = await fetch("/api/favorites", { cache: "no-store" });
         if (!response.ok) {
           return { items: [] };
         }
@@ -50,12 +54,34 @@ export function HeaderFavorites() {
       }
     },
     enabled: isSignedIn,
-    staleTime: 30_000,
+    staleTime: 0,
     retry: false, // Don't retry on error to avoid spam
   });
 
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    const refetchFavorites = () => {
+      queryClient.invalidateQueries({ queryKey: ["favorites"], refetchType: "active" });
+    };
+
+    window.addEventListener(FAVORITES_UPDATED_EVENT, refetchFavorites);
+    return () => window.removeEventListener(FAVORITES_UPDATED_EVENT, refetchFavorites);
+  }, [isSignedIn, queryClient]);
+
   const favorites = favoritesData?.items ?? [];
   const favoritesCount = favorites.length;
+
+  const openFavoriteProduct = (item: FavoriteItem) => {
+    const productIdentifier = getProductIdentifier(item.id, item.slug);
+    if (productIdentifier && productIdentifier !== "unknown") {
+      router.push(`/${productIdentifier}`);
+      return;
+    }
+    if (item.tenantSlug) {
+      router.push(`/${item.tenantSlug}`);
+    }
+  };
 
   if (!isSignedIn) {
     return null;
@@ -64,8 +90,13 @@ export function HeaderFavorites() {
   return (
     <Dropdown
       trigger={
-        <Button variant="ghost" size="sm" className="rounded-full" aria-label="Favorites">
+        <Button variant="ghost" size="sm" className="relative rounded-full" aria-label="Favorites">
           <Heart className="h-5 w-5" />
+          {favoritesCount > 0 ? (
+            <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs text-primary-foreground">
+              {favoritesCount}
+            </span>
+          ) : null}
         </Button>
       }
       triggerAsChild
@@ -85,13 +116,13 @@ export function HeaderFavorites() {
             </div>
             <div className="py-1">
               {favorites.map((item) => {
-                const productIdentifier = getProductIdentifier(item.id, item.slug);
                 return (
-                  <DropdownItem key={item.id} asChild>
-                    <Link
-                      href={`/${productIdentifier}`}
-                      className="flex items-start gap-3 p-3 hover:bg-slate-50 transition-colors"
-                    >
+                  <DropdownItem
+                    key={item.id}
+                    onClick={() => openFavoriteProduct(item)}
+                    className="items-start p-3"
+                  >
+                    <div className="flex items-start gap-3">
                       {item.imageUrl ? (
                         <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0">
                           <LazyImage
@@ -117,7 +148,7 @@ export function HeaderFavorites() {
                           {formatCurrencyAmount(item.price, item.currency)}
                         </p>
                       </div>
-                    </Link>
+                    </div>
                   </DropdownItem>
                 );
               })}

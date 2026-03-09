@@ -23,6 +23,11 @@ import { MarketHubLogo } from "@/assets";
 import { Link, useRouter, useSearchParams } from "@/i18n/navigation.client";
 import { useLocale, useTranslations } from "@/i18n/provider";
 import type { CartItem } from "@/lib/api/cart";
+import {
+  CART_STORAGE_KEY,
+  CART_STORAGE_UPDATED_EVENT,
+  readCartIdFromStorage,
+} from "@/lib/cart-storage";
 import { fetchCategoryTree } from "@/lib/api/categories";
 import { HeaderFavorites } from "./header-favorites";
 import { LanguageSwitcher } from "./language-switcher";
@@ -62,8 +67,33 @@ export function Header({
   useEffect(() => setQ(qParam), [qParam]);
 
   useEffect(() => {
-    const id = globalThis.window ? globalThis.window.localStorage.getItem("cart") : null;
-    setCartId(id);
+    const syncCartId = () => {
+      setCartId(readCartIdFromStorage(CART_STORAGE_KEY));
+    };
+
+    syncCartId();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === CART_STORAGE_KEY) {
+        syncCartId();
+      }
+    };
+
+    const handleCartUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ key?: string; cartId?: string | null }>;
+      if (customEvent.detail?.key && customEvent.detail.key !== CART_STORAGE_KEY) {
+        return;
+      }
+      syncCartId();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(CART_STORAGE_UPDATED_EVENT, handleCartUpdated as EventListener);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(CART_STORAGE_UPDATED_EVENT, handleCartUpdated as EventListener);
+    };
   }, []);
 
   useEffect(() => {
