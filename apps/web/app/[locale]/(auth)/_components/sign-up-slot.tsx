@@ -536,7 +536,7 @@ function SignUpForm() {
           </div>
 
           <div className="space-y-2">
-            <Field name="unsafeMetadata.consentAccepted">
+            <Field name="legalAccepted">
               <ClerkLabel className="sr-only">{t("auth.signUp.consentLabel")}</ClerkLabel>
               <div className="flex items-start gap-3 text-sm text-slate-700">
                 <ClerkInput
