@@ -18,13 +18,18 @@ import { FacebookIcon } from "./facebook-icon";
 import { GoogleIcon } from "./google-icon";
 import { SignUpSkeleton } from "./sign-up-skeleton";
 
+function generateUsername(): string {
+  // Keep username compact and alphanumeric to satisfy strict Clerk username policies.
+  const timePart = Date.now().toString(36).slice(-4);
+  const randomPart = Math.random().toString(36).slice(2, 8);
+  return `im${timePart}${randomPart}`.slice(0, 15);
+}
+
 function SignUpForm() {
   const t = useTranslations();
   const [showPassword, setShowPassword] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
-  const [generatedUsername] = useState(
-    () => `imall_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-  );
+  const [generatedUsername] = useState(() => generateUsername());
   const [clientErrors, setClientErrors] = useState<
     Partial<
       Record<
@@ -47,10 +52,9 @@ function SignUpForm() {
   const oauthCompletePath = `${localePrefix}/`;
   const maxBirthDate = new Date();
   maxBirthDate.setFullYear(maxBirthDate.getFullYear() - 18);
-  const maxBirthDateValue = `${maxBirthDate.getFullYear()}-${String(maxBirthDate.getMonth() + 1).padStart(
-    2,
-    "0",
-  )}-${String(maxBirthDate.getDate()).padStart(2, "0")}`;
+  const maxBirthDateValue = `${maxBirthDate.getFullYear()}-${String(
+    maxBirthDate.getMonth() + 1,
+  ).padStart(2, "0")}-${String(maxBirthDate.getDate()).padStart(2, "0")}`;
 
   const handleOAuth = async (provider: "google" | "facebook") => {
     if (!clerk?.client) return;
@@ -557,6 +561,7 @@ function SignUpForm() {
           <Field name="username">
             <ClerkInput type="hidden" value={generatedUsername} readOnly />
           </Field>
+          <FieldError name="username" className="mt-1 block text-sm text-red-600" />
 
           <SignUp.Action submit asChild>
             <Button
