@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   checkoutCart,
   getCart,
@@ -13,13 +14,12 @@ import {
   type UserShippingAddress,
 } from "@/actions/user-addresses";
 import { useTranslations } from "@/i18n/provider";
+import type { CartItem } from "@/lib/api/cart";
 import {
   clearCartIdFromStorage,
   readCartIdFromStorage,
   writeCartIdToStorage,
 } from "@/lib/cart-storage";
-import type { CartItem } from "@/lib/api/cart";
-import { toast } from "sonner";
 import {
   type CheckoutPaymentMethod,
   type CheckoutStep,
@@ -51,9 +51,7 @@ type CrystalInvoicePayload = {
   total: number;
 };
 
-type PrintCrystalInstallmentInvoice = (
-  input: CrystalInvoicePayload,
-) => Promise<void>;
+type PrintCrystalInstallmentInvoice = (input: CrystalInvoicePayload) => Promise<void>;
 
 let crystalInvoicePrinterPromise: Promise<PrintCrystalInstallmentInvoice> | null = null;
 
@@ -64,6 +62,41 @@ async function getCrystalInvoicePrinter(): Promise<PrintCrystalInstallmentInvoic
     );
   }
   return crystalInvoicePrinterPromise;
+}
+
+function normalizeCredoRedirectUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return trimmed;
+
+  try {
+    const parsed = new URL(trimmed);
+    // Some Credo environments still return an http URL; mobile browsers may block/downgrade it.
+    if (parsed.hostname.endsWith("credo.ge") && parsed.protocol === "http:") {
+      parsed.protocol = "https:";
+    }
+    return parsed.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
+function navigateToInstallmentProvider(url: string) {
+  const targetUrl = normalizeCredoRedirectUrl(url);
+  if (!targetUrl) {
+    throw new Error("Installment redirect URL is missing");
+  }
+
+  // iOS/WebView can be flaky with assign() in async flows; anchor-click is more reliable.
+  const anchor = document.createElement("a");
+  anchor.href = targetUrl;
+  anchor.target = "_self";
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+
+  // Fallback in case synthetic click is ignored.
+  globalThis.window.location.assign(targetUrl);
 }
 
 function findDuplicateAddress(
@@ -97,8 +130,9 @@ export function useCheckoutController({
   const [pendingOrderCode, setPendingOrderCode] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
-  const [installmentProvider, setInstallmentProvider] =
-    useState<InstallmentProvider>(initialInstallmentProvider);
+  const [installmentProvider, setInstallmentProvider] = useState<InstallmentProvider>(
+    initialInstallmentProvider,
+  );
   const [shippingForm, setShippingForm] = useState<ShippingFormState>(EMPTY_SHIPPING_FORM);
   const [savedAddresses, setSavedAddresses] = useState<UserShippingAddress[]>([]);
   const [addressesLoading, setAddressesLoading] = useState(true);
@@ -363,7 +397,7 @@ export function useCheckoutController({
         localStorage.setItem(installmentOrderCodeKey, session.orderCode);
         writeCartIdToStorage(cartId, cartKey);
         setPendingOrderCode(session.orderCode);
-        globalThis.window.location.assign(session.redirectUrl);
+        navigateToInstallmentProvider(session.redirectUrl);
         return;
       }
 
