@@ -622,6 +622,7 @@
     },
     "installments": {
       "pendingOrderCode": "Заявка на рассрочку отправлена. Проверьте статус после возврата из банка.",
+      "openBankPage": "Открыть страницу банка снова",
       "checkStatus": "Проверить статус рассрочки",
       "checkingStatus": "Проверяем статус...",
       "clearPending": "Очистить ожидание",
@@ -919,7 +920,9 @@
       "selectStatus": "Select a status before updating",
       "mockUpdated": "Mock order updated",
       "updated": "Order status updated",
-      "updateFailed": "Failed to update order"
+      "updateFailed": "Failed to update order",
+      "stockConfirmed": "Stock confirmed",
+      "deliveryConfirmed": "Delivery confirmed"
     },
     "details": {
       "lineItems": "Line items",
@@ -932,10 +935,26 @@
       "noSku": "No SKU"
     },
     "statuses": {
+      "approved": "Approved",
       "pending": "Pending",
       "processing": "Processing",
       "completed": "Completed",
       "cancelled": "Cancelled"
+    },
+    "installments": {
+      "confirmStock": "Confirm stock",
+      "verifyCode": "Submit code",
+      "codePlaceholder": "Enter code",
+      "orderCode": "Order code",
+      "credoStatus": "Credo status",
+      "stage": {
+        "approved": "Approved",
+        "pending": "Pending code",
+        "completed": "Completed",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled",
+        "unknown": "Unknown"
+      }
     },
     "fulfillmentStatus": {
       "unfulfilled": "Unfulfilled",
@@ -1137,6 +1156,9 @@
     "shop": "Магазин: {shop}",
     "items": "Товаров: {count}",
     "paymentMethod": "Способ оплаты: {method}",
+    "installmentStatus": "Статус рассрочки: {status}",
+    "viewCode": "Показать код",
+    "hideCode": "Скрыть код",
     "errors": {
       "load": "Не удалось загрузить заказы."
     }

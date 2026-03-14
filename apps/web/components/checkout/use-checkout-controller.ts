@@ -128,6 +128,7 @@ export function useCheckoutController({
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingOrderCode, setPendingOrderCode] = useState<string | null>(null);
+  const [pendingRedirectUrl, setPendingRedirectUrl] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [installmentProvider, setInstallmentProvider] = useState<InstallmentProvider>(
@@ -141,6 +142,7 @@ export function useCheckoutController({
   const [addressMessage, setAddressMessage] = useState<string | null>(null);
 
   const installmentOrderCodeKey = `${cartKey}:installmentOrderCode`;
+  const installmentRedirectUrlKey = `${cartKey}:installmentRedirectUrl`;
   const hasEnoughAddressFieldsToSave = useMemo(
     () =>
       Boolean(
@@ -171,8 +173,12 @@ export function useCheckoutController({
       const savedOrderCode = globalThis.window
         ? localStorage.getItem(installmentOrderCodeKey)
         : null;
+      const savedRedirectUrl = globalThis.window
+        ? localStorage.getItem(installmentRedirectUrlKey)
+        : null;
       if (!cancelled) {
         setPendingOrderCode(savedOrderCode);
+        setPendingRedirectUrl(savedRedirectUrl);
       }
 
       const [cartResult, addressesResult] = await Promise.allSettled([
@@ -211,7 +217,7 @@ export function useCheckoutController({
     return () => {
       cancelled = true;
     };
-  }, [cartKey, installmentOrderCodeKey]);
+  }, [cartKey, installmentOrderCodeKey, installmentRedirectUrlKey]);
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0),
@@ -234,11 +240,13 @@ export function useCheckoutController({
 
   const clearInstallmentState = useCallback(() => {
     setPendingOrderCode(null);
+    setPendingRedirectUrl(null);
     setStatusMessage(null);
     if (globalThis.window) {
       localStorage.removeItem(installmentOrderCodeKey);
+      localStorage.removeItem(installmentRedirectUrlKey);
     }
-  }, [installmentOrderCodeKey]);
+  }, [installmentOrderCodeKey, installmentRedirectUrlKey]);
 
   const applySavedAddress = useCallback((address: UserShippingAddress) => {
     setShippingForm(mapAddressToShippingForm(address));
@@ -395,9 +403,12 @@ export function useCheckoutController({
         });
 
         localStorage.setItem(installmentOrderCodeKey, session.orderCode);
+        const normalizedRedirectUrl = normalizeCredoRedirectUrl(session.redirectUrl);
+        localStorage.setItem(installmentRedirectUrlKey, normalizedRedirectUrl);
         writeCartIdToStorage(cartId, cartKey);
         setPendingOrderCode(session.orderCode);
-        navigateToInstallmentProvider(session.redirectUrl);
+        setPendingRedirectUrl(normalizedRedirectUrl);
+        navigateToInstallmentProvider(normalizedRedirectUrl);
         return;
       }
 
@@ -416,6 +427,7 @@ export function useCheckoutController({
     clearInstallmentState,
     installmentCommission,
     installmentOrderCodeKey,
+    installmentRedirectUrlKey,
     installmentProvider,
     items,
     onlineInstallmentsAllowed,
@@ -451,6 +463,7 @@ export function useCheckoutController({
     errorMessage,
     setErrorMessage,
     pendingOrderCode,
+    pendingRedirectUrl,
     statusMessage,
     checkingStatus,
     installmentProvider,

@@ -3,7 +3,6 @@
 import { ArrowLeft } from "lucide-react";
 import { Link, useSearchParams } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
-import type { CheckoutPaymentMethod, InstallmentProvider } from "./types";
 import { CheckoutConfirmation } from "./checkout-confirmation";
 import { CheckoutInstallmentBanner } from "./checkout-installment-banner";
 import { CheckoutProgress } from "./checkout-progress";
@@ -11,6 +10,7 @@ import { CheckoutSkeleton } from "./checkout-skeleton";
 import { OrderSummary } from "./order-summary";
 import { PaymentStep } from "./payment-step";
 import { ShippingStep } from "./shipping-step";
+import type { CheckoutPaymentMethod, InstallmentProvider } from "./types";
 import { useCheckoutController } from "./use-checkout-controller";
 
 type CheckoutClientProps = {
@@ -54,6 +54,7 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
 
         <CheckoutInstallmentBanner
           pendingOrderCode={checkout.pendingOrderCode}
+          pendingRedirectUrl={checkout.pendingRedirectUrl}
           statusMessage={checkout.statusMessage}
           checkingStatus={checkout.checkingStatus}
           submitting={checkout.submitting}

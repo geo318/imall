@@ -5,6 +5,7 @@ import { useTranslations } from "@/i18n/provider";
 
 type CheckoutInstallmentBannerProps = {
   pendingOrderCode: string | null;
+  pendingRedirectUrl: string | null;
   statusMessage: string | null;
   checkingStatus: boolean;
   submitting: boolean;
@@ -14,6 +15,7 @@ type CheckoutInstallmentBannerProps = {
 
 export function CheckoutInstallmentBanner({
   pendingOrderCode,
+  pendingRedirectUrl,
   statusMessage,
   checkingStatus,
   submitting,
@@ -32,6 +34,16 @@ export function CheckoutInstallmentBanner({
         {t("checkout.installments.pendingOrderCode")}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
+        {pendingRedirectUrl ? (
+          <Button
+            type="button"
+            onClick={() => {
+              globalThis.window.location.assign(pendingRedirectUrl);
+            }}
+          >
+            {t("checkout.installments.openBankPage")}
+          </Button>
+        ) : null}
         <Button
           type="button"
           variant="outline"

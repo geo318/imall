@@ -622,6 +622,7 @@
     },
     "installments": {
       "pendingOrderCode": "Installment request is pending. Check status after returning from the bank.",
+      "openBankPage": "Open bank page again",
       "checkStatus": "Check installment status",
       "checkingStatus": "Checking status...",
       "clearPending": "Clear pending request",
@@ -919,7 +920,9 @@
       "selectStatus": "Select a status before updating",
       "mockUpdated": "Mock order updated",
       "updated": "Order status updated",
-      "updateFailed": "Failed to update order"
+      "updateFailed": "Failed to update order",
+      "stockConfirmed": "Stock confirmed",
+      "deliveryConfirmed": "Delivery confirmed"
     },
     "details": {
       "lineItems": "Line items",
@@ -932,10 +935,26 @@
       "noSku": "No SKU"
     },
     "statuses": {
+      "approved": "Approved",
       "pending": "Pending",
       "processing": "Processing",
       "completed": "Completed",
       "cancelled": "Cancelled"
+    },
+    "installments": {
+      "confirmStock": "Confirm stock",
+      "verifyCode": "Submit code",
+      "codePlaceholder": "Enter code",
+      "orderCode": "Order code",
+      "credoStatus": "Credo status",
+      "stage": {
+        "approved": "Approved",
+        "pending": "Pending code",
+        "completed": "Completed",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled",
+        "unknown": "Unknown"
+      }
     },
     "fulfillmentStatus": {
       "unfulfilled": "Unfulfilled",
@@ -1137,6 +1156,9 @@
     "shop": "Shop: {shop}",
     "items": "Items: {count}",
     "paymentMethod": "Payment method: {method}",
+    "installmentStatus": "Installment status: {status}",
+    "viewCode": "View code",
+    "hideCode": "Hide code",
     "errors": {
       "load": "Failed to load orders."
     }

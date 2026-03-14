@@ -622,6 +622,7 @@
     },
     "installments": {
       "pendingOrderCode": "განვადების განაცხადი გაგზავნილია. ბანკიდან დაბრუნების შემდეგ შეამოწმეთ სტატუსი.",
+      "openBankPage": "ბანკის გვერდის თავიდან გახსნა",
       "checkStatus": "სტატუსის შემოწმება",
       "checkingStatus": "სტატუსის შემოწმება...",
       "clearPending": "მოლოდინის წაშლა",
@@ -919,7 +920,9 @@
       "selectStatus": "აირჩიეთ სტატუსი",
       "mockUpdated": "დემო შეკვეთა განახლდა",
       "updated": "შეკვეთის სტატუსი განახლდა",
-      "updateFailed": "განახლება ვერ მოხერხდა"
+      "updateFailed": "განახლება ვერ მოხერხდა",
+      "stockConfirmed": "მარაგი დადასტურდა",
+      "deliveryConfirmed": "მიწოდება დადასტურდა"
     },
     "details": {
       "lineItems": "პოზიციები",
@@ -932,10 +935,26 @@
       "noSku": "SKU არ არის"
     },
     "statuses": {
+      "approved": "დამტკიცებული",
       "pending": "მოლოდინში",
       "processing": "მუშავდება",
       "completed": "დასრულდა",
       "cancelled": "გაუქმდა"
+    },
+    "installments": {
+      "confirmStock": "მარაგის დადასტურება",
+      "verifyCode": "კოდის დადასტურება",
+      "codePlaceholder": "შეიყვანეთ კოდი",
+      "orderCode": "განაცხადის კოდი",
+      "credoStatus": "Credo სტატუსი",
+      "stage": {
+        "approved": "დამტკიცებული",
+        "pending": "კოდის მოლოდინში",
+        "completed": "დასრულებული",
+        "rejected": "უარყოფილი",
+        "cancelled": "გაუქმებული",
+        "unknown": "უცნობი"
+      }
     },
     "fulfillmentStatus": {
       "unfulfilled": "შეუსრულებელი",
@@ -1137,6 +1156,9 @@
     "shop": "მაღაზია: {shop}",
     "items": "ნივთები: {count}",
     "paymentMethod": "გადახდის მეთოდი: {method}",
+    "installmentStatus": "განვადების სტატუსი: {status}",
+    "viewCode": "კოდის ნახვა",
+    "hideCode": "კოდის დამალვა",
     "errors": {
       "load": "შეკვეთების ჩატვირთვა ვერ მოხერხდა."
     }
