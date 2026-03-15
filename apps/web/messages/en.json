@@ -630,6 +630,7 @@
       "statusUnknown": "Unable to detect installment status right now.",
       "notFound": "No installment request was found at the bank yet. Please wait a bit and retry.",
       "invalidRequest": "Installment request details are invalid. Please start a new installment request.",
+      "missingCredoData": "Please fill first name, last name, email, phone, and address before starting online installments.",
       "syncFailed": "Failed to sync installment status. Please try again.",
       "manual": {
         "invoiceGenerated": "Crystal invoice opened. Print it and continue in bank branch.",

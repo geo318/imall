@@ -99,6 +99,21 @@ function navigateToInstallmentProvider(url: string) {
   globalThis.window.location.assign(targetUrl);
 }
 
+function isMobileBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+function hasRequiredCredoCustomerData(shippingForm: ShippingFormState): boolean {
+  return Boolean(
+    shippingForm.firstName.trim() &&
+      shippingForm.lastName.trim() &&
+      shippingForm.email.trim() &&
+      shippingForm.phone.trim() &&
+      shippingForm.address.trim(),
+  );
+}
+
 function findDuplicateAddress(
   addresses: UserShippingAddress[],
   shippingForm: ShippingFormState,
@@ -371,11 +386,17 @@ export function useCheckoutController({
     const cartId = readCartIdFromStorage(cartKey);
     if (!cartId) return;
 
+    let mobilePopup: Window | null = null;
     setSubmitting(true);
     try {
       if (paymentMethod === "installments") {
         if (!onlineInstallmentsAllowed && installmentProvider === "credo") {
           setErrorMessage(t("checkout.payment.onlineInstallmentsMultiVendorError"));
+          return;
+        }
+
+        if (installmentProvider === "credo" && !hasRequiredCredoCustomerData(shippingForm)) {
+          setErrorMessage(t("checkout.installments.missingCredoData"));
           return;
         }
 
@@ -394,6 +415,11 @@ export function useCheckoutController({
         }
 
         const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
+        mobilePopup =
+          isMobileBrowser() && typeof globalThis.window !== "undefined"
+            ? globalThis.window.open("about:blank", "_blank", "noopener,noreferrer")
+            : null;
+
         const session = await startInstallmentCheckout(cartId, {
           installmentLength: 12,
           clientFullName: fullName || undefined,
@@ -404,10 +430,29 @@ export function useCheckoutController({
 
         localStorage.setItem(installmentOrderCodeKey, session.orderCode);
         const normalizedRedirectUrl = normalizeCredoRedirectUrl(session.redirectUrl);
+        const redirectHost = (() => {
+          try {
+            return new URL(normalizedRedirectUrl).hostname.toLowerCase();
+          } catch {
+            return "";
+          }
+        })();
+        if (!redirectHost.endsWith("credo.ge")) {
+          if (mobilePopup && !mobilePopup.closed) {
+            mobilePopup.close();
+          }
+          throw new Error(`Unexpected installment redirect host: ${redirectHost || "unknown"}`);
+        }
+
         localStorage.setItem(installmentRedirectUrlKey, normalizedRedirectUrl);
         writeCartIdToStorage(cartId, cartKey);
         setPendingOrderCode(session.orderCode);
         setPendingRedirectUrl(normalizedRedirectUrl);
+        if (mobilePopup && !mobilePopup.closed) {
+          mobilePopup.location.replace(normalizedRedirectUrl);
+          return;
+        }
+
         navigateToInstallmentProvider(normalizedRedirectUrl);
         return;
       }
@@ -417,6 +462,9 @@ export function useCheckoutController({
       clearInstallmentState();
       setStep("confirmation");
     } catch (error) {
+      if (mobilePopup && !mobilePopup.closed) {
+        mobilePopup.close();
+      }
       const message = error instanceof Error ? error.message : t("checkout.errors.default");
       setErrorMessage(message);
     } finally {
