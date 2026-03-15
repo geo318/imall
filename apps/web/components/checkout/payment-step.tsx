@@ -173,8 +173,8 @@ export function PaymentStep({
         ))}
       </form>
 
-      <div className="flex gap-4">
-        <Button variant="outline" onClick={onBack} className="flex-1">
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <Button variant="outline" onClick={onBack} className="w-full sm:flex-1">
           {t("checkout.actions.back")}
         </Button>
         {paymentMethod === "installments" && installmentProvider === "credo" ? (
@@ -183,7 +183,7 @@ export function PaymentStep({
             form={credoFormId}
             name="mode"
             value="server-form"
-            className="flex flex-1 items-center justify-center rounded-lg bg-[#006393] p-[18px] text-[14px] font-tbcx-bold text-white outline-none transition-all hover:bg-[#006393]/90 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center rounded-lg bg-[#006393] p-[18px] text-[14px] font-tbcx-bold text-white outline-none transition-all hover:bg-[#006393]/90 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
             disabled={submitting || checkingStatus || !credoLaunchForm.ready}
           >
             <svg
@@ -215,7 +215,7 @@ export function PaymentStep({
         ) : (
           <Button
             onClick={() => void onSubmit()}
-            className="flex-1"
+            className="w-full sm:flex-1"
             size="lg"
             disabled={submitting || checkingStatus}
           >
@@ -227,29 +227,6 @@ export function PaymentStep({
           </Button>
         )}
       </div>
-
-      {paymentMethod === "installments" && installmentProvider === "credo" ? (
-        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-          <p className="text-sm font-medium text-slate-900">
-            {t("checkout.installments.fallbackTitle")}
-          </p>
-          <p className="mt-1 text-xs text-slate-600">{t("checkout.installments.fallbackHint")}</p>
-          <div className="mt-3">
-            <Button
-              type="submit"
-              form={credoFormId}
-              formTarget="_blank"
-              name="mode"
-              value="server-form-new-tab"
-              variant="outline"
-              disabled={submitting || checkingStatus || !credoLaunchForm.ready}
-              className="w-full sm:w-auto"
-            >
-              {t("checkout.installments.openInNewTab")}
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
