@@ -585,17 +585,6 @@ export function useCheckoutController({
     [continueFromShipping, step, submitCheckout],
   );
 
-  const openCredoPopupFormTarget = useCallback(() => {
-    const popup = globalThis.window.open("", "credo_popup", "popup=yes,width=520,height=820");
-    if (!popup) {
-      setErrorMessage(t("checkout.installments.popupBlocked"));
-      return false;
-    }
-
-    setErrorMessage(null);
-    return true;
-  }, [t]);
-
   return {
     items,
     step,
@@ -627,7 +616,6 @@ export function useCheckoutController({
     persistCurrentAddress,
     handleContinue,
     credoLaunchForm,
-    openCredoPopupFormTarget,
     subtotal,
     shipping,
     installmentCommission,

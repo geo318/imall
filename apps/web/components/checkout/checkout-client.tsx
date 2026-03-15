@@ -100,7 +100,6 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
                 onBack={() => checkout.setStep("shipping")}
                 onSubmit={checkout.handleContinue}
                 credoLaunchForm={checkout.credoLaunchForm}
-                onOpenCredoPopupTarget={checkout.openCredoPopupFormTarget}
                 submitting={checkout.submitting}
                 checkingStatus={checkout.checkingStatus}
               />
