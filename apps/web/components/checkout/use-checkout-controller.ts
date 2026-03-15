@@ -21,6 +21,14 @@ import {
   writeCartIdToStorage,
 } from "@/lib/cart-storage";
 import {
+  buildCredoLaunchUrl,
+  type CredoLaunchMode,
+  clearPersistedInstallmentCookies,
+  normalizeCredoMobile,
+  normalizeCredoRedirectUrl,
+  readPersistedInstallmentState,
+} from "./credo-launch";
+import {
   type CheckoutPaymentMethod,
   type CheckoutStep,
   EMPTY_SHIPPING_FORM,
@@ -38,6 +46,12 @@ type UseCheckoutControllerOptions = {
 
 type PersistAddressOptions = {
   manual?: boolean;
+};
+
+type CredoLaunchFormConfig = {
+  action: string;
+  fields: Record<string, string>;
+  ready: boolean;
 };
 
 const normalizeAddressValue = (value?: string | null) => (value ?? "").trim().toLowerCase();
@@ -62,31 +76,6 @@ async function getCrystalInvoicePrinter(): Promise<PrintCrystalInstallmentInvoic
     );
   }
   return crystalInvoicePrinterPromise;
-}
-
-function normalizeCredoRedirectUrl(rawUrl: string): string {
-  const trimmed = rawUrl.trim();
-  if (!trimmed) return trimmed;
-
-  try {
-    const parsed = new URL(trimmed);
-    // Some Credo environments still return an http URL; mobile browsers may block/downgrade it.
-    if (parsed.hostname.endsWith("credo.ge") && parsed.protocol === "http:") {
-      parsed.protocol = "https:";
-    }
-    return parsed.toString();
-  } catch {
-    return trimmed;
-  }
-}
-
-function normalizeCredoMobile(rawValue: string): string {
-  const digits = rawValue.replace(/\D/g, "");
-  // Convert +9955XXXXXXXX -> 5XXXXXXXX
-  if (digits.startsWith("995") && digits.length >= 12) {
-    return digits.slice(3);
-  }
-  return digits;
 }
 
 function hasRequiredCredoCustomerData(shippingForm: ShippingFormState): boolean {
@@ -158,6 +147,65 @@ export function useCheckoutController({
     () => findDuplicateAddress(savedAddresses, shippingForm),
     [savedAddresses, shippingForm],
   );
+  const credoLaunchForm = useMemo<CredoLaunchFormConfig>(() => {
+    const cartId = typeof globalThis.window !== "undefined" ? readCartIdFromStorage(cartKey) : null;
+    const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
+    const normalizedMobile = normalizeCredoMobile(shippingForm.phone);
+
+    return {
+      action: "/api/checkout/installments/credo/launch",
+      ready: Boolean(cartId) && hasRequiredCredoCustomerData(shippingForm),
+      fields: {
+        cartId: cartId ?? "",
+        cartKey,
+        installmentLength: "12",
+        clientFullName: fullName,
+        mobile: normalizedMobile,
+        email: shippingForm.email.trim(),
+        factAddress: shippingForm.address.trim(),
+        returnTo:
+          typeof globalThis.window !== "undefined"
+            ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
+            : "",
+      },
+    };
+  }, [cartKey, shippingForm]);
+
+  const hydratePendingInstallmentState = useCallback(() => {
+    const localOrderCode =
+      typeof globalThis.window !== "undefined"
+        ? localStorage.getItem(installmentOrderCodeKey)
+        : null;
+    const localRedirectUrl =
+      typeof globalThis.window !== "undefined"
+        ? localStorage.getItem(installmentRedirectUrlKey)
+        : null;
+    const persistedCookieState =
+      typeof document !== "undefined"
+        ? readPersistedInstallmentState(cartKey, document.cookie)
+        : null;
+
+    const nextOrderCode = localOrderCode || persistedCookieState?.orderCode || null;
+    const nextRedirectUrl = localRedirectUrl || persistedCookieState?.redirectUrl || null;
+
+    setPendingOrderCode(nextOrderCode);
+    setPendingRedirectUrl(nextRedirectUrl);
+
+    if (
+      typeof globalThis.window !== "undefined" &&
+      persistedCookieState?.orderCode &&
+      !localOrderCode
+    ) {
+      localStorage.setItem(installmentOrderCodeKey, persistedCookieState.orderCode);
+    }
+    if (
+      typeof globalThis.window !== "undefined" &&
+      persistedCookieState?.redirectUrl &&
+      !localRedirectUrl
+    ) {
+      localStorage.setItem(installmentRedirectUrlKey, persistedCookieState.redirectUrl);
+    }
+  }, [cartKey, installmentOrderCodeKey, installmentRedirectUrlKey]);
 
   useEffect(() => {
     setPaymentMethod(initialPaymentMethod);
@@ -171,16 +219,7 @@ export function useCheckoutController({
 
     async function loadCheckoutData() {
       const cartId = readCartIdFromStorage(cartKey);
-      const savedOrderCode = globalThis.window
-        ? localStorage.getItem(installmentOrderCodeKey)
-        : null;
-      const savedRedirectUrl = globalThis.window
-        ? localStorage.getItem(installmentRedirectUrlKey)
-        : null;
-      if (!cancelled) {
-        setPendingOrderCode(savedOrderCode);
-        setPendingRedirectUrl(savedRedirectUrl);
-      }
+      if (!cancelled) hydratePendingInstallmentState();
 
       const [cartResult, addressesResult] = await Promise.allSettled([
         cartId ? getCart(cartId) : Promise.resolve({ items: [] }),
@@ -218,7 +257,30 @@ export function useCheckoutController({
     return () => {
       cancelled = true;
     };
-  }, [cartKey, installmentOrderCodeKey, installmentRedirectUrlKey]);
+  }, [cartKey, hydratePendingInstallmentState]);
+
+  useEffect(() => {
+    if (typeof globalThis.window === "undefined") {
+      return;
+    }
+
+    const handleFocus = () => {
+      hydratePendingInstallmentState();
+    };
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        hydratePendingInstallmentState();
+      }
+    };
+
+    globalThis.window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      globalThis.window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [hydratePendingInstallmentState]);
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0),
@@ -247,6 +309,7 @@ export function useCheckoutController({
       localStorage.removeItem(installmentOrderCodeKey);
       localStorage.removeItem(installmentRedirectUrlKey);
     }
+    clearPersistedInstallmentCookies();
   }, [installmentOrderCodeKey, installmentRedirectUrlKey]);
 
   const applySavedAddress = useCallback((address: UserShippingAddress) => {
@@ -368,107 +431,170 @@ export function useCheckoutController({
     setStep("payment");
   }, [persistCurrentAddress, savedAddresses.length]);
 
-  const submitCheckout = useCallback(async () => {
-    const cartId = readCartIdFromStorage(cartKey);
-    if (!cartId) return;
-    setSubmitting(true);
-    try {
-      if (paymentMethod === "installments") {
-        if (!onlineInstallmentsAllowed && installmentProvider === "credo") {
-          setErrorMessage(t("checkout.payment.onlineInstallmentsMultiVendorError"));
-          return;
-        }
-
-        if (installmentProvider === "credo" && !hasRequiredCredoCustomerData(shippingForm)) {
-          setErrorMessage(t("checkout.installments.missingCredoData"));
-          return;
-        }
-
-        if (installmentProvider === "crystal") {
-          const printCrystalInstallmentInvoice = await getCrystalInvoicePrinter();
-          await printCrystalInstallmentInvoice({
-            buyer: shippingForm,
-            items,
-            subtotal,
-            shipping,
-            installmentCommission,
-            total,
-          });
-          toast.success(t("checkout.installments.manual.invoiceGenerated"));
-          return;
-        }
-
-        const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
-        const normalizedMobile = normalizeCredoMobile(shippingForm.phone);
-
-        const session = await startInstallmentCheckout(cartId, {
-          installmentLength: 12,
-          clientFullName: fullName || undefined,
-          mobile: normalizedMobile || undefined,
-          email: shippingForm.email.trim() || undefined,
-          factAddress: shippingForm.address.trim() || undefined,
-        });
-
-        localStorage.setItem(installmentOrderCodeKey, session.orderCode);
-        const normalizedRedirectUrl = normalizeCredoRedirectUrl(session.redirectUrl);
-        const redirectHost = (() => {
-          try {
-            return new URL(normalizedRedirectUrl).hostname.toLowerCase();
-          } catch {
-            return "";
+  const submitCheckout = useCallback(
+    async (launchMode: CredoLaunchMode = "server-assign") => {
+      const cartId = readCartIdFromStorage(cartKey);
+      if (!cartId) return;
+      setSubmitting(true);
+      try {
+        if (paymentMethod === "installments") {
+          if (!onlineInstallmentsAllowed && installmentProvider === "credo") {
+            setErrorMessage(t("checkout.payment.onlineInstallmentsMultiVendorError"));
+            return;
           }
-        })();
-        if (!redirectHost.endsWith("credo.ge")) {
-          throw new Error(`Unexpected installment redirect host: ${redirectHost || "unknown"}`);
+
+          if (installmentProvider === "credo" && !hasRequiredCredoCustomerData(shippingForm)) {
+            setErrorMessage(t("checkout.installments.missingCredoData"));
+            return;
+          }
+
+          if (installmentProvider === "crystal") {
+            const printCrystalInstallmentInvoice = await getCrystalInvoicePrinter();
+            await printCrystalInstallmentInvoice({
+              buyer: shippingForm,
+              items,
+              subtotal,
+              shipping,
+              installmentCommission,
+              total,
+            });
+            toast.success(t("checkout.installments.manual.invoiceGenerated"));
+            return;
+          }
+
+          const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
+          const normalizedMobile = normalizeCredoMobile(shippingForm.phone);
+          const launchUrl = buildCredoLaunchUrl({
+            cartId,
+            cartKey,
+            installmentLength: 12,
+            clientFullName: fullName || undefined,
+            mobile: normalizedMobile || undefined,
+            email: shippingForm.email.trim() || undefined,
+            factAddress: shippingForm.address.trim() || undefined,
+            returnTo:
+              typeof globalThis.window !== "undefined"
+                ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
+                : undefined,
+          });
+
+          if (launchMode !== "direct-replace") {
+            if (launchMode === "server-new-tab") {
+              const newTab = globalThis.window.open(launchUrl, "_blank");
+              if (!newTab) {
+                throw new Error(t("checkout.installments.popupBlocked"));
+              }
+              hydratePendingInstallmentState();
+              return;
+            }
+
+            if (launchMode === "server-popup") {
+              const popup = globalThis.window.open(
+                launchUrl,
+                "credo_installments",
+                "popup=yes,width=520,height=820",
+              );
+              if (!popup) {
+                throw new Error(t("checkout.installments.popupBlocked"));
+              }
+              hydratePendingInstallmentState();
+              return;
+            }
+
+            if (launchMode === "server-replace") {
+              globalThis.window.location.replace(launchUrl);
+              return;
+            }
+
+            globalThis.window.location.assign(launchUrl);
+            return;
+          }
+
+          const session = await startInstallmentCheckout(cartId, {
+            installmentLength: 12,
+            clientFullName: fullName || undefined,
+            mobile: normalizedMobile || undefined,
+            email: shippingForm.email.trim() || undefined,
+            factAddress: shippingForm.address.trim() || undefined,
+          });
+
+          localStorage.setItem(installmentOrderCodeKey, session.orderCode);
+          const normalizedRedirectUrl = normalizeCredoRedirectUrl(session.redirectUrl);
+          const redirectHost = (() => {
+            try {
+              return new URL(normalizedRedirectUrl).hostname.toLowerCase();
+            } catch {
+              return "";
+            }
+          })();
+          if (!redirectHost.endsWith("credo.ge")) {
+            throw new Error(`Unexpected installment redirect host: ${redirectHost || "unknown"}`);
+          }
+
+          localStorage.setItem(installmentRedirectUrlKey, normalizedRedirectUrl);
+          writeCartIdToStorage(cartId, cartKey);
+          setPendingOrderCode(session.orderCode);
+          setPendingRedirectUrl(normalizedRedirectUrl);
+          globalThis.window.location.replace(normalizedRedirectUrl);
+          return;
         }
 
-        localStorage.setItem(installmentRedirectUrlKey, normalizedRedirectUrl);
-        writeCartIdToStorage(cartId, cartKey);
-        setPendingOrderCode(session.orderCode);
-        setPendingRedirectUrl(normalizedRedirectUrl);
-        globalThis.window.location.replace(normalizedRedirectUrl);
+        await checkoutCart(cartId);
+        clearCartIdFromStorage(cartKey);
+        clearInstallmentState();
+        setStep("confirmation");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : t("checkout.errors.default");
+        setErrorMessage(message);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [
+      cartKey,
+      clearInstallmentState,
+      hydratePendingInstallmentState,
+      installmentCommission,
+      installmentOrderCodeKey,
+      installmentRedirectUrlKey,
+      installmentProvider,
+      items,
+      onlineInstallmentsAllowed,
+      paymentMethod,
+      shipping,
+      shippingForm,
+      subtotal,
+      t,
+      total,
+    ],
+  );
+
+  const handleContinue = useCallback(
+    async (launchMode?: CredoLaunchMode) => {
+      setErrorMessage(null);
+
+      if (step === "shipping") {
+        await continueFromShipping();
         return;
       }
 
-      await checkoutCart(cartId);
-      clearCartIdFromStorage(cartKey);
-      clearInstallmentState();
-      setStep("confirmation");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("checkout.errors.default");
-      setErrorMessage(message);
-    } finally {
-      setSubmitting(false);
-    }
-  }, [
-    cartKey,
-    clearInstallmentState,
-    installmentCommission,
-    installmentOrderCodeKey,
-    installmentRedirectUrlKey,
-    installmentProvider,
-    items,
-    onlineInstallmentsAllowed,
-    paymentMethod,
-    shipping,
-    shippingForm,
-    subtotal,
-    t,
-    total,
-  ]);
+      if (step === "payment") {
+        await submitCheckout(launchMode);
+      }
+    },
+    [continueFromShipping, step, submitCheckout],
+  );
 
-  const handleContinue = useCallback(async () => {
+  const openCredoPopupFormTarget = useCallback(() => {
+    const popup = globalThis.window.open("", "credo_popup", "popup=yes,width=520,height=820");
+    if (!popup) {
+      setErrorMessage(t("checkout.installments.popupBlocked"));
+      return false;
+    }
+
     setErrorMessage(null);
-
-    if (step === "shipping") {
-      await continueFromShipping();
-      return;
-    }
-
-    if (step === "payment") {
-      await submitCheckout();
-    }
-  }, [continueFromShipping, step, submitCheckout]);
+    return true;
+  }, [t]);
 
   return {
     items,
@@ -500,6 +626,8 @@ export function useCheckoutController({
     applySavedAddress,
     persistCurrentAddress,
     handleContinue,
+    credoLaunchForm,
+    openCredoPopupFormTarget,
     subtotal,
     shipping,
     installmentCommission,

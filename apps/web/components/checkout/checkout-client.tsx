@@ -23,6 +23,7 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
   const searchParams = useSearchParams();
   const requestedPayment = searchParams.get("payment");
   const requestedProvider = searchParams.get("provider");
+  const installmentLaunchError = searchParams.get("installment_error");
   const initialPaymentMethod: CheckoutPaymentMethod =
     requestedPayment === "installments" ? "installments" : "card";
   const initialInstallmentProvider: InstallmentProvider =
@@ -62,9 +63,9 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
           onClear={checkout.clearInstallmentState}
         />
 
-        {checkout.errorMessage ? (
+        {checkout.errorMessage || installmentLaunchError ? (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {checkout.errorMessage}
+            {checkout.errorMessage || installmentLaunchError}
           </div>
         ) : null}
 
@@ -98,6 +99,8 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
                 onlineInstallmentsAllowed={checkout.onlineInstallmentsAllowed}
                 onBack={() => checkout.setStep("shipping")}
                 onSubmit={checkout.handleContinue}
+                credoLaunchForm={checkout.credoLaunchForm}
+                onOpenCredoPopupTarget={checkout.openCredoPopupFormTarget}
                 submitting={checkout.submitting}
                 checkingStatus={checkout.checkingStatus}
               />

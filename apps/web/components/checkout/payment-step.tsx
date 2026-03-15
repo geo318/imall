@@ -3,9 +3,11 @@
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
-import Image from "next/image";
 import { CreditCard, Shield } from "lucide-react";
+import Image from "next/image";
+import { useId } from "react";
 import { useTranslations } from "@/i18n/provider";
+import type { CredoLaunchMode } from "./credo-launch";
 import type { CheckoutPaymentMethod, InstallmentProvider } from "./types";
 
 const INSTALLMENT_PROVIDER_LOGOS: Record<InstallmentProvider, string> = {
@@ -20,7 +22,13 @@ type PaymentStepProps = {
   onInstallmentProviderChange: (provider: InstallmentProvider) => void;
   onlineInstallmentsAllowed: boolean;
   onBack: () => void;
-  onSubmit: () => Promise<void> | void;
+  onSubmit: (mode?: CredoLaunchMode) => Promise<void> | void;
+  credoLaunchForm: {
+    action: string;
+    fields: Record<string, string>;
+    ready: boolean;
+  };
+  onOpenCredoPopupTarget: () => boolean;
   submitting: boolean;
   checkingStatus: boolean;
 };
@@ -33,10 +41,13 @@ export function PaymentStep({
   onlineInstallmentsAllowed,
   onBack,
   onSubmit,
+  credoLaunchForm,
+  onOpenCredoPopupTarget,
   submitting,
   checkingStatus,
 }: PaymentStepProps) {
   const t = useTranslations();
+  const credoFormId = useId();
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-6">
@@ -159,23 +170,110 @@ export function PaymentStep({
         <span>{t("checkout.payment.secureNote")}</span>
       </div>
 
+      <form id={credoFormId} action={credoLaunchForm.action} method="GET" className="hidden">
+        {Object.entries(credoLaunchForm.fields).map(([key, value]) => (
+          <input key={key} type="hidden" name={key} value={value} />
+        ))}
+      </form>
+
       <div className="flex gap-4">
         <Button variant="outline" onClick={onBack} className="flex-1">
           {t("checkout.actions.back")}
         </Button>
-        <Button
-          onClick={() => void onSubmit()}
-          className="flex-1"
-          size="lg"
-          disabled={submitting || checkingStatus}
-        >
-          {submitting
-            ? t("checkout.actions.processing")
-            : paymentMethod === "installments"
-              ? t("checkout.actions.goToInstallments")
-              : t("checkout.actions.placeOrder")}
-        </Button>
+        {paymentMethod === "installments" && installmentProvider === "credo" ? (
+          <Button
+            type="submit"
+            form={credoFormId}
+            name="mode"
+            value="server-form"
+            className="flex-1"
+            size="lg"
+            disabled={submitting || checkingStatus || !credoLaunchForm.ready}
+          >
+            {submitting ? t("checkout.actions.processing") : t("checkout.actions.goToInstallments")}
+          </Button>
+        ) : (
+          <Button
+            onClick={() => void onSubmit()}
+            className="flex-1"
+            size="lg"
+            disabled={submitting || checkingStatus}
+          >
+            {submitting
+              ? t("checkout.actions.processing")
+              : paymentMethod === "installments"
+                ? t("checkout.actions.goToInstallments")
+                : t("checkout.actions.placeOrder")}
+          </Button>
+        )}
       </div>
+
+      {paymentMethod === "installments" && installmentProvider === "credo" ? (
+        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+          <p className="text-sm font-medium text-slate-900">
+            {t("checkout.installments.debugTitle")}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">{t("checkout.installments.debugHint")}</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <Button
+              type="submit"
+              form={credoFormId}
+              name="mode"
+              value="server-form"
+              variant="outline"
+              disabled={submitting || checkingStatus || !credoLaunchForm.ready}
+            >
+              {t("checkout.installments.serverForm")}
+            </Button>
+            <Button
+              type="submit"
+              form={credoFormId}
+              formTarget="_blank"
+              name="mode"
+              value="server-form-new-tab"
+              variant="outline"
+              disabled={submitting || checkingStatus || !credoLaunchForm.ready}
+            >
+              {t("checkout.installments.serverNewTab")}
+            </Button>
+            <Button
+              type="submit"
+              form={credoFormId}
+              formTarget="credo_named_window"
+              name="mode"
+              value="server-form-window"
+              variant="outline"
+              disabled={submitting || checkingStatus || !credoLaunchForm.ready}
+            >
+              {t("checkout.installments.serverNamedWindow")}
+            </Button>
+            <Button
+              type="submit"
+              form={credoFormId}
+              formTarget="credo_popup"
+              name="mode"
+              value="server-form-popup"
+              variant="outline"
+              disabled={submitting || checkingStatus || !credoLaunchForm.ready}
+              onClick={(event) => {
+                if (!onOpenCredoPopupTarget()) {
+                  event.preventDefault();
+                }
+              }}
+            >
+              {t("checkout.installments.serverPopup")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={submitting || checkingStatus}
+              onClick={() => void onSubmit("direct-replace")}
+            >
+              {t("checkout.installments.directReplace")}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
