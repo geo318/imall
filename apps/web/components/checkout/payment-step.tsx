@@ -7,7 +7,6 @@ import { CreditCard, Shield } from "lucide-react";
 import Image from "next/image";
 import { useId } from "react";
 import { useTranslations } from "@/i18n/provider";
-import type { CredoLaunchMode } from "./credo-launch";
 import type { CheckoutPaymentMethod, InstallmentProvider } from "./types";
 
 const INSTALLMENT_PROVIDER_LOGOS: Record<InstallmentProvider, string> = {
@@ -22,13 +21,12 @@ type PaymentStepProps = {
   onInstallmentProviderChange: (provider: InstallmentProvider) => void;
   onlineInstallmentsAllowed: boolean;
   onBack: () => void;
-  onSubmit: (mode?: CredoLaunchMode) => Promise<void> | void;
+  onSubmit: () => Promise<void> | void;
   credoLaunchForm: {
     action: string;
     fields: Record<string, string>;
     ready: boolean;
   };
-  onOpenCredoPopupTarget: () => boolean;
   submitting: boolean;
   checkingStatus: boolean;
 };
@@ -42,7 +40,6 @@ export function PaymentStep({
   onBack,
   onSubmit,
   credoLaunchForm,
-  onOpenCredoPopupTarget,
   submitting,
   checkingStatus,
 }: PaymentStepProps) {
@@ -181,17 +178,40 @@ export function PaymentStep({
           {t("checkout.actions.back")}
         </Button>
         {paymentMethod === "installments" && installmentProvider === "credo" ? (
-          <Button
+          <button
             type="submit"
             form={credoFormId}
             name="mode"
             value="server-form"
-            className="flex-1"
-            size="lg"
+            className="flex flex-1 items-center justify-center rounded-lg bg-[#006393] p-[18px] text-[14px] font-tbcx-bold text-white outline-none transition-all hover:bg-[#006393]/90 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={submitting || checkingStatus || !credoLaunchForm.ready}
           >
-            {submitting ? t("checkout.actions.processing") : t("checkout.actions.goToInstallments")}
-          </Button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              className="mr-2"
+              aria-hidden="true"
+            >
+              <path
+                d="M18.9977 17.242L18.1247 16.8065C17.9468 16.7097 17.769 16.6129 17.5912 16.5C19.1595 14.6936 20.0001 12.4193 20.0001 9.99998C20.0001 4.4839 15.5054 1.90735e-06 9.97603 1.90735e-06C8.73107 1.90735e-06 7.51847 0.225784 6.38672 0.661263V2.29033V2.46774C7.50234 1.93551 8.73107 1.66125 9.97603 1.66125C14.5839 1.66125 18.3187 5.40323 18.3187 9.98389C18.3187 11.9517 17.6397 13.8226 16.3947 15.3065C16.2815 15.129 16.1684 14.9516 16.0713 14.7581L15.6348 13.8871C15.4084 13.4355 14.7132 13.5968 14.7132 14.0968V17.6452C14.7132 17.9032 14.9234 18.1291 15.1982 18.1291H18.7552C19.2888 18.1452 19.4504 17.4677 18.9977 17.242Z"
+                fill="white"
+              />
+              <path
+                d="M9.95922 3.35467C8.64964 3.35467 7.42081 3.74177 6.38615 4.38694V5.85469C6.38615 6.77402 5.65857 7.48376 4.73692 7.48376C4.42973 7.48376 4.12255 7.4031 3.88009 7.24178C3.49206 8.08045 3.26562 9.03206 3.26562 10.016C3.26562 13.6934 6.2568 16.6772 9.95922 16.6772C11.285 16.6772 12.5299 16.2901 13.5809 15.6128V14.1128C13.5809 13.1934 14.3084 12.4837 15.23 12.4837C15.5372 12.4837 15.8283 12.5644 16.087 12.7257C16.4588 11.9031 16.669 10.9838 16.669 10.016C16.669 6.33854 13.6617 3.35467 9.95922 3.35467Z"
+                fill="white"
+              />
+              <path
+                d="M9.99186 18.3226C5.38402 18.3226 1.64913 14.5806 1.64913 9.99992C1.64913 9.82251 1.64913 9.6451 1.66536 9.46769C1.66536 9.41932 1.66536 9.37094 1.68149 9.32257C1.69772 9.17734 1.71385 9.04831 1.72998 8.90318C1.72998 8.8709 1.74621 8.83861 1.74621 8.79024C1.90782 7.67741 2.29586 6.62895 2.86173 5.69353V5.67733C3.07193 5.32252 3.33062 4.98379 3.58931 4.66126C3.70253 4.83867 3.81564 5.01608 3.91272 5.19348L4.34925 6.06444C4.57558 6.51611 5.2708 6.35479 5.2708 5.85474V2.30636C5.2708 2.04829 5.0606 1.82251 4.78578 1.82251H1.22883C0.711452 1.82251 0.549744 2.51605 1.01863 2.74184L1.89169 3.17731C2.08566 3.27417 2.2636 3.37092 2.4252 3.49995C1.85933 4.16121 1.37431 4.88704 1.0024 5.67733V5.69353C0.808435 6.11281 0.630598 6.5322 0.485123 6.98387C0.46889 7.03224 0.452761 7.08062 0.436528 7.14508C0.388036 7.32249 0.339545 7.5 0.291053 7.67741C0.274924 7.72579 0.274924 7.77416 0.258691 7.80645C0.210199 8.01604 0.161708 8.24192 0.129345 8.45162C0.113216 8.49999 0.113216 8.56446 0.113216 8.61283C0.0808539 8.79024 0.0647246 8.95156 0.0484918 9.12897C0.0484918 9.19353 0.0323626 9.258 0.0323626 9.32257C0.0162332 9.54835 0 9.77414 0 9.99992C0 15.5161 4.49473 20 10.0242 20C11.2853 20 12.4979 19.758 13.6135 19.3386V17.6774V17.5C12.4979 18.0161 11.2691 18.3226 9.99186 18.3226Z"
+                fill="white"
+              />
+            </svg>
+            {submitting
+              ? t("checkout.actions.processing")
+              : t("checkout.actions.credoInstallments")}
+          </button>
         ) : (
           <Button
             onClick={() => void onSubmit()}
@@ -211,20 +231,10 @@ export function PaymentStep({
       {paymentMethod === "installments" && installmentProvider === "credo" ? (
         <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
           <p className="text-sm font-medium text-slate-900">
-            {t("checkout.installments.debugTitle")}
+            {t("checkout.installments.fallbackTitle")}
           </p>
-          <p className="mt-1 text-xs text-slate-600">{t("checkout.installments.debugHint")}</p>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <Button
-              type="submit"
-              form={credoFormId}
-              name="mode"
-              value="server-form"
-              variant="outline"
-              disabled={submitting || checkingStatus || !credoLaunchForm.ready}
-            >
-              {t("checkout.installments.serverForm")}
-            </Button>
+          <p className="mt-1 text-xs text-slate-600">{t("checkout.installments.fallbackHint")}</p>
+          <div className="mt-3">
             <Button
               type="submit"
               form={credoFormId}
@@ -233,43 +243,9 @@ export function PaymentStep({
               value="server-form-new-tab"
               variant="outline"
               disabled={submitting || checkingStatus || !credoLaunchForm.ready}
+              className="w-full sm:w-auto"
             >
-              {t("checkout.installments.serverNewTab")}
-            </Button>
-            <Button
-              type="submit"
-              form={credoFormId}
-              formTarget="credo_named_window"
-              name="mode"
-              value="server-form-window"
-              variant="outline"
-              disabled={submitting || checkingStatus || !credoLaunchForm.ready}
-            >
-              {t("checkout.installments.serverNamedWindow")}
-            </Button>
-            <Button
-              type="submit"
-              form={credoFormId}
-              formTarget="credo_popup"
-              name="mode"
-              value="server-form-popup"
-              variant="outline"
-              disabled={submitting || checkingStatus || !credoLaunchForm.ready}
-              onClick={(event) => {
-                if (!onOpenCredoPopupTarget()) {
-                  event.preventDefault();
-                }
-              }}
-            >
-              {t("checkout.installments.serverPopup")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={submitting || checkingStatus}
-              onClick={() => void onSubmit("direct-replace")}
-            >
-              {t("checkout.installments.directReplace")}
+              {t("checkout.installments.openInNewTab")}
             </Button>
           </div>
         </div>

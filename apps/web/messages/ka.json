@@ -610,7 +610,8 @@
       "back": "უკან",
       "placeOrder": "შეკვეთის გაფორმება",
       "processing": "მუშავდება...",
-      "goToInstallments": "გაგრძელება განვადებით"
+      "goToInstallments": "გაგრძელება განვადებით",
+      "credoInstallments": "განვადება"
     },
     "summary": {
       "title": "შეჯამება",
@@ -631,14 +632,9 @@
       "notFound": "ბანკში განაცხადი ჯერ არ ჩანს. ცოტა ხანში სცადეთ თავიდან.",
       "invalidRequest": "განვადების მოთხოვნის მონაცემები არასწორია. დაიწყეთ ახალი განაცხადი.",
       "missingCredoData": "ონლაინ განვადების დასაწყებად შეავსეთ სახელი, გვარი, ელ-ფოსტა, ტელეფონი და მისამართი.",
-      "popupBlocked": "ბრაუზერმა popup ან ახალი ჩანართი დაბლოკა. სცადეთ სხვა ღილაკი.",
-      "debugTitle": "Credo-ს გაშვების ტესტები",
-      "debugHint": "სცადეთ სხვადასხვა ღილაკი და ნახეთ, რომელი გზა მუშაობს უკეთ მობილურზე.",
-      "serverForm": "Native form submit",
-      "serverNewTab": "სერვერული redirect ახალ tab-ში",
-      "serverNamedWindow": "სახელიანი window submit",
-      "serverPopup": "სერვერული redirect popup-ში",
-      "directReplace": "პირდაპირი Credo redirect",
+      "fallbackTitle": "სარეზერვო ვარიანტი",
+      "fallbackHint": "თუ ბანკის გვერდი ამ ჩანართში არ გაიხსნა, სცადეთ ახალ ჩანართში გახსნა.",
+      "openInNewTab": "ახალ ჩანართში გახსნა",
       "syncFailed": "განვადების სტატუსის სინქრონიზაცია ვერ მოხერხდა. სცადეთ თავიდან.",
       "manual": {
         "invoiceGenerated": "Crystal-ის ინვოისი გაიხსნა. დაბეჭდეთ და მიიტანეთ ფილიალში.",

@@ -610,7 +610,8 @@
       "back": "Back",
       "placeOrder": "Place order",
       "processing": "Processing...",
-      "goToInstallments": "Continue with installments"
+      "goToInstallments": "Continue with installments",
+      "credoInstallments": "Installments"
     },
     "summary": {
       "title": "Order summary",
@@ -631,14 +632,9 @@
       "notFound": "No installment request was found at the bank yet. Please wait a bit and retry.",
       "invalidRequest": "Installment request details are invalid. Please start a new installment request.",
       "missingCredoData": "Please fill first name, last name, email, phone, and address before starting online installments.",
-      "popupBlocked": "Popup or new tab was blocked by the browser. Try another launch button.",
-      "debugTitle": "Credo launch tests",
-      "debugHint": "Use these alternative launch buttons to see which mobile navigation path works best.",
-      "serverForm": "Native form submit",
-      "serverNewTab": "Server redirect new tab",
-      "serverNamedWindow": "Named window submit",
-      "serverPopup": "Server redirect popup",
-      "directReplace": "Direct Credo redirect",
+      "fallbackTitle": "Fallback option",
+      "fallbackHint": "If the bank page does not open in this tab, try opening it in a new tab.",
+      "openInNewTab": "Open in new tab",
       "syncFailed": "Failed to sync installment status. Please try again.",
       "manual": {
         "invoiceGenerated": "Crystal invoice opened. Print it and continue in bank branch.",
