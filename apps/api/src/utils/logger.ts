@@ -1,6 +1,9 @@
 import { env } from "@repo/shared";
 
 export const logger = {
+  info: (...args: unknown[]) => {
+    console.log(...args);
+  },
   debug: (...args: unknown[]) => {
     if (env.NODE_ENV === "development") {
       console.log(...args);

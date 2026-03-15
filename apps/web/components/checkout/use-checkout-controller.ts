@@ -80,36 +80,22 @@ function normalizeCredoRedirectUrl(rawUrl: string): string {
   }
 }
 
-function navigateToInstallmentProvider(url: string) {
-  const targetUrl = normalizeCredoRedirectUrl(url);
-  if (!targetUrl) {
-    throw new Error("Installment redirect URL is missing");
+function normalizeCredoMobile(rawValue: string): string {
+  const digits = rawValue.replace(/\D/g, "");
+  // Convert +9955XXXXXXXX -> 5XXXXXXXX
+  if (digits.startsWith("995") && digits.length >= 12) {
+    return digits.slice(3);
   }
-
-  // iOS/WebView can be flaky with assign() in async flows; anchor-click is more reliable.
-  const anchor = document.createElement("a");
-  anchor.href = targetUrl;
-  anchor.target = "_self";
-  anchor.rel = "noopener";
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-
-  // Fallback in case synthetic click is ignored.
-  globalThis.window.location.assign(targetUrl);
-}
-
-function isMobileBrowser(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  return digits;
 }
 
 function hasRequiredCredoCustomerData(shippingForm: ShippingFormState): boolean {
+  const mobile = normalizeCredoMobile(shippingForm.phone);
   return Boolean(
     shippingForm.firstName.trim() &&
       shippingForm.lastName.trim() &&
       shippingForm.email.trim() &&
-      shippingForm.phone.trim() &&
+      mobile &&
       shippingForm.address.trim(),
   );
 }
@@ -385,8 +371,6 @@ export function useCheckoutController({
   const submitCheckout = useCallback(async () => {
     const cartId = readCartIdFromStorage(cartKey);
     if (!cartId) return;
-
-    let mobilePopup: Window | null = null;
     setSubmitting(true);
     try {
       if (paymentMethod === "installments") {
@@ -415,15 +399,12 @@ export function useCheckoutController({
         }
 
         const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
-        mobilePopup =
-          isMobileBrowser() && typeof globalThis.window !== "undefined"
-            ? globalThis.window.open("about:blank", "_blank", "noopener,noreferrer")
-            : null;
+        const normalizedMobile = normalizeCredoMobile(shippingForm.phone);
 
         const session = await startInstallmentCheckout(cartId, {
           installmentLength: 12,
           clientFullName: fullName || undefined,
-          mobile: shippingForm.phone.trim() || undefined,
+          mobile: normalizedMobile || undefined,
           email: shippingForm.email.trim() || undefined,
           factAddress: shippingForm.address.trim() || undefined,
         });
@@ -438,9 +419,6 @@ export function useCheckoutController({
           }
         })();
         if (!redirectHost.endsWith("credo.ge")) {
-          if (mobilePopup && !mobilePopup.closed) {
-            mobilePopup.close();
-          }
           throw new Error(`Unexpected installment redirect host: ${redirectHost || "unknown"}`);
         }
 
@@ -448,12 +426,7 @@ export function useCheckoutController({
         writeCartIdToStorage(cartId, cartKey);
         setPendingOrderCode(session.orderCode);
         setPendingRedirectUrl(normalizedRedirectUrl);
-        if (mobilePopup && !mobilePopup.closed) {
-          mobilePopup.location.replace(normalizedRedirectUrl);
-          return;
-        }
-
-        navigateToInstallmentProvider(normalizedRedirectUrl);
+        globalThis.window.location.replace(normalizedRedirectUrl);
         return;
       }
 
@@ -462,9 +435,6 @@ export function useCheckoutController({
       clearInstallmentState();
       setStep("confirmation");
     } catch (error) {
-      if (mobilePopup && !mobilePopup.closed) {
-        mobilePopup.close();
-      }
       const message = error instanceof Error ? error.message : t("checkout.errors.default");
       setErrorMessage(message);
     } finally {

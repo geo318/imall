@@ -745,9 +745,26 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         meta: credoMeta,
       });
 
-      logger.debug("[Cart Route] Created Credo installment session", {
+      logger.info("[Cart Route] Credo installment payload summary", {
+        cartId,
+        productsCount: credoProducts.length,
+        hasClientFullName: Boolean(payload.clientFullName?.trim()),
+        hasMobile: Boolean(payload.mobile?.trim()),
+        hasEmail: Boolean(payload.email?.trim()),
+        hasFactAddress: Boolean(payload.factAddress?.trim()),
+      });
+
+      logger.info("[Cart Route] Created Credo installment session", {
         cartId,
         orderCode: session.orderCode,
+        redirectUrl: session.redirectUrl,
+        redirectHost: (() => {
+          try {
+            return new URL(session.redirectUrl).hostname;
+          } catch {
+            return "invalid";
+          }
+        })(),
       });
 
       return {
@@ -860,7 +877,18 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         return { error: "Order code does not match this cart" };
       }
 
+      logger.info("[Cart Route] Syncing Credo installment status", {
+        cartId,
+        orderCode: payload.orderCode,
+      });
+
       const statusResult = await fetchCredoInstallmentStatus(payload.orderCode);
+      logger.info("[Cart Route] Credo installment status response", {
+        cartId,
+        orderCode: payload.orderCode,
+        statusId: statusResult.statusId,
+        statusName: statusResult.statusName,
+      });
       let checkoutCompleted = cart.status === "completed";
       let checkoutResult: CheckoutResult | null = null;
 

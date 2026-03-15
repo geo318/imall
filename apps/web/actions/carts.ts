@@ -314,6 +314,15 @@ export async function startInstallmentCheckout(
   cartId: string,
   payload: StartInstallmentCheckoutInput,
 ): Promise<StartInstallmentCheckoutResult> {
+  console.info("[carts.action] startInstallmentCheckout request", {
+    cartId,
+    hasClientFullName: Boolean(payload.clientFullName?.trim()),
+    hasMobile: Boolean(payload.mobile?.trim()),
+    hasEmail: Boolean(payload.email?.trim()),
+    hasFactAddress: Boolean(payload.factAddress?.trim()),
+    installmentLength: payload.installmentLength ?? null,
+  });
+
   const response = await backendRequest(`/carts/${cartId}/checkout/installments/start`, {
     method: "POST",
     body: payload,
@@ -331,7 +340,13 @@ export async function startInstallmentCheckout(
     throw new Error(errorMessage);
   }
 
-  return response.json();
+  const result = (await response.json()) as StartInstallmentCheckoutResult;
+  console.info("[carts.action] startInstallmentCheckout response", {
+    cartId,
+    orderCode: result.orderCode,
+    redirectUrl: result.redirectUrl,
+  });
+  return result;
 }
 
 export type InstallmentStatusResult = {
