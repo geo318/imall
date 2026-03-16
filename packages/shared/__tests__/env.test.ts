@@ -11,6 +11,8 @@ describe("env schemas", () => {
       NEXT_PUBLIC_DOMAIN: "http://localhost:3001",
       BACKEND_URL: "http://localhost:3001",
       CLERK_SECRET_KEY: "sk_test_mock_secret_key",
+      SUPERADMIN_EMAIL: "admin@example.com",
+      SUPERADMIN_PASSWORD: "super-secret",
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_mock_publishable_key",
     });
 
@@ -28,6 +30,8 @@ describe("env schemas", () => {
       DATABASE_URL: "postgres://user:pass@localhost:5432/db",
       NEXT_PUBLIC_DOMAIN: "http://localhost:3001",
       CLERK_SECRET_KEY: "sk_test_mock_secret_key",
+      SUPERADMIN_EMAIL: "admin@example.com",
+      SUPERADMIN_PASSWORD: "super-secret",
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_mock_publishable_key",
     });
 

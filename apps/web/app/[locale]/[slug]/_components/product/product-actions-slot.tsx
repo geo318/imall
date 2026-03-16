@@ -20,7 +20,7 @@ export function ProductActionsSlot({ product, selectedVariantId, productIdentifi
   const auction = selectedVariant?.auction ?? null;
   const shopSlug = product.tenantSlug ?? "demo-shop";
   const availableQty = selectedVariant?.availableQty;
-  const isSoldOut = availableQty !== undefined && availableQty <= 0;
+  const isSoldOut = selectedVariant?.trackInventory !== false && availableQty !== undefined && availableQty <= 0;
 
   if (!selectedVariant) {
     return null;

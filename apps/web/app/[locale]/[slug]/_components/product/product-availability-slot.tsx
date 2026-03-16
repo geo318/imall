@@ -22,7 +22,8 @@ export function ProductAvailabilitySlot({ product, selectedVariantId, productIde
   const selectedVariant = product.variants.find((v) => v.id === selectedVariantId);
   const auction = selectedVariant?.auction ?? null;
   const availableQty = selectedVariant?.availableQty;
-  const stockStatus = getStockStatus(availableQty);
+  const trackInventory = selectedVariant?.trackInventory;
+  const stockStatus = getStockStatus(availableQty, trackInventory);
 
   // Refetch for fresh stock data on demand
   const { refetch } = useQuery({
@@ -60,6 +61,13 @@ export function ProductAvailabilitySlot({ product, selectedVariantId, productIde
         });
         return;
       }
+      if (variant.trackInventory === false) {
+        toast.success(t("productAvailability.infoRetrieved"), {
+          id: "check-availability",
+          description: t("productAvailability.availableForPurchase"),
+        });
+        return;
+      }
       if (variant.availableQty === undefined) {
         toast.success(t("productAvailability.infoRetrieved"), {
           id: "check-availability",
@@ -92,6 +100,13 @@ export function ProductAvailabilitySlot({ product, selectedVariantId, productIde
       return (
         <Badge className="bg-red-100 text-red-800 border-red-200 text-sm">
           {t("productAvailability.outOfStock")}
+        </Badge>
+      );
+    }
+    if (trackInventory === false) {
+      return (
+        <Badge className="bg-emerald-100 text-emerald-900 border-emerald-200 text-sm">
+          {t("productAvailability.inStock")}
         </Badge>
       );
     }

@@ -5,6 +5,7 @@ export type CartItem = {
   id: string;
   qty: number;
   availableQty?: number;
+  trackInventory?: boolean;
   variantId?: string;
   tenantId?: string;
   productId: string;

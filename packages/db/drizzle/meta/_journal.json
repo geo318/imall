@@ -141,6 +141,27 @@
       "when": 1773083449745,
       "tag": "0019_flawless_squadron_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1773150000000,
+      "tag": "0022_credo_installment_workflow",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1773142338488,
+      "tag": "0021_condemned_supernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1773657600000,
+      "tag": "0023_variant_inventory_mode",
+      "breakpoints": true
     }
   ]
 }

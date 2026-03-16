@@ -3,7 +3,13 @@ import type { ReactNode } from "react";
 
 export type StockStatus = "sold" | "low" | "in_stock" | "unknown" | "out_of_stock";
 
-export function getStockStatus(availableQty: number | undefined): StockStatus {
+export function getStockStatus(
+  availableQty: number | undefined,
+  trackInventory: boolean | undefined,
+): StockStatus {
+  if (trackInventory === false) {
+    return "in_stock";
+  }
   if (availableQty === undefined) {
     return "unknown";
   }

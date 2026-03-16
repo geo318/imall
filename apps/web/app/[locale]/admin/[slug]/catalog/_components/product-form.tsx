@@ -186,7 +186,15 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       category: "",
       draft: false,
       isAuction: false,
-      variants: [{ price: "", currency: DEFAULT_CURRENCY_CODE, stock: "", optionPairs: [] }],
+      variants: [
+        {
+          price: "",
+          currency: DEFAULT_CURRENCY_CODE,
+          stock: "",
+          trackInventory: false,
+          optionPairs: [],
+        },
+      ],
     },
     mode: "onChange",
   });
@@ -352,9 +360,15 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
           return {
             ...variant,
             sku: variant.sku ?? undefined,
+            trackInventory: variant.trackInventory ?? typeof variant.availableQty === "number",
             price: variant.price ?? "",
             currency: variant.currency || DEFAULT_CURRENCY_CODE,
-            stock: typeof variant.availableQty === "number" ? String(variant.availableQty) : "",
+            stock:
+              variant.trackInventory === false
+                ? ""
+                : typeof variant.availableQty === "number"
+                  ? String(variant.availableQty)
+                  : "",
             auctionStartBid: auction?.startingBid ?? "",
             auctionMinIncrement: auction?.minIncrement ?? "",
             auctionBuyNow: auction?.buyNowPrice ?? "",
@@ -378,10 +392,16 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         description: productData?.description || "",
         slug: initialSlug || "",
         category: normalizedCategory || "",
-        draft: false,
+        draft: productData?.draft ?? false,
         isAuction: isAuctionValue,
         variants: normalizedVariants ?? [
-          { price: "", currency: DEFAULT_CURRENCY_CODE, stock: "", optionPairs: [] },
+          {
+            price: "",
+            currency: DEFAULT_CURRENCY_CODE,
+            stock: "",
+            trackInventory: false,
+            optionPairs: [],
+          },
         ],
       };
 
@@ -448,15 +468,34 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     const currentVariants = getValues("variants") ?? [];
     if (isAuction) {
       const [first] = currentVariants;
-      const normalized = first ?? { price: "", currency: DEFAULT_CURRENCY_CODE, stock: "", optionPairs: [] };
-      const nextVariant = { ...normalized, stock: "" };
+      const normalized =
+        first ?? {
+          price: "",
+          currency: DEFAULT_CURRENCY_CODE,
+          stock: "",
+          trackInventory: true,
+          optionPairs: [],
+        };
+      const nextVariant = { ...normalized, trackInventory: true, stock: "" };
       if (currentVariants.length !== 1 || normalized.stock) {
         setValue("variants", [nextVariant], { shouldValidate: true });
       }
     } else if (currentVariants.length === 0) {
-      setValue("variants", [{ price: "", currency: DEFAULT_CURRENCY_CODE, stock: "", optionPairs: [] }], {
-        shouldValidate: true,
-      });
+      setValue(
+        "variants",
+        [
+          {
+            price: "",
+            currency: DEFAULT_CURRENCY_CODE,
+            stock: "",
+            trackInventory: false,
+            optionPairs: [],
+          },
+        ],
+        {
+          shouldValidate: true,
+        },
+      );
     }
   }, [getValues, isAuction, setValue]);
 
@@ -469,7 +508,8 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       const normalizedVariants = (data.variants ?? []).map((variant) => ({
         ...variant,
         sku: variant.sku?.trim() ? variant.sku.trim() : undefined,
-        stock: data.isAuction ? undefined : variant.stock,
+        stock:
+          data.isAuction || variant.trackInventory === false ? undefined : variant.stock,
         optionPairs: (variant.optionPairs ?? [])
           .map((pair) => ({
             optionName: pair.optionName?.trim() ?? "",
@@ -492,11 +532,6 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         images: data.images,
       };
 
-      // Remove draft when updating
-      if (!isNewProduct) {
-        delete (payload as Partial<typeof payload>).draft;
-      }
-
       const url = productId
         ? `/api/admin/${shopSlug}/products/${productId}`
         : `/api/admin/${shopSlug}/products`;
@@ -509,13 +544,21 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to save product");
+        const error = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+        };
+        throw new Error(error.error || error.message || "Failed to save product");
       }
 
       return response.json();
     },
-    onSuccess: (saved: { slug?: string } | undefined) => {
+    onSuccess: (
+      saved: { slug?: string; draft?: boolean } | undefined,
+      variables: Partial<ProductFormData> & {
+        images: Array<{ id: string; url?: string; isPrimary: boolean }>;
+      },
+    ) => {
       queryClient.invalidateQueries({ queryKey: ["admin-products", shopSlug] });
       queryClient.invalidateQueries({ queryKey: ["tenant-variant-options", shopSlug] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -543,7 +586,14 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       ];
 
       void revalidateClient(revalidateTags, revalidatePaths);
-      toast.success(productId ? "Product updated successfully" : "Product created successfully");
+      const isDraftResult = saved?.draft ?? variables.draft ?? false;
+      toast.success(
+        isDraftResult
+          ? "Draft saved successfully"
+          : productId
+            ? "Product updated successfully"
+            : "Product created successfully",
+      );
       onSuccess();
     },
     onError: (error: Error) => {
@@ -609,6 +659,8 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     const formData = getValues();
     await onSubmit(formData as ProductFormData, true);
   };
+
+  const isDraftListing = Boolean(productData?.draft);
 
   if (isLoading) {
     return <div className="text-center py-8 text-slate-600">Loading product...</div>;
@@ -800,19 +852,28 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        {/* Only show "Save as draft" when creating a new product, not when editing */}
-        {isNewProduct && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleSaveAsDraft}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? "Saving..." : "Save as draft"}
-          </Button>
-        )}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleSaveAsDraft}
+          disabled={isSubmitting}
+        >
+          {isSubmitting
+            ? "Saving..."
+            : isNewProduct
+              ? "Save as draft"
+              : isDraftListing
+                ? "Update draft"
+                : "Move to draft"}
+        </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : productId ? "Update Product" : "Create Product"}
+          {isSubmitting
+            ? "Saving..."
+            : isNewProduct
+              ? "Create Product"
+              : isDraftListing
+                ? "Publish Product"
+                : "Update Product"}
         </Button>
       </div>
     </form>

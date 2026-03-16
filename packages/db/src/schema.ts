@@ -217,6 +217,7 @@ export const variants = pgTable(
       .references(() => products.id)
       .notNull(),
     sku: varchar("sku", { length: 128 }),
+    trackInventory: boolean("track_inventory").default(true).notNull(),
     price: numeric("price", { precision: 12, scale: 2 }).notNull(),
     currency: varchar("currency", { length: 8 }).default("USD").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -436,20 +437,40 @@ export const cartItems = pgTable(
 // Orders represent completed purchases. Each order may include many
 // order items. When an order is created from a cart or auction, the
 // inventory ledger is updated accordingly.
-export const orders = pgTable("orders", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  tenantId: uuid("tenant_id")
-    .references(() => tenants.id)
-    .notNull(),
-  userId: uuid("user_id").references(() => users.id),
-  status: varchar("status", { length: 32 }).default("pending"),
-  paymentMethod: varchar("payment_method", { length: 32 }).default("card").notNull(),
-  manualSale: boolean("manual_sale").default(false).notNull(),
-  manualSaleComment: text("manual_sale_comment"),
-  total: numeric("total", { precision: 12, scale: 2 }).notNull(),
-  currency: varchar("currency", { length: 8 }).default("USD").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    tenantId: uuid("tenant_id")
+      .references(() => tenants.id)
+      .notNull(),
+    userId: uuid("user_id").references(() => users.id),
+    status: varchar("status", { length: 32 }).default("pending"),
+    paymentMethod: varchar("payment_method", { length: 32 }).default("card").notNull(),
+    manualSale: boolean("manual_sale").default(false).notNull(),
+    manualSaleComment: text("manual_sale_comment"),
+    installmentOrderCode: varchar("installment_order_code", { length: 64 }),
+    installmentStatusId: integer("installment_status_id"),
+    installmentStatusName: varchar("installment_status_name", { length: 64 }),
+    installmentFlowStage: varchar("installment_flow_stage", { length: 32 }),
+    installmentVerificationCode: varchar("installment_verification_code", { length: 16 }),
+    installmentStockConfirmedAt: timestamp("installment_stock_confirmed_at"),
+    installmentDeliveredAt: timestamp("installment_delivered_at"),
+    total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 8 }).default("USD").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    installmentOrderCodeUniqueIdx: uniqueIndex("orders_installment_order_code_unique").on(
+      table.installmentOrderCode,
+    ),
+    tenantInstallmentStageIdx: index("orders_tenant_installment_stage_idx").on(
+      table.tenantId,
+      table.installmentFlowStage,
+      table.createdAt,
+    ),
+  }),
+);
 
 export const orderItems = pgTable("order_items", {
   id: uuid("id").defaultRandom().primaryKey(),

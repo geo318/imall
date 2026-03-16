@@ -77,6 +77,9 @@ export function CartContent() {
 
   const unavailableItems = useMemo(() => {
     return items.filter((item) => {
+      if (item.trackInventory === false) {
+        return false;
+      }
       const available = item.availableQty;
       // Item is unavailable if: sold out (available <= 0) or quantity exceeds available stock
       return (
@@ -88,6 +91,9 @@ export function CartContent() {
 
   const purchasableItems = useMemo(() => {
     return items.filter((item) => {
+      if (item.trackInventory === false) {
+        return true;
+      }
       const available = item.availableQty;
       // Item is purchasable if: available is undefined (unknown, allow) or available > 0 and >= qty
       return available === undefined || (available > 0 && available >= item.qty);
@@ -180,12 +186,13 @@ export function CartContent() {
         {items.map((item) =>
           (() => {
             const available = item.availableQty;
+            const tracksInventory = item.trackInventory !== false;
             // Treat undefined as "unknown" (not sold out), only 0 or negative means sold out
-            const isSoldOut = available !== undefined && available <= 0;
-            const isOver = available !== undefined && available < item.qty;
+            const isSoldOut = tracksInventory && available !== undefined && available <= 0;
+            const isOver = tracksInventory && available !== undefined && available < item.qty;
             const disablePlus =
               isSoldOut ||
-              (available !== undefined && item.qty >= available) ||
+              (tracksInventory && available !== undefined && item.qty >= available) ||
               updateQtyMutation.isPending;
             const disableMinus = isSoldOut || item.qty <= 1 || updateQtyMutation.isPending;
 

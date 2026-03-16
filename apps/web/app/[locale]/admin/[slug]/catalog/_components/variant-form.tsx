@@ -71,6 +71,7 @@ export function VariantForm({
         price: "",
         currency: DEFAULT_CURRENCY_CODE,
         isAuction: isAuction,
+        trackInventory: false,
         stock: "",
         auctionStartBid: "",
         auctionMinIncrement: "",
@@ -89,7 +90,11 @@ export function VariantForm({
   const updateVariant = (index: number, field: keyof Variant, value: string | boolean) => {
     const updated = [...variants];
     if (updated[index]) {
-      updated[index] = { ...updated[index], [field]: value };
+      const nextVariant = { ...updated[index], [field]: value };
+      if (field === "trackInventory" && value === false) {
+        nextVariant.stock = "";
+      }
+      updated[index] = nextVariant;
     }
     onVariantsChange(updated);
   };
@@ -490,36 +495,61 @@ export function VariantForm({
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="mt-4 space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor={`price-${index}`}>Price *</Label>
-                    <Input
-                      id={`price-${index}`}
-                      type="number"
-                      step="0.01"
-                      value={variant.price ?? ""}
-                      onChange={(e) => updateVariant(index, "price", e.target.value)}
-                      placeholder="0.00"
-                      required
-                    />
-                    {errors.price ? (
-                      <p className="text-xs text-destructive">{errors.price}</p>
-                    ) : null}
+                    <Label htmlFor={`stock-policy-${index}`}>Stock Policy</Label>
+                    <Select
+                      value={variant.trackInventory ? "limited" : "infinite"}
+                      onValueChange={(value) =>
+                        updateVariant(index, "trackInventory", value === "limited")
+                      }
+                    >
+                      <SelectTrigger id={`stock-policy-${index}`}>
+                        <SelectValue placeholder="Select stock policy" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="infinite">Infinite stock</SelectItem>
+                        <SelectItem value="limited">Limited stock</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Infinite stock is the default. Switch to limited stock only when you want the
+                      store to enforce quantity.
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={`stock-${index}`}>Stock Qty</Label>
-                    <Input
-                      id={`stock-${index}`}
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={variant.stock ?? ""}
-                      onChange={(e) => updateVariant(index, "stock", e.target.value)}
-                      placeholder="0"
-                    />
-                    {errors.stock ? (
-                      <p className="text-xs text-destructive">{errors.stock}</p>
-                    ) : null}
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor={`price-${index}`}>Price *</Label>
+                      <Input
+                        id={`price-${index}`}
+                        type="number"
+                        step="0.01"
+                        value={variant.price ?? ""}
+                        onChange={(e) => updateVariant(index, "price", e.target.value)}
+                        placeholder="0.00"
+                        required
+                      />
+                      {errors.price ? (
+                        <p className="text-xs text-destructive">{errors.price}</p>
+                      ) : null}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`stock-${index}`}>Stock Qty</Label>
+                      <Input
+                        id={`stock-${index}`}
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={variant.stock ?? ""}
+                        onChange={(e) => updateVariant(index, "stock", e.target.value)}
+                        placeholder={variant.trackInventory ? "0" : "Unlimited"}
+                        disabled={!variant.trackInventory}
+                      />
+                      {errors.stock ? (
+                        <p className="text-xs text-destructive">{errors.stock}</p>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               )}

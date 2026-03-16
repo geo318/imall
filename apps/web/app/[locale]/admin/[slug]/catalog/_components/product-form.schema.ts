@@ -74,7 +74,9 @@ const variantOptionPairSchema = z.object({
 
 // Variant schema
 export const variantSchema = z.object({
+  id: optionalString,
   sku: optionalString,
+  trackInventory: z.boolean().default(false),
   price: optionalNumberString,
   currency: z.string().default(DEFAULT_CURRENCY_CODE),
   isAuction: z.boolean().optional(),

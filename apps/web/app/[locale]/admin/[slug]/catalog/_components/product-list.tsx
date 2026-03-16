@@ -7,7 +7,7 @@ import { Input } from "@repo/ui/input";
 import { Modal, ModalBody, ModalHeader, ModalTitle } from "@repo/ui/modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, ExternalLink, Trash2 } from "lucide-react";
+import { Copy, Edit, ExternalLink, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import LazyImage from "@/components/shared/lazy-image";
@@ -135,6 +135,32 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
     },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      const response = await fetch(`/api/admin/${shopSlug}/products/${productId}/duplicate`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        const error = (await response.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+        };
+        throw new Error(
+          error.error || error.message || t("adminProductList.errors.duplicateFailed"),
+        );
+      }
+      return response.json() as Promise<{ id: string }>;
+    },
+    onSuccess: (duplicated) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-products", shopSlug] });
+      toast.success(t("adminProductList.toasts.duplicated"));
+      onEdit(duplicated.id);
+    },
+    onError: () => {
+      toast.error(t("adminProductList.toasts.duplicateFailed"));
+    },
+  });
+
   const getProductIdentifier = (product: ProductWithStats) => {
     const shortId = product.id.replaceAll("-", "").substring(0, 8);
     return `${product.slug}-${shortId}`;
@@ -144,7 +170,13 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
     if (hasAuction) {
       return <Badge variant="outline">{t("adminProductList.stock.auction")}</Badge>;
     }
+    if (product.variants.some((variant) => variant.trackInventory === false)) {
+      return (
+        <Badge className="bg-sky-100 text-sky-900">{t("adminProductList.stock.infinite")}</Badge>
+      );
+    }
     const trackedStocks = product.variants
+      .filter((variant) => variant.trackInventory !== false)
       .map((variant) => variant.availableQty)
       .filter((qty): qty is number => typeof qty === "number");
 
@@ -243,10 +275,16 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                 const currency = product.currency || primaryVariant?.currency || DEFAULT_CURRENCY_CODE;
                 const currencyLabel = currencySymbol(currency);
                 const trackedStocks = product.variants
+                  .filter((variant) => variant.trackInventory !== false)
                   .map((variant) => variant.availableQty)
                   .filter((qty): qty is number => typeof qty === "number");
+                const hasInfiniteStock = product.variants.some(
+                  (variant) => variant.trackInventory === false,
+                );
                 const totalStock =
-                  trackedStocks.length > 0
+                  hasInfiniteStock
+                    ? null
+                    : trackedStocks.length > 0
                     ? trackedStocks.reduce((sum, qty) => sum + qty, 0)
                     : undefined;
 
@@ -298,7 +336,11 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                         {renderStock(product, hasAuction)}
                         {!hasAuction && (
                           <span className="text-xs text-slate-500">
-                            {totalStock !== undefined ? totalStock : "--"}
+                            {hasInfiniteStock
+                              ? t("adminProductList.stock.infinite")
+                              : totalStock !== undefined
+                                ? totalStock
+                                : "--"}
                           </span>
                         )}
                       </button>
@@ -347,6 +389,18 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         </Link>
+                        {!product.deletedAt && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => duplicateMutation.mutate(product.id)}
+                            disabled={duplicateMutation.isPending}
+                            className="h-8 w-8 p-0"
+                            title={t("adminProductList.actions.duplicate")}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        )}
                         {!product.deletedAt && (
                           <Button
                             variant="ghost"
@@ -455,7 +509,10 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                         const priceLabel = Number.isFinite(priceValue)
                           ? formatCurrencyAmount(priceValue, variant.currency)
                           : "--";
-                        const stockQty = variant.availableQty ?? 0;
+                        const stockQty =
+                          variant.trackInventory === false
+                            ? t("adminProductList.stock.infinite")
+                            : (variant.availableQty ?? 0);
                         return (
                           <TableRow key={variant.id}>
                             <TableCell>

@@ -855,6 +855,7 @@
     },
     "stock": {
       "auction": "აუქციონი",
+      "infinite": "უსასრულო",
       "setStock": "მარაგის დაყენება",
       "out": "ამოწურული",
       "low": "დაბალი",
@@ -873,6 +874,7 @@
     "actions": {
       "edit": "რედაქტირება",
       "view": "ნახვა",
+      "duplicate": "დუბლირება",
       "delete": "წაშლა"
     },
     "pagination": {
@@ -889,11 +891,14 @@
     },
     "errors": {
       "fetchFailed": "პროდუქტების მიღება ვერ მოხერხდა",
-      "deleteFailed": "წაშლა ვერ მოხერხდა"
+      "deleteFailed": "წაშლა ვერ მოხერხდა",
+      "duplicateFailed": "დუბლირება ვერ მოხერხდა"
     },
     "toasts": {
       "deleted": "პროდუქტი წაიშალა",
-      "deleteFailed": "წაშლა ვერ მოხერხდა"
+      "deleteFailed": "წაშლა ვერ მოხერხდა",
+      "duplicated": "დრაფტის ასლი შეიქმნა",
+      "duplicateFailed": "დუბლირება ვერ მოხერხდა"
     }
   },
   "adminOrders": {

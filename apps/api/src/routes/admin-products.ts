@@ -6,6 +6,7 @@ import {
   db,
   inventoryLedger,
   inventorySnapshot,
+  orderItems,
   productOptionDefinitions,
   productStats,
   products,
@@ -30,9 +31,15 @@ import {
 } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { authPlugin, getTenantIdBySlug, isSuperadminRequest } from "../context";
+import {
+  authPlugin,
+  getTenantIdBySlug,
+  getVariantInventoryStatusMap,
+  isSuperadminRequest,
+} from "../context";
 import { getStorage } from "../storage";
 import { sanitizePersistedImageUrls } from "../utils/image-urls";
+import { resolveStockQty, resolveTrackInventory } from "../utils/admin-product-inventory";
 import { invalidateCachedResponsesByPrefixes } from "../utils/response-cache";
 import { ensureAuth, requireAuth, verifyTenantAccess } from "../utils/auth";
 
@@ -74,6 +81,13 @@ const optionalShortString = z.preprocess((value) => {
   return trimmed === "" ? undefined : trimmed;
 }, z.string().max(64).optional());
 
+const optionalUuidString = z.preprocess((value) => {
+  if (value === null || value === undefined) return undefined;
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}, z.string().uuid().optional());
+
 const optionalThumbnailString = z.preprocess((value) => {
   if (value === null || value === undefined) return undefined;
   if (typeof value !== "string") return value;
@@ -103,7 +117,9 @@ const productSchema = z
     isAuction: z.boolean().default(false),
     variants: z.array(
       z.object({
+        id: optionalUuidString,
         sku: z.string().optional(),
+        trackInventory: z.boolean().optional(),
         price: optionalNumberString,
         currency: z.string().default(DEFAULT_CURRENCY),
         isAuction: z.boolean().optional(),
@@ -171,6 +187,8 @@ type NormalizedOptionPair = {
   optionThumbnail?: string;
 };
 
+type DbTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 type PersistVariantOptionsInput = {
   tenantId: string;
   productId: string;
@@ -178,7 +196,7 @@ type PersistVariantOptionsInput = {
     variantId: string;
     optionPairs: NormalizedOptionPair[];
   }>;
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0];
+  tx: DbTx;
 };
 
 function invalidatePublicProductCaches(shopSlug: string) {
@@ -379,6 +397,45 @@ function determineSlug({
   return crypto.randomUUID().replace(/-/g, "").substring(0, 8);
 }
 
+async function determineDuplicateIdentity({
+  tx,
+  tenantId,
+  sourceSlug,
+  sourceTitle,
+}: {
+  tx: DbTx;
+  tenantId: string;
+  sourceSlug: string;
+  sourceTitle: string;
+}) {
+  const baseSlug = `${sourceSlug || slugify(sourceTitle) || "listing"}-copy`;
+  const baseTitle = `${sourceTitle} (Copy)`;
+
+  for (let suffix = 0; suffix < 100; suffix += 1) {
+    const slugCandidate = suffix === 0 ? baseSlug : `${baseSlug}-${suffix + 1}`;
+    const [existing] = await tx
+      .select({ id: products.id })
+      .from(products)
+      .where(
+        and(
+          eq(products.tenantId, tenantId),
+          eq(products.slug, slugCandidate),
+          isNull(products.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!existing) {
+      return {
+        slug: slugCandidate,
+        title: suffix === 0 ? baseTitle : `${baseTitle} ${suffix + 1}`,
+      };
+    }
+  }
+
+  throw new Error("Could not create a unique duplicate slug");
+}
+
 function resolveVariantPrice(variant: VariantInput, isAuction: boolean) {
   if (variant.price) {
     return variant.price;
@@ -387,20 +444,6 @@ function resolveVariantPrice(variant: VariantInput, isAuction: boolean) {
     return variant.auctionStartBid || variant.auctionBuyNow || "0";
   }
   return "0";
-}
-
-function resolveStockQty(variant: VariantInput, isAuction: boolean) {
-  if (isAuction) {
-    return 0;
-  }
-  if (!variant.stock) {
-    return 0;
-  }
-  const qty = Number(variant.stock);
-  if (!Number.isFinite(qty) || qty <= 0) {
-    return 0;
-  }
-  return Math.floor(qty);
 }
 
 const adminProductsQuerySchema = z.object({
@@ -509,6 +552,7 @@ export const adminProductsRoutes = new Elysia({
             id: variants.id,
             productId: variants.productId,
             sku: variants.sku,
+            trackInventory: variants.trackInventory,
             price: variants.price,
             currency: variants.currency,
           })
@@ -518,17 +562,10 @@ export const adminProductsRoutes = new Elysia({
       ]);
 
       const variantIds = variantRows.map((variant) => variant.id);
-      const [inventoryRows, auctionRows] = await Promise.all([
+      const [inventoryMap, auctionRows] = await Promise.all([
         variantIds.length > 0
-          ? db
-              .select({
-                variantId: inventoryLedger.variantId,
-                available: sum(inventoryLedger.delta),
-              })
-              .from(inventoryLedger)
-              .where(inArray(inventoryLedger.variantId, variantIds))
-              .groupBy(inventoryLedger.variantId)
-          : Promise.resolve([]),
+          ? getVariantInventoryStatusMap(tenantId, variantIds)
+          : Promise.resolve(new Map()),
         variantIds.length > 0
           ? db
               .select({
@@ -541,10 +578,6 @@ export const adminProductsRoutes = new Elysia({
               .where(inArray(auctions.variantId, variantIds))
           : Promise.resolve([]),
       ]);
-
-      const inventoryMap = new Map(
-        inventoryRows.map((row) => [row.variantId, Number(row.available ?? 0)]),
-      );
       const auctionMap = new Map(auctionRows.map((row) => [row.variantId, row]));
       const statsMap = new Map(statsRows.map((row) => [row.productId, row]));
       const variantsByProductId = new Map<string, typeof variantRows>();
@@ -558,10 +591,11 @@ export const adminProductsRoutes = new Elysia({
       const productsWithDetails = productRows.map((product) => {
         const productVariants = (variantsByProductId.get(product.id) ?? []).map((variant) => ({
           ...variant,
-          availableQty: inventoryMap.has(variant.id)
-            ? (inventoryMap.get(variant.id) ?? 0)
+          availableQty: inventoryMap.get(variant.id)?.trackInventory
+            ? (inventoryMap.get(variant.id)?.available ?? 0)
             : undefined,
         }));
+        const hasInfiniteStock = productVariants.some((variant) => variant.trackInventory === false);
         const stockTotal = productVariants.reduce((sumQty, variant) => {
           return sumQty + (variant.availableQty ?? 0);
         }, 0);
@@ -617,6 +651,7 @@ export const adminProductsRoutes = new Elysia({
           priceMin: priceMinValue,
           currency,
           stockTotal,
+          hasInfiniteStock,
           images,
           stats: {
             viewsTotal: stats.viewsTotal || 0,
@@ -643,7 +678,9 @@ export const adminProductsRoutes = new Elysia({
           return direction * ((a.priceMin ?? 0) - (b.priceMin ?? 0));
         }
         if (sort === "stock") {
-          return direction * ((a.stockTotal ?? 0) - (b.stockTotal ?? 0));
+          const aStock = a.hasInfiniteStock ? Number.MAX_SAFE_INTEGER : (a.stockTotal ?? 0);
+          const bStock = b.hasInfiniteStock ? Number.MAX_SAFE_INTEGER : (b.stockTotal ?? 0);
+          return direction * (aStock - bStock);
         }
         const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -742,6 +779,7 @@ export const adminProductsRoutes = new Elysia({
         .select({
           id: variants.id,
           sku: variants.sku,
+          trackInventory: variants.trackInventory,
           price: variants.price,
           currency: variants.currency,
         })
@@ -750,7 +788,7 @@ export const adminProductsRoutes = new Elysia({
 
       // Get auctions for variants
       const variantIds = productVariants.map((v) => v.id);
-      const [optionDefinitionRows, variantOptionRows, inventoryRows, variantAuctions] =
+      const [optionDefinitionRows, variantOptionRows, inventoryMap, variantAuctions] =
         await Promise.all([
           db
             .select({
@@ -789,15 +827,8 @@ export const adminProductsRoutes = new Elysia({
                 .orderBy(asc(productOptionDefinitions.sortOrder))
             : Promise.resolve([]),
           variantIds.length > 0
-            ? db
-                .select({
-                  variantId: inventoryLedger.variantId,
-                  available: sum(inventoryLedger.delta),
-                })
-                .from(inventoryLedger)
-                .where(inArray(inventoryLedger.variantId, variantIds))
-                .groupBy(inventoryLedger.variantId)
-            : Promise.resolve([]),
+            ? getVariantInventoryStatusMap(tenantId, variantIds)
+            : Promise.resolve(new Map()),
           variantIds.length > 0
             ? db
                 .select()
@@ -807,10 +838,6 @@ export const adminProductsRoutes = new Elysia({
                 )
             : Promise.resolve([]),
         ]);
-      const inventoryMap = new Map(
-        inventoryRows.map((row) => [row.variantId, Number(row.available ?? 0)]),
-      );
-
       const optionDefinitions = optionDefinitionRows.map((row) => ({
         optionKey: row.optionKey,
         optionName: row.optionName,
@@ -853,7 +880,9 @@ export const adminProductsRoutes = new Elysia({
           const auction = variantAuctions.find((a) => a.variantId === v.id);
           return {
             ...v,
-            availableQty: inventoryMap.has(v.id) ? (inventoryMap.get(v.id) ?? 0) : undefined,
+            availableQty: inventoryMap.get(v.id)?.trackInventory
+              ? (inventoryMap.get(v.id)?.available ?? 0)
+              : undefined,
             optionPairs: optionPairsByVariant.get(v.id) ?? [],
             auction: auction || null,
           };
@@ -1006,6 +1035,7 @@ export const adminProductsRoutes = new Elysia({
         // Create variants and auctions
         for (const variantData of validated.variants) {
           const resolvedPrice = resolveVariantPrice(variantData, validated.isAuction);
+          const trackInventory = resolveTrackInventory(variantData, validated.isAuction);
           const normalizedOptionPairs = normalizeOptionPairs(variantData.optionPairs);
           const [variant] = await tx
             .insert(variants)
@@ -1013,6 +1043,7 @@ export const adminProductsRoutes = new Elysia({
               tenantId,
               productId: product.id,
               sku: variantData.sku || null,
+              trackInventory,
               price: resolvedPrice,
               currency: variantData.currency || DEFAULT_CURRENCY,
             })
@@ -1027,7 +1058,7 @@ export const adminProductsRoutes = new Elysia({
             optionPairs: normalizedOptionPairs,
           });
 
-          const stockQty = resolveStockQty(variantData, validated.isAuction);
+          const stockQty = resolveStockQty(variantData, validated.isAuction, trackInventory);
           if (stockQty > 0) {
             await tx.insert(inventoryLedger).values({
               id: crypto.randomUUID(),
@@ -1076,7 +1107,7 @@ export const adminProductsRoutes = new Elysia({
           sold: 0,
         });
 
-        const created = { id: product.id, slug: product.slug };
+        const created = { id: product.id, slug: product.slug, draft: product.draft };
         invalidatePublicProductCaches(shopSlug);
         return created;
       });
@@ -1178,7 +1209,7 @@ export const adminProductsRoutes = new Elysia({
         }
 
         const [existingProduct] = await tx
-          .select({ slug: products.slug })
+          .select({ slug: products.slug, draft: products.draft })
           .from(products)
           .where(
             and(
@@ -1220,6 +1251,7 @@ export const adminProductsRoutes = new Elysia({
         }
 
         const sanitizedImageUrls = sanitizePersistedImageUrls(imageUrls);
+        const nextDraft = validated.draft ?? existingProduct.draft;
 
         // Update product (only if not soft-deleted)
         await tx
@@ -1230,7 +1262,7 @@ export const adminProductsRoutes = new Elysia({
             category: validated.category,
             slug: slugToStore,
             imageUrls: sanitizedImageUrls.length > 0 ? sanitizedImageUrls.join("\n") : null,
-            draft: validated.draft ?? false,
+            draft: nextDraft,
           })
           .where(
             and(
@@ -1242,103 +1274,235 @@ export const adminProductsRoutes = new Elysia({
 
         // Get existing variant IDs before deletion
         const existingVariants = await tx
-          .select({ id: variants.id })
+          .select({ id: variants.id, trackInventory: variants.trackInventory })
           .from(variants)
           .where(eq(variants.productId, productId));
 
         const existingVariantIds = existingVariants.map((v) => v.id);
+        const existingVariantMap = new Map(existingVariants.map((variant) => [variant.id, variant]));
 
-        // Delete related records first (due to foreign key constraints)
-        if (existingVariantIds.length > 0) {
-          // Get auction IDs before deleting them
-          const existingAuctions = await tx
-            .select({ id: auctions.id })
-            .from(auctions)
-            .where(inArray(auctions.variantId, existingVariantIds));
+        const [existingAuctionRows, currentInventoryRows, variantsWithOrderHistory] =
+          existingVariantIds.length > 0
+            ? await Promise.all([
+                tx
+                  .select({ id: auctions.id, variantId: auctions.variantId })
+                  .from(auctions)
+                  .where(inArray(auctions.variantId, existingVariantIds)),
+                tx
+                  .select({
+                    variantId: inventoryLedger.variantId,
+                    available: sum(inventoryLedger.delta),
+                  })
+                  .from(inventoryLedger)
+                  .where(inArray(inventoryLedger.variantId, existingVariantIds))
+                  .groupBy(inventoryLedger.variantId),
+                tx
+                  .select({ variantId: orderItems.variantId })
+                  .from(orderItems)
+                  .where(inArray(orderItems.variantId, existingVariantIds))
+                  .groupBy(orderItems.variantId),
+              ])
+            : [[], [], []];
 
-          const existingAuctionIds = existingAuctions.map((a) => a.id);
-
-          // Delete bids first (they reference auctions)
-          if (existingAuctionIds.length > 0) {
-            await tx.delete(bids).where(inArray(bids.auctionId, existingAuctionIds));
-          }
-
-          // Delete auctions
-          await tx.delete(auctions).where(inArray(auctions.variantId, existingVariantIds));
-
-          // Delete inventory records
-          await tx
-            .delete(inventoryLedger)
-            .where(inArray(inventoryLedger.variantId, existingVariantIds));
-          await tx
-            .delete(inventorySnapshot)
-            .where(inArray(inventorySnapshot.variantId, existingVariantIds));
-
-          // Delete cart items (users will lose items in cart, but that's acceptable for admin updates)
-          await tx.delete(cartItems).where(inArray(cartItems.variantId, existingVariantIds));
-
-          // Note: We don't delete orderItems as they represent historical orders
-          // If you need to delete variants that have orders, you'll need a different strategy
-        }
-
-        // Now delete variants
-        await tx.delete(variants).where(eq(variants.productId, productId));
+        const hasExistingAuctions = existingAuctionRows.length > 0;
+        const inventoryByVariantId = new Map(
+          currentInventoryRows.map((row) => [row.variantId, Number(row.available ?? 0)]),
+        );
+        const protectedVariantIds = new Set(
+          variantsWithOrderHistory.map((row) => row.variantId),
+        );
 
         const variantOptionPayloads: Array<{
           variantId: string;
           optionPairs: NormalizedOptionPair[];
         }> = [];
 
-        for (const variantData of validated.variants) {
-          const resolvedPrice = resolveVariantPrice(variantData, validated.isAuction);
-          const normalizedOptionPairs = normalizeOptionPairs(variantData.optionPairs);
-          const [variant] = await tx
-            .insert(variants)
-            .values({
-              tenantId,
-              productId,
-              sku: variantData.sku || null,
-              price: resolvedPrice,
-              currency: variantData.currency || DEFAULT_CURRENCY,
-            })
-            .returning();
+        if (!validated.isAuction && !hasExistingAuctions) {
+          const retainedVariantIds = new Set<string>();
 
-          if (!variant) {
-            throw new Error("Failed to create variant");
-          }
+          for (const variantData of validated.variants) {
+            const resolvedPrice = resolveVariantPrice(variantData, validated.isAuction);
+            const normalizedOptionPairs = normalizeOptionPairs(variantData.optionPairs);
+            const trackInventory = resolveTrackInventory(variantData, validated.isAuction);
+            const desiredStockQty = resolveStockQty(
+              variantData,
+              validated.isAuction,
+              trackInventory,
+            );
 
-          variantOptionPayloads.push({
-            variantId: variant.id,
-            optionPairs: normalizedOptionPairs,
-          });
+            let variantId = variantData.id;
+            if (variantId && existingVariantMap.has(variantId)) {
+              retainedVariantIds.add(variantId);
 
-          const stockQty = resolveStockQty(variantData, validated.isAuction);
-          if (stockQty > 0) {
-            await tx.insert(inventoryLedger).values({
-              id: crypto.randomUUID(),
-              tenantId,
-              variantId: variant.id,
-              delta: stockQty,
-              reason: INVENTORY_REASONS.INIT,
-              refType: "initial",
+              await tx
+                .update(variants)
+                .set({
+                  sku: variantData.sku || null,
+                  trackInventory,
+                  price: resolvedPrice,
+                  currency: variantData.currency || DEFAULT_CURRENCY,
+                })
+                .where(and(eq(variants.id, variantId), eq(variants.productId, productId)));
+
+              const currentAvailable = inventoryByVariantId.get(variantId) ?? 0;
+              const inventoryDelta = trackInventory
+                ? desiredStockQty - currentAvailable
+                : -currentAvailable;
+              if (inventoryDelta !== 0) {
+                await tx.insert(inventoryLedger).values({
+                  id: crypto.randomUUID(),
+                  tenantId,
+                  variantId,
+                  delta: inventoryDelta,
+                  reason: INVENTORY_REASONS.ADJUSTMENT,
+                  refType: "admin_update",
+                  refId: productId,
+                });
+              }
+            } else {
+              const [variant] = await tx
+                .insert(variants)
+                .values({
+                  tenantId,
+                  productId,
+                  sku: variantData.sku || null,
+                  trackInventory,
+                  price: resolvedPrice,
+                  currency: variantData.currency || DEFAULT_CURRENCY,
+                })
+                .returning();
+
+              if (!variant) {
+                throw new Error("Failed to create variant");
+              }
+
+              variantId = variant.id;
+              retainedVariantIds.add(variant.id);
+
+              if (desiredStockQty > 0) {
+                await tx.insert(inventoryLedger).values({
+                  id: crypto.randomUUID(),
+                  tenantId,
+                  variantId: variant.id,
+                  delta: desiredStockQty,
+                  reason: INVENTORY_REASONS.INIT,
+                  refType: "initial",
+                });
+              }
+            }
+
+            if (!variantId) {
+              throw new Error("Failed to resolve variant");
+            }
+
+            variantOptionPayloads.push({
+              variantId,
+              optionPairs: normalizedOptionPairs,
             });
           }
 
-          if (validated.isAuction && variantData.auctionStartBid) {
-            await tx.insert(auctions).values({
-              tenantId,
+          const removedVariantIds = existingVariantIds.filter((id) => !retainedVariantIds.has(id));
+          if (removedVariantIds.length > 0) {
+            const blockedVariantIds = removedVariantIds.filter((id) => protectedVariantIds.has(id));
+            if (blockedVariantIds.length > 0) {
+              throw new Error(
+                "Cannot remove variants that already have order history. Duplicate the listing instead.",
+              );
+            }
+
+            const removedAuctions = await tx
+              .select({ id: auctions.id })
+              .from(auctions)
+              .where(inArray(auctions.variantId, removedVariantIds));
+            const removedAuctionIds = removedAuctions.map((auction) => auction.id);
+
+            if (removedAuctionIds.length > 0) {
+              await tx.delete(bids).where(inArray(bids.auctionId, removedAuctionIds));
+            }
+
+            await tx.delete(auctions).where(inArray(auctions.variantId, removedVariantIds));
+            await tx
+              .delete(inventoryLedger)
+              .where(inArray(inventoryLedger.variantId, removedVariantIds));
+            await tx
+              .delete(inventorySnapshot)
+              .where(inArray(inventorySnapshot.variantId, removedVariantIds));
+            await tx.delete(cartItems).where(inArray(cartItems.variantId, removedVariantIds));
+            await tx.delete(variants).where(inArray(variants.id, removedVariantIds));
+          }
+        } else {
+          // Auction edits still use full recreation until a safer auction-specific edit flow exists.
+          if (existingVariantIds.length > 0) {
+            const existingAuctionIds = existingAuctionRows.map((auction) => auction.id);
+            if (existingAuctionIds.length > 0) {
+              await tx.delete(bids).where(inArray(bids.auctionId, existingAuctionIds));
+            }
+
+            await tx.delete(auctions).where(inArray(auctions.variantId, existingVariantIds));
+            await tx
+              .delete(inventoryLedger)
+              .where(inArray(inventoryLedger.variantId, existingVariantIds));
+            await tx
+              .delete(inventorySnapshot)
+              .where(inArray(inventorySnapshot.variantId, existingVariantIds));
+            await tx.delete(cartItems).where(inArray(cartItems.variantId, existingVariantIds));
+          }
+
+          await tx.delete(variants).where(eq(variants.productId, productId));
+
+          for (const variantData of validated.variants) {
+            const resolvedPrice = resolveVariantPrice(variantData, validated.isAuction);
+            const normalizedOptionPairs = normalizeOptionPairs(variantData.optionPairs);
+            const trackInventory = resolveTrackInventory(variantData, validated.isAuction);
+            const [variant] = await tx
+              .insert(variants)
+              .values({
+                tenantId,
+                productId,
+                sku: variantData.sku || null,
+                trackInventory,
+                price: resolvedPrice,
+                currency: variantData.currency || DEFAULT_CURRENCY,
+              })
+              .returning();
+
+            if (!variant) {
+              throw new Error("Failed to create variant");
+            }
+
+            variantOptionPayloads.push({
               variantId: variant.id,
-              status: "scheduled",
-              startsAt: variantData.auctionStartsAt
-                ? new Date(variantData.auctionStartsAt)
-                : new Date(),
-              endsAt: variantData.auctionEndsAt
-                ? new Date(variantData.auctionEndsAt)
-                : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-              startingBid: variantData.auctionStartBid,
-              minIncrement: variantData.auctionMinIncrement || "1.00",
-              buyNowPrice: variantData.auctionBuyNow || null,
+              optionPairs: normalizedOptionPairs,
             });
+
+            const stockQty = resolveStockQty(variantData, validated.isAuction, trackInventory);
+            if (stockQty > 0) {
+              await tx.insert(inventoryLedger).values({
+                id: crypto.randomUUID(),
+                tenantId,
+                variantId: variant.id,
+                delta: stockQty,
+                reason: INVENTORY_REASONS.INIT,
+                refType: "initial",
+              });
+            }
+
+            if (validated.isAuction && variantData.auctionStartBid) {
+              await tx.insert(auctions).values({
+                tenantId,
+                variantId: variant.id,
+                status: "scheduled",
+                startsAt: variantData.auctionStartsAt
+                  ? new Date(variantData.auctionStartsAt)
+                  : new Date(),
+                endsAt: variantData.auctionEndsAt
+                  ? new Date(variantData.auctionEndsAt)
+                  : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                startingBid: variantData.auctionStartBid,
+                minIncrement: variantData.auctionMinIncrement || "1.00",
+                buyNowPrice: variantData.auctionBuyNow || null,
+              });
+            }
           }
         }
 
@@ -1350,7 +1514,7 @@ export const adminProductsRoutes = new Elysia({
         });
 
         invalidatePublicProductCaches(shopSlug);
-        return { id: productId };
+        return { id: productId, slug: slugToStore, draft: nextDraft };
       });
     } catch (error) {
       if (error instanceof Response) return error;
@@ -1364,6 +1528,252 @@ export const adminProductsRoutes = new Elysia({
           headers: { "Content-Type": "application/json" },
         });
       }
+      return new Response(
+        JSON.stringify({
+          error: error instanceof Error ? error.message : "Internal server error",
+        }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
+  })
+  .post("/:productId/duplicate", async ({ params, auth, request }) => {
+    try {
+      const { shopSlug, productId } = params as {
+        shopSlug: string;
+        productId: string;
+      };
+      const tenantId = await getTenantIdBySlug(shopSlug);
+      const superadmin = isSuperadminRequest(request);
+      if (!superadmin) {
+        const effectiveAuth = await ensureAuth(auth, request);
+        requireAuth(effectiveAuth);
+        if (!effectiveAuth?.userId) {
+          return Response.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const hasAccess = await verifyTenantAccess(effectiveAuth.userId, tenantId);
+        if (!hasAccess) {
+          return Response.json(
+            { error: "Forbidden: You don't have access to this shop" },
+            {
+              status: 403,
+            },
+          );
+        }
+      }
+
+      const capabilities = await getTenantCapabilities(tenantId);
+      if (!capabilities.canSell) {
+        return Response.json(
+          { error: "Selling is disabled for this shop" },
+          {
+            status: 403,
+          },
+        );
+      }
+
+      return await db.transaction(async (tx) => {
+        const [sourceProduct] = await tx
+          .select({
+            id: products.id,
+            slug: products.slug,
+            title: products.title,
+            description: products.description,
+            category: products.category,
+            imageUrls: products.imageUrls,
+          })
+          .from(products)
+          .where(
+            and(
+              eq(products.id, productId),
+              eq(products.tenantId, tenantId),
+              isNull(products.deletedAt),
+            ),
+          )
+          .limit(1);
+
+        if (!sourceProduct) {
+          throw new Error("Product not found");
+        }
+
+        const [sourceVariants, duplicateIdentity] = await Promise.all([
+          tx
+            .select({
+              id: variants.id,
+              sku: variants.sku,
+              trackInventory: variants.trackInventory,
+              price: variants.price,
+              currency: variants.currency,
+            })
+            .from(variants)
+            .where(eq(variants.productId, sourceProduct.id)),
+          determineDuplicateIdentity({
+            tx,
+            tenantId,
+            sourceSlug: sourceProduct.slug,
+            sourceTitle: sourceProduct.title,
+          }),
+        ]);
+
+        const sourceVariantIds = sourceVariants.map((variant) => variant.id);
+        const [inventoryRows, optionRows, auctionRows] = await Promise.all([
+          sourceVariantIds.length > 0
+            ? tx
+                .select({
+                  variantId: inventoryLedger.variantId,
+                  available: sum(inventoryLedger.delta),
+                })
+                .from(inventoryLedger)
+                .where(inArray(inventoryLedger.variantId, sourceVariantIds))
+                .groupBy(inventoryLedger.variantId)
+            : Promise.resolve([]),
+          sourceVariantIds.length > 0
+            ? tx
+                .select({
+                  variantId: variantOptionValues.variantId,
+                  optionKey: tenantVariantOptions.optionKey,
+                  optionName: tenantVariantOptions.name,
+                  optionValue: variantOptionValues.value,
+                  valueKey: variantOptionValues.valueKey,
+                  optionThumbnail: variantOptionValues.thumbnailUrl,
+                  sortOrder: productOptionDefinitions.sortOrder,
+                })
+                .from(variantOptionValues)
+                .innerJoin(
+                  productOptionDefinitions,
+                  eq(variantOptionValues.productOptionId, productOptionDefinitions.id),
+                )
+                .innerJoin(
+                  tenantVariantOptions,
+                  eq(productOptionDefinitions.tenantOptionId, tenantVariantOptions.id),
+                )
+                .where(inArray(variantOptionValues.variantId, sourceVariantIds))
+                .orderBy(asc(productOptionDefinitions.sortOrder))
+            : Promise.resolve([]),
+          sourceVariantIds.length > 0
+            ? tx.select().from(auctions).where(inArray(auctions.variantId, sourceVariantIds))
+            : Promise.resolve([]),
+        ]);
+
+        const inventoryByVariantId = new Map(
+          inventoryRows.map((row) => [row.variantId, Number(row.available ?? 0)]),
+        );
+        const optionPairsByVariantId = new Map<string, NormalizedOptionPair[]>();
+        for (const row of optionRows) {
+          const existing = optionPairsByVariantId.get(row.variantId) ?? [];
+          existing.push({
+            optionKey: row.optionKey,
+            optionName: row.optionName,
+            optionValue: row.optionValue,
+            valueKey: row.valueKey,
+            optionThumbnail: row.optionThumbnail ?? undefined,
+          });
+          optionPairsByVariantId.set(row.variantId, existing);
+        }
+        const auctionByVariantId = new Map(auctionRows.map((auction) => [auction.variantId, auction]));
+
+        const [duplicatedProduct] = await tx
+          .insert(products)
+          .values({
+            tenantId,
+            slug: duplicateIdentity.slug,
+            title: duplicateIdentity.title,
+            description: sourceProduct.description,
+            category: sourceProduct.category,
+            imageUrls: sourceProduct.imageUrls,
+            status: "active",
+            draft: true,
+          })
+          .returning({
+            id: products.id,
+            slug: products.slug,
+            draft: products.draft,
+          });
+
+        if (!duplicatedProduct) {
+          throw new Error("Failed to duplicate product");
+        }
+
+        const variantOptionPayloads: Array<{
+          variantId: string;
+          optionPairs: NormalizedOptionPair[];
+        }> = [];
+
+        for (const sourceVariant of sourceVariants) {
+          const [duplicatedVariant] = await tx
+            .insert(variants)
+            .values({
+              tenantId,
+              productId: duplicatedProduct.id,
+              sku: sourceVariant.sku,
+              trackInventory: sourceVariant.trackInventory,
+              price: sourceVariant.price,
+              currency: sourceVariant.currency || DEFAULT_CURRENCY,
+            })
+            .returning({ id: variants.id });
+
+          if (!duplicatedVariant) {
+            throw new Error("Failed to duplicate variant");
+          }
+
+          const available = inventoryByVariantId.get(sourceVariant.id) ?? 0;
+          if (sourceVariant.trackInventory && available > 0) {
+            await tx.insert(inventoryLedger).values({
+              id: crypto.randomUUID(),
+              tenantId,
+              variantId: duplicatedVariant.id,
+              delta: available,
+              reason: INVENTORY_REASONS.INIT,
+              refType: "duplicate",
+              refId: duplicatedProduct.id,
+            });
+          }
+
+          const auction = auctionByVariantId.get(sourceVariant.id);
+          if (auction) {
+            await tx.insert(auctions).values({
+              tenantId,
+              variantId: duplicatedVariant.id,
+              status: "scheduled",
+              startsAt: auction.startsAt,
+              endsAt: auction.endsAt,
+              startingBid: auction.startingBid,
+              minIncrement: auction.minIncrement,
+              buyNowPrice: auction.buyNowPrice,
+              currentPrice: null,
+              highestBidId: null,
+              highestBidderId: null,
+            });
+          }
+
+          variantOptionPayloads.push({
+            variantId: duplicatedVariant.id,
+            optionPairs: optionPairsByVariantId.get(sourceVariant.id) ?? [],
+          });
+        }
+
+        await persistVariantOptionsForProduct({
+          tx,
+          tenantId,
+          productId: duplicatedProduct.id,
+          variantOptionPayloads,
+        });
+
+        await tx.insert(productStats).values({
+          productId: duplicatedProduct.id,
+          tenantId,
+          viewsTotal: 0,
+          viewsUnique: 0,
+          addedToCart: 0,
+          loved: 0,
+          sold: 0,
+        });
+
+        invalidatePublicProductCaches(shopSlug);
+        return duplicatedProduct;
+      });
+    } catch (error) {
+      if (error instanceof Response) return error;
+      console.error("[Admin Products] Error duplicating product:", error);
       return new Response(
         JSON.stringify({
           error: error instanceof Error ? error.message : "Internal server error",

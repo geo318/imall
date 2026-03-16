@@ -1,4 +1,4 @@
-import { db, inventoryLedger, tenants } from "@repo/db";
+import { db, inventoryLedger, tenants, variants } from "@repo/db";
 import { INVENTORY_REASONS, env as sharedEnv } from "@repo/shared";
 import { and, eq, inArray, sum } from "drizzle-orm";
 import { Elysia } from "elysia";
@@ -191,32 +191,73 @@ export async function getTenantBySlug(slug: string): Promise<{
 }
 
 export async function getAvailableStock(tenantId: string, variantId: string) {
-  const [row] = await db
-    .select({ onHand: sum(inventoryLedger.delta) })
-    .from(inventoryLedger)
-    .where(and(eq(inventoryLedger.tenantId, tenantId), eq(inventoryLedger.variantId, variantId)));
-  // PostgreSQL sum() returns null when no rows exist, convert to 0
-  const stock = row?.onHand ? Number(row.onHand) : 0;
-  return stock;
+  const inventory = await getVariantInventoryStatus(tenantId, variantId);
+  if (!inventory) {
+    return 0;
+  }
+  if (!inventory.trackInventory) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return inventory.available;
+}
+
+export type VariantInventoryStatus = {
+  trackInventory: boolean;
+  available: number;
+};
+
+export async function getVariantInventoryStatus(
+  tenantId: string,
+  variantId: string,
+): Promise<VariantInventoryStatus | null> {
+  const map = await getVariantInventoryStatusMap(tenantId, [variantId]);
+  return map.get(variantId) ?? null;
+}
+
+export async function getVariantInventoryStatusMap(tenantId: string, variantIds: string[]) {
+  const map = new Map<string, VariantInventoryStatus>();
+  if (variantIds.length === 0) {
+    return map;
+  }
+
+  const [variantRows, stockRows] = await Promise.all([
+    db
+      .select({ id: variants.id, trackInventory: variants.trackInventory })
+      .from(variants)
+      .where(and(eq(variants.tenantId, tenantId), inArray(variants.id, variantIds))),
+    db
+      .select({
+        variantId: inventoryLedger.variantId,
+        onHand: sum(inventoryLedger.delta),
+      })
+      .from(inventoryLedger)
+      .where(
+        and(eq(inventoryLedger.tenantId, tenantId), inArray(inventoryLedger.variantId, variantIds)),
+      )
+      .groupBy(inventoryLedger.variantId),
+  ]);
+
+  const stockMap = new Map<string, number>(
+    stockRows.map((row) => [row.variantId, row.onHand ? Number(row.onHand) : 0]),
+  );
+
+  for (const row of variantRows) {
+    map.set(row.id, {
+      trackInventory: Boolean(row.trackInventory),
+      available: stockMap.get(row.id) ?? 0,
+    });
+  }
+
+  return map;
 }
 
 export async function getAvailableStockMap(tenantId: string, variantIds: string[]) {
+  const inventoryMap = await getVariantInventoryStatusMap(tenantId, variantIds);
+
   const map = new Map<string, number>();
-  if (variantIds.length === 0) return map;
-
-  const rows = await db
-    .select({
-      variantId: inventoryLedger.variantId,
-      onHand: sum(inventoryLedger.delta),
-    })
-    .from(inventoryLedger)
-    .where(
-      and(eq(inventoryLedger.tenantId, tenantId), inArray(inventoryLedger.variantId, variantIds)),
-    )
-    .groupBy(inventoryLedger.variantId);
-
-  for (const row of rows) {
-    map.set(row.variantId, row.onHand ? Number(row.onHand) : 0);
+  for (const [variantId, inventory] of inventoryMap.entries()) {
+    map.set(variantId, inventory.trackInventory ? inventory.available : Number.MAX_SAFE_INTEGER);
   }
 
   return map;

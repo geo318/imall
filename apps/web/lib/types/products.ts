@@ -30,6 +30,7 @@ const optionDefinitionSchema = z.object({
 const variantSchema = z.object({
   id: z.string(),
   sku: z.string().nullable(),
+  trackInventory: z.boolean().optional(),
   price: z.string(),
   currency: z.string(),
   availableQty: z.number().optional(),
@@ -62,6 +63,7 @@ export const productSchema = z.object({
   hasAuction: z.boolean().optional(),
   variantCount: z.number().optional(),
   stockTotal: z.number().optional(),
+  hasInfiniteStock: z.boolean().optional(),
   priceMin: z.number().nullable().optional(),
   currency: z.string().optional(),
   auctionStartingBid: z.number().nullable().optional(),

@@ -28,7 +28,7 @@ import {
 } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
-import { getAvailableStockMap, listQuerySchema } from "../context";
+import { getVariantInventoryStatusMap, listQuerySchema } from "../context";
 import { sanitizePersistedImageUrls } from "../utils/image-urls";
 import { logger } from "../utils/logger";
 import { withCachedResponse } from "../utils/response-cache";
@@ -200,7 +200,11 @@ export const productsRoutes = new Elysia({
         const minPriceSql = sql<number>`min(${variants.price})`;
 
         // Build where clauses - filter out soft-deleted products
-        const whereClauses: SQL[] = [eq(products.tenantId, tenantId), isNull(products.deletedAt)];
+        const whereClauses: SQL[] = [
+          eq(products.tenantId, tenantId),
+          isNull(products.deletedAt),
+          eq(products.draft, false),
+        ];
         if (qLike) {
           const searchCondition = or(
             ilike(products.title, qLike),
@@ -380,6 +384,7 @@ export const productsRoutes = new Elysia({
             eq(products.tenantId, tenantId),
             eq(products.slug, params.productSlug),
             isNull(products.deletedAt),
+            eq(products.draft, false),
           ),
         )
         .limit(1);
@@ -404,6 +409,7 @@ export const productsRoutes = new Elysia({
         .select({
           id: variants.id,
           sku: variants.sku,
+          trackInventory: variants.trackInventory,
           price: variants.price,
           currency: variants.currency,
         })
@@ -443,12 +449,13 @@ export const productsRoutes = new Elysia({
         variantAuctions.map((auction) => [auction.variantId, auction]),
       );
 
-      const availableStockByVariant = await getAvailableStockMap(tenantId, variantIds);
+      const inventoryByVariantId = await getVariantInventoryStatusMap(tenantId, variantIds);
 
       // Serialize dates to ISO strings for JSON response and add availability
       const serializedVariants = productVariants.map((variant) => {
         const auction = auctionByVariantId.get(variant.id);
-        const availableQty = availableStockByVariant.get(variant.id) ?? 0;
+        const inventory = inventoryByVariantId.get(variant.id);
+        const availableQty = inventory?.trackInventory ? inventory.available : undefined;
 
         if (!auction) {
           return {
@@ -557,7 +564,11 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           tenantName: string;
         };
 
-        const baseWhere = and(sql`${products.deletedAt} IS NULL`, eq(tenants.canSell, true));
+        const baseWhere = and(
+          sql`${products.deletedAt} IS NULL`,
+          eq(products.draft, false),
+          eq(tenants.canSell, true),
+        );
 
         // Avoid `ORDER BY random()` full-table sort and avoid global COUNT(*) scans.
         // Pull a bounded, indexed "recent window", rotate slightly by time bucket,
@@ -781,7 +792,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
         `;
         const minPriceSql = sql<number>`min(${variants.price})`;
 
-        const whereClauses: SQL[] = [isNull(products.deletedAt)];
+        const whereClauses: SQL[] = [isNull(products.deletedAt), eq(products.draft, false)];
         if (qLike) {
           const searchCondition = or(
             ilike(products.title, qLike),

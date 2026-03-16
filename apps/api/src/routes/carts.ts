@@ -18,13 +18,13 @@ import {
   cartItemSchema,
   getAvailableStock,
   getAvailableStockMap,
+  getVariantInventoryStatusMap,
   INVENTORY_REASONS,
 } from "../context";
 import {
   type CredoInstallmentProduct,
   createCredoInstallmentApplication,
   fetchCredoInstallmentStatus,
-  isInstallmentCheckoutReadyStatus,
   validateOrderCodeForCart,
 } from "../integrations/credo-installments";
 import { sanitizePersistedImageUrls } from "../utils/image-urls";
@@ -60,7 +60,24 @@ type CompleteCartCheckoutOptions = {
   paymentMethod?: string;
   manualSale?: boolean;
   manualSaleComment?: string | null;
+  orderStatus?: string;
+  installmentOrderCode?: string | null;
+  installmentStatusId?: number | null;
+  installmentStatusName?: string | null;
+  installmentFlowStage?: string | null;
 };
+
+const CREDO_APPROVED_STATUS_IDS = new Set([3, 4, 12, 5]);
+const CREDO_CANCELLED_STATUS_IDS = new Set([6, 7]);
+
+function toInstallmentFlowStage(statusId: number | null, fallback: string | null): string | null {
+  if (statusId === 5) return "completed";
+  if (statusId === 12) return "pending";
+  if (statusId === 3 || statusId === 4) return "approved";
+  if (statusId === 6) return "rejected";
+  if (statusId === 7) return "cancelled";
+  return fallback;
+}
 
 async function completeCartCheckout(
   cartId: string,
@@ -162,10 +179,14 @@ async function completeCartCheckout(
           id: crypto.randomUUID(),
           tenantId,
           userId: cartUserId ?? authUserId ?? null,
-          status: "pending",
+          status: options.orderStatus ?? "pending",
           paymentMethod: options.paymentMethod ?? "card",
           manualSale: options.manualSale ?? false,
           manualSaleComment: options.manualSaleComment?.trim() || null,
+          installmentOrderCode: options.installmentOrderCode?.trim() || null,
+          installmentStatusId: options.installmentStatusId ?? null,
+          installmentStatusName: options.installmentStatusName ?? null,
+          installmentFlowStage: options.installmentFlowStage ?? null,
           total: String(total),
           currency,
         })
@@ -278,6 +299,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           variantId: cartItems.variantId,
           tenantId: cartItems.tenantId, // Each item has its own tenant
           sku: variants.sku,
+          trackInventory: variants.trackInventory,
           price: variants.price,
           currency: variants.currency,
           productId: products.id,
@@ -297,17 +319,21 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         variantIdsByTenant.set(item.tenantId, tenantVariants);
       }
 
-      const stockByTenant = new Map<string, Map<string, number>>();
+      const stockByTenant = new Map<
+        string,
+        Map<string, { trackInventory: boolean; available: number }>
+      >();
       await Promise.all(
         Array.from(variantIdsByTenant.entries()).map(async ([tenantId, variantIds]) => {
-          const stockMap = await getAvailableStockMap(tenantId, Array.from(variantIds));
+          const stockMap = await getVariantInventoryStatusMap(tenantId, Array.from(variantIds));
           stockByTenant.set(tenantId, stockMap);
         }),
       );
 
       // Attach availability and parse image URLs for each item
       const itemsWithAvailability = items.map((item) => {
-        const availableQty = stockByTenant.get(item.tenantId)?.get(item.variantId) ?? 0;
+        const inventory = stockByTenant.get(item.tenantId)?.get(item.variantId);
+        const availableQty = inventory?.trackInventory ? inventory.available : undefined;
 
         // Parse image URLs from comma-delimited string
         const productImageUrl =
@@ -891,14 +917,53 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       });
       let checkoutCompleted = cart.status === "completed";
       let checkoutResult: CheckoutResult | null = null;
+      const [existingOrder] = await db
+        .select({
+          id: orders.id,
+          status: orders.status,
+          installmentFlowStage: orders.installmentFlowStage,
+        })
+        .from(orders)
+        .where(eq(orders.installmentOrderCode, payload.orderCode))
+        .limit(1);
 
-      if (
-        !checkoutCompleted &&
+      const nextFlowStage = toInstallmentFlowStage(
+        statusResult.statusId,
+        existingOrder?.installmentFlowStage ?? null,
+      );
+
+      if (existingOrder) {
+        const orderPatch: Partial<typeof orders.$inferInsert> = {
+          installmentStatusId: statusResult.statusId,
+          installmentStatusName: statusResult.statusName,
+          installmentFlowStage: nextFlowStage,
+        };
+
+        if (statusResult.statusId === 5 && existingOrder.status !== "completed") {
+          orderPatch.status = "completed";
+          orderPatch.installmentDeliveredAt = new Date();
+          orderPatch.installmentVerificationCode = null;
+        } else if (
+          CREDO_CANCELLED_STATUS_IDS.has(statusResult.statusId ?? Number.NaN) &&
+          existingOrder.status !== "completed"
+        ) {
+          orderPatch.status = "cancelled";
+        }
+
+        await db.update(orders).set(orderPatch).where(eq(orders.id, existingOrder.id));
+        checkoutCompleted =
+          orderPatch.status === "completed" || existingOrder.status === "completed";
+      } else if (
         cart.status === "open" &&
-        isInstallmentCheckoutReadyStatus(statusResult.statusId)
+        CREDO_APPROVED_STATUS_IDS.has(statusResult.statusId ?? 0)
       ) {
         checkoutResult = await completeCartCheckout(cartId, auth?.userId ?? null, {
           paymentMethod: "installments_credo",
+          orderStatus: nextFlowStage === "completed" ? "completed" : "approved",
+          installmentOrderCode: payload.orderCode,
+          installmentStatusId: statusResult.statusId,
+          installmentStatusName: statusResult.statusName,
+          installmentFlowStage: nextFlowStage ?? "approved",
         });
         checkoutCompleted = true;
       }
