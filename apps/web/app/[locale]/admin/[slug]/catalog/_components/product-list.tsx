@@ -14,7 +14,7 @@ import LazyImage from "@/components/shared/lazy-image";
 import { Link } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
-import { DEFAULT_CURRENCY_CODE, currencySymbol, formatCurrencyAmount } from "@/lib/utils/currency";
+import { currencySymbol, DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 import { getPrimaryImage } from "@/lib/utils/images";
 
 type Props = {
@@ -193,7 +193,11 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
     if (hasLow) {
       return <Badge variant="destructive">{t("adminProductList.stock.low")}</Badge>;
     }
-    return <Badge className="bg-emerald-100 text-emerald-900">{t("adminProductList.stock.inStock")}</Badge>;
+    return (
+      <Badge className="bg-emerald-100 text-emerald-900">
+        {t("adminProductList.stock.inStock")}
+      </Badge>
+    );
   };
 
   return (
@@ -224,7 +228,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
         </Select>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white">
+      <div className="rounded-lg border border-slate-200 bg-white overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -270,9 +274,13 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                 const priceValue = hasAuction ? auctionPrice : basePrice;
                 const priceLabel =
                   priceValue !== null && priceValue !== undefined && Number.isFinite(priceValue)
-                    ? formatCurrencyAmount(Number(priceValue), product.currency || primaryVariant?.currency)
+                    ? formatCurrencyAmount(
+                        Number(priceValue),
+                        product.currency || primaryVariant?.currency,
+                      )
                     : "--";
-                const currency = product.currency || primaryVariant?.currency || DEFAULT_CURRENCY_CODE;
+                const currency =
+                  product.currency || primaryVariant?.currency || DEFAULT_CURRENCY_CODE;
                 const currencyLabel = currencySymbol(currency);
                 const trackedStocks = product.variants
                   .filter((variant) => variant.trackInventory !== false)
@@ -281,16 +289,15 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                 const hasInfiniteStock = product.variants.some(
                   (variant) => variant.trackInventory === false,
                 );
-                const totalStock =
-                  hasInfiniteStock
-                    ? null
-                    : trackedStocks.length > 0
+                const totalStock = hasInfiniteStock
+                  ? null
+                  : trackedStocks.length > 0
                     ? trackedStocks.reduce((sum, qty) => sum + qty, 0)
                     : undefined;
 
                 return (
                   <TableRow key={product.id}>
-                    <TableCell>
+                    <TableCell className="max-w-64">
                       <div className="flex items-center gap-3">
                         <div className="relative h-12 w-12 overflow-hidden rounded-md bg-slate-100">
                           <LazyImage
@@ -314,8 +321,10 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                     <TableCell>
                       <div className="font-semibold text-slate-900">{priceLabel}</div>
                       <div className="text-xs text-slate-500">
-                        {hasAuction ? t("adminProductList.type.auction") : t("adminProductList.type.fixed")} ·{" "}
-                        {currencyLabel}
+                        {hasAuction
+                          ? t("adminProductList.type.auction")
+                          : t("adminProductList.type.fixed")}{" "}
+                        · {currencyLabel}
                       </div>
                       {variantCount > 1 && !hasAuction && (
                         <button
@@ -364,7 +373,9 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                           </Badge>
                         )}
                         {product.deletedAt && (
-                          <Badge variant="destructive">{t("adminProductList.status.deleted")}</Badge>
+                          <Badge variant="destructive">
+                            {t("adminProductList.status.deleted")}
+                          </Badge>
                         )}
                       </div>
                     </TableCell>
@@ -516,12 +527,9 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                         return (
                           <TableRow key={variant.id}>
                             <TableCell>
-                              {variant.sku ||
-                                t("adminProductList.variantOverview.noSkuShort")}
+                              {variant.sku || t("adminProductList.variantOverview.noSkuShort")}
                             </TableCell>
-                            <TableCell>
-                              {priceLabel}
-                            </TableCell>
+                            <TableCell>{priceLabel}</TableCell>
                             <TableCell>{stockQty}</TableCell>
                           </TableRow>
                         );
