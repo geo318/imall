@@ -38,10 +38,10 @@ import {
   isSuperadminRequest,
 } from "../context";
 import { getStorage } from "../storage";
-import { sanitizePersistedImageUrls } from "../utils/image-urls";
 import { resolveStockQty, resolveTrackInventory } from "../utils/admin-product-inventory";
-import { invalidateCachedResponsesByPrefixes } from "../utils/response-cache";
 import { ensureAuth, requireAuth, verifyTenantAccess } from "../utils/auth";
+import { sanitizePersistedImageUrls } from "../utils/image-urls";
+import { invalidateCachedResponsesByPrefixes } from "../utils/response-cache";
 
 const DEFAULT_CURRENCY = "GEL";
 
@@ -595,7 +595,9 @@ export const adminProductsRoutes = new Elysia({
             ? (inventoryMap.get(variant.id)?.available ?? 0)
             : undefined,
         }));
-        const hasInfiniteStock = productVariants.some((variant) => variant.trackInventory === false);
+        const hasInfiniteStock = productVariants.some(
+          (variant) => variant.trackInventory === false,
+        );
         const stockTotal = productVariants.reduce((sumQty, variant) => {
           return sumQty + (variant.availableQty ?? 0);
         }, 0);
@@ -936,15 +938,6 @@ export const adminProductsRoutes = new Elysia({
         }
       }
       const capabilities = await getTenantCapabilities(tenantId);
-      if (!capabilities.canSell) {
-        return Response.json(
-          { error: "Selling is disabled for this shop" },
-          {
-            status: 403,
-          },
-        );
-      }
-
       const validated = productSchema.parse(body);
       if (validated.isAuction && !capabilities.canAuction) {
         return Response.json(
@@ -1159,15 +1152,6 @@ export const adminProductsRoutes = new Elysia({
         }
       }
       const capabilities = await getTenantCapabilities(tenantId);
-      if (!capabilities.canSell) {
-        return Response.json(
-          { error: "Selling is disabled for this shop" },
-          {
-            status: 403,
-          },
-        );
-      }
-
       const validated = productSchema.parse(body);
       if (validated.isAuction && !capabilities.canAuction) {
         return Response.json(
@@ -1279,7 +1263,9 @@ export const adminProductsRoutes = new Elysia({
           .where(eq(variants.productId, productId));
 
         const existingVariantIds = existingVariants.map((v) => v.id);
-        const existingVariantMap = new Map(existingVariants.map((variant) => [variant.id, variant]));
+        const existingVariantMap = new Map(
+          existingVariants.map((variant) => [variant.id, variant]),
+        );
 
         const [existingAuctionRows, currentInventoryRows, variantsWithOrderHistory] =
           existingVariantIds.length > 0
@@ -1308,9 +1294,7 @@ export const adminProductsRoutes = new Elysia({
         const inventoryByVariantId = new Map(
           currentInventoryRows.map((row) => [row.variantId, Number(row.available ?? 0)]),
         );
-        const protectedVariantIds = new Set(
-          variantsWithOrderHistory.map((row) => row.variantId),
-        );
+        const protectedVariantIds = new Set(variantsWithOrderHistory.map((row) => row.variantId));
 
         const variantOptionPayloads: Array<{
           variantId: string;
@@ -1561,16 +1545,6 @@ export const adminProductsRoutes = new Elysia({
         }
       }
 
-      const capabilities = await getTenantCapabilities(tenantId);
-      if (!capabilities.canSell) {
-        return Response.json(
-          { error: "Selling is disabled for this shop" },
-          {
-            status: 403,
-          },
-        );
-      }
-
       return await db.transaction(async (tx) => {
         const [sourceProduct] = await tx
           .select({
@@ -1669,7 +1643,9 @@ export const adminProductsRoutes = new Elysia({
           });
           optionPairsByVariantId.set(row.variantId, existing);
         }
-        const auctionByVariantId = new Map(auctionRows.map((auction) => [auction.variantId, auction]));
+        const auctionByVariantId = new Map(
+          auctionRows.map((auction) => [auction.variantId, auction]),
+        );
 
         const [duplicatedProduct] = await tx
           .insert(products)
@@ -1809,16 +1785,6 @@ export const adminProductsRoutes = new Elysia({
           );
         }
       }
-      const capabilities = await getTenantCapabilities(tenantId);
-      if (!capabilities.canSell) {
-        return Response.json(
-          { error: "Selling is disabled for this shop" },
-          {
-            status: 403,
-          },
-        );
-      }
-
       // Soft delete: set deletedAt timestamp instead of actually deleting
       await db
         .update(products)

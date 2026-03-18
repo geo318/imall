@@ -7,15 +7,15 @@ import { Input } from "@repo/ui/input";
 import { Modal, ModalBody, ModalHeader, ModalTitle } from "@repo/ui/modal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Edit, ExternalLink, Trash2 } from "lucide-react";
+import { Copy, CopyPlus, Edit, Eye, Images, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import LazyImage from "@/components/shared/lazy-image";
 import { Link } from "@/i18n/navigation.client";
-import { useTranslations } from "@/i18n/provider";
+import { useLocale, useTranslations } from "@/i18n/provider";
 import type { ApiProduct } from "@/lib/api/products";
 import { currencySymbol, DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
-import { getPrimaryImage } from "@/lib/utils/images";
+import { getImage, getPrimaryImage } from "@/lib/utils/images";
 
 type Props = {
   shopSlug: string;
@@ -56,6 +56,7 @@ const sortOptions = [
 
 export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props) {
   const t = useTranslations();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -152,6 +153,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
       return response.json() as Promise<{ id: string }>;
     },
     onSuccess: (duplicated) => {
+      queryClient.removeQueries({ queryKey: ["admin-product", shopSlug] });
       queryClient.invalidateQueries({ queryKey: ["admin-products", shopSlug] });
       toast.success(t("adminProductList.toasts.duplicated"));
       onEdit(duplicated.id);
@@ -164,6 +166,16 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
   const getProductIdentifier = (product: ProductWithStats) => {
     const shortId = product.id.replaceAll("-", "").substring(0, 8);
     return `${product.slug}-${shortId}`;
+  };
+
+  const copyListingUrl = async (productIdentifier: string) => {
+    try {
+      const listingUrl = `${window.location.origin}/${locale}/${productIdentifier}`;
+      await navigator.clipboard.writeText(listingUrl);
+      toast.success(t("adminProductList.toasts.linkCopied"));
+    } catch {
+      toast.error(t("adminProductList.toasts.linkCopyFailed"));
+    }
   };
 
   const renderStock = (product: ProductWithStats, hasAuction: boolean) => {
@@ -250,6 +262,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
             ) : (
               pageProducts.map((product) => {
                 const primaryImageUrl = getPrimaryImage(product.images);
+                const resolvedPrimaryImageUrl = primaryImageUrl ? getImage(primaryImageUrl) : "";
                 const productIdentifier = getProductIdentifier(product);
                 const variantCount = product.variantCount ?? product.variants.length;
                 const hasAuction = Boolean(
@@ -397,9 +410,40 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                             className="h-8 w-8 p-0"
                             title={t("adminProductList.actions.view")}
                           >
-                            <ExternalLink className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </Button>
                         </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void copyListingUrl(productIdentifier)}
+                          className="h-8 w-8 p-0"
+                          title={t("adminProductList.actions.copyLink")}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        {resolvedPrimaryImageUrl ? (
+                          <a href={resolvedPrimaryImageUrl} target="_blank" rel="noreferrer">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              title={t("adminProductList.actions.viewImage")}
+                            >
+                              <Images className="h-4 w-4" />
+                            </Button>
+                          </a>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            title={t("adminProductList.actions.viewImage")}
+                            disabled
+                          >
+                            <Images className="h-4 w-4" />
+                          </Button>
+                        )}
                         {!product.deletedAt && (
                           <Button
                             variant="ghost"
@@ -409,7 +453,7 @@ export function ProductList({ shopSlug, onEdit, statusFilter = "active" }: Props
                             className="h-8 w-8 p-0"
                             title={t("adminProductList.actions.duplicate")}
                           >
-                            <Copy className="h-4 w-4" />
+                            <CopyPlus className="h-4 w-4" />
                           </Button>
                         )}
                         {!product.deletedAt && (

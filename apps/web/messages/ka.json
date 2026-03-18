@@ -875,7 +875,9 @@
       "edit": "რედაქტირება",
       "view": "ნახვა",
       "duplicate": "დუბლირება",
-      "delete": "წაშლა"
+      "delete": "წაშლა",
+      "copyLink": "ბმულის კოპირება",
+      "viewImage": "სურათის გახსნა"
     },
     "pagination": {
       "showing": "ნაჩვენებია {from}-{to} / {total}",
@@ -898,7 +900,9 @@
       "deleted": "პროდუქტი წაიშალა",
       "deleteFailed": "წაშლა ვერ მოხერხდა",
       "duplicated": "დრაფტის ასლი შეიქმნა",
-      "duplicateFailed": "დუბლირება ვერ მოხერხდა"
+      "duplicateFailed": "დუბლირება ვერ მოხერხდა",
+      "linkCopied": "ლისტინგის ბმული დაკოპირდა",
+      "linkCopyFailed": "ლისტინგის ბმულის კოპირება ვერ მოხერხდა"
     }
   },
   "adminOrders": {

@@ -875,7 +875,9 @@
       "edit": "Edit",
       "view": "View",
       "duplicate": "Duplicate",
-      "delete": "Delete"
+      "delete": "Delete",
+      "copyLink": "Скопировать ссылку",
+      "viewImage": "Открыть изображение"
     },
     "pagination": {
       "showing": "Showing {from}-{to} of {total}",
@@ -898,7 +900,9 @@
       "deleted": "Product deleted",
       "deleteFailed": "Failed to delete product",
       "duplicated": "Draft copy created",
-      "duplicateFailed": "Failed to duplicate product"
+      "duplicateFailed": "Failed to duplicate product",
+      "linkCopied": "Ссылка на объявление скопирована",
+      "linkCopyFailed": "Не удалось скопировать ссылку"
     }
   },
   "adminOrders": {

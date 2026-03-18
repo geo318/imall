@@ -220,10 +220,9 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       return response.json();
     },
     enabled: !!productId,
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: 0,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
-    refetchOnMount: false,
     retry: false,
   });
 
@@ -468,14 +467,13 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
     const currentVariants = getValues("variants") ?? [];
     if (isAuction) {
       const [first] = currentVariants;
-      const normalized =
-        first ?? {
-          price: "",
-          currency: DEFAULT_CURRENCY_CODE,
-          stock: "",
-          trackInventory: true,
-          optionPairs: [],
-        };
+      const normalized = first ?? {
+        price: "",
+        currency: DEFAULT_CURRENCY_CODE,
+        stock: "",
+        trackInventory: true,
+        optionPairs: [],
+      };
       const nextVariant = { ...normalized, trackInventory: true, stock: "" };
       if (currentVariants.length !== 1 || normalized.stock) {
         setValue("variants", [nextVariant], { shouldValidate: true });
@@ -508,8 +506,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
       const normalizedVariants = (data.variants ?? []).map((variant) => ({
         ...variant,
         sku: variant.sku?.trim() ? variant.sku.trim() : undefined,
-        stock:
-          data.isAuction || variant.trackInventory === false ? undefined : variant.stock,
+        stock: data.isAuction || variant.trackInventory === false ? undefined : variant.stock,
         optionPairs: (variant.optionPairs ?? [])
           .map((pair) => ({
             optionName: pair.optionName?.trim() ?? "",
@@ -559,6 +556,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         images: Array<{ id: string; url?: string; isPrimary: boolean }>;
       },
     ) => {
+      queryClient.removeQueries({ queryKey: ["admin-product", shopSlug] });
       queryClient.invalidateQueries({ queryKey: ["admin-products", shopSlug] });
       queryClient.invalidateQueries({ queryKey: ["tenant-variant-options", shopSlug] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -852,12 +850,7 @@ export function ProductForm({ shopSlug, productId, onCancel, onSuccess }: Props)
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handleSaveAsDraft}
-          disabled={isSubmitting}
-        >
+        <Button type="button" variant="outline" onClick={handleSaveAsDraft} disabled={isSubmitting}>
           {isSubmitting
             ? "Saving..."
             : isNewProduct
