@@ -5,6 +5,7 @@ const DEFAULT_CREDO_ORDER_URL = "https://ganvadeba.credo.ge/widget_api/order.php
 const DEFAULT_CREDO_STATUS_URL = "https://ganvadeba.credo.ge/widget/api.php";
 const ORDER_CODE_PREFIX = "IML";
 const ORDER_CODE_MAX_LENGTH = 50;
+const CREDO_TEXT_MAX_LENGTH = 90;
 
 export type CredoInstallmentProduct = {
   id: string;
@@ -76,11 +77,9 @@ function getCredoMerchantId(): string {
 }
 
 function getCredoSecret(): string {
-  if (!env.CREDO_SHARED_SECRET) {
-    throw new Error("CREDO_SHARED_SECRET is not configured");
-  }
-
-  return env.CREDO_SHARED_SECRET;
+  // Some merchant accounts run with an empty Credo "password".
+  // In that mode, hash formulas still work with an empty suffix.
+  return env.CREDO_SHARED_SECRET?.trim() ?? "";
 }
 
 function getOrderUrl(): string {
@@ -189,7 +188,7 @@ export async function createCredoInstallmentApplication(
 
   const products = input.products.map((product) => ({
     id: normalizeText(product.id, 64),
-    title: normalizeText(product.title, 160),
+    title: normalizeText(product.title, CREDO_TEXT_MAX_LENGTH),
     amount: Math.max(1, Math.floor(product.amount)),
     price: Math.max(1, Math.floor(product.price)),
     type: 0 as const,
@@ -214,18 +213,21 @@ export async function createCredoInstallmentApplication(
     payload.installmentLength = installmentLength;
   }
 
-  if (input.clientFullName?.trim())
-    payload.clientFullName = normalizeText(input.clientFullName, 128);
+  if (input.clientFullName?.trim()) {
+    payload.clientFullName = normalizeText(input.clientFullName, CREDO_TEXT_MAX_LENGTH);
+  }
   if (input.mobile?.trim()) payload.mobile = normalizeText(input.mobile, 32);
-  if (input.email?.trim()) payload.email = normalizeText(input.email, 256);
-  if (input.factAddress?.trim()) payload.factAddress = normalizeText(input.factAddress, 256);
+  if (input.email?.trim()) payload.email = normalizeText(input.email, CREDO_TEXT_MAX_LENGTH);
+  if (input.factAddress?.trim()) {
+    payload.factAddress = normalizeText(input.factAddress, CREDO_TEXT_MAX_LENGTH);
+  }
 
   if (input.meta) {
     const normalizedMeta = Object.entries(input.meta).reduce<Record<string, string>>(
       (acc, [rawKey, rawValue]) => {
         if (rawValue === null || rawValue === undefined) return acc;
         const key = normalizeText(String(rawKey), 64);
-        const value = normalizeText(String(rawValue), 256);
+        const value = normalizeText(String(rawValue), CREDO_TEXT_MAX_LENGTH);
         if (!key || !value) return acc;
         acc[key] = value;
         return acc;
@@ -319,8 +321,4 @@ export async function fetchCredoInstallmentStatus(
     statusName,
     raw: parsed ?? rawText,
   };
-}
-
-export function isInstallmentCheckoutReadyStatus(statusId: number | null): boolean {
-  return statusId === 12 || statusId === 5;
 }
