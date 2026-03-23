@@ -54,6 +54,8 @@ type CredoLaunchFormConfig = {
   ready: boolean;
 };
 
+const DEFAULT_CART_STORAGE_KEY = "cart";
+
 const normalizeAddressValue = (value?: string | null) => (value ?? "").trim().toLowerCase();
 
 type CrystalInvoicePayload = {
@@ -105,6 +107,30 @@ function findDuplicateAddress(
   );
 }
 
+function resolveStoredCartId(cartKey: string): string | null {
+  const directCartId = readCartIdFromStorage(cartKey);
+  if (directCartId) {
+    return directCartId;
+  }
+
+  if (cartKey === DEFAULT_CART_STORAGE_KEY) {
+    return null;
+  }
+
+  const fallbackCartId = readCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
+  if (fallbackCartId) {
+    writeCartIdToStorage(fallbackCartId, cartKey);
+  }
+  return fallbackCartId;
+}
+
+function clearCheckoutCartKeys(cartKey: string) {
+  clearCartIdFromStorage(cartKey);
+  if (cartKey !== DEFAULT_CART_STORAGE_KEY) {
+    clearCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
+  }
+}
+
 export function useCheckoutController({
   cartKey,
   initialPaymentMethod = "card",
@@ -148,7 +174,7 @@ export function useCheckoutController({
     [savedAddresses, shippingForm],
   );
   const credoLaunchForm = useMemo<CredoLaunchFormConfig>(() => {
-    const cartId = typeof globalThis.window !== "undefined" ? readCartIdFromStorage(cartKey) : null;
+    const cartId = typeof globalThis.window !== "undefined" ? resolveStoredCartId(cartKey) : null;
     const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
     const normalizedMobile = normalizeCredoMobile(shippingForm.phone);
 
@@ -218,7 +244,7 @@ export function useCheckoutController({
     let cancelled = false;
 
     async function loadCheckoutData() {
-      const cartId = readCartIdFromStorage(cartKey);
+      const cartId = resolveStoredCartId(cartKey);
       if (!cancelled) hydratePendingInstallmentState();
 
       const [cartResult, addressesResult] = await Promise.allSettled([
@@ -381,7 +407,7 @@ export function useCheckoutController({
   );
 
   const syncInstallmentStatus = useCallback(async () => {
-    const cartId = readCartIdFromStorage(cartKey);
+    const cartId = resolveStoredCartId(cartKey);
     if (!cartId || !pendingOrderCode) return;
 
     setCheckingStatus(true);
@@ -393,7 +419,7 @@ export function useCheckoutController({
       const statusLabel = status.statusName || `#${status.statusId ?? "unknown"}`;
 
       if (status.checkoutCompleted) {
-        clearCartIdFromStorage(cartKey);
+        clearCheckoutCartKeys(cartKey);
         clearInstallmentState();
         setStep("confirmation");
         return;
@@ -433,7 +459,7 @@ export function useCheckoutController({
 
   const submitCheckout = useCallback(
     async (launchMode: CredoLaunchMode = "server-assign") => {
-      const cartId = readCartIdFromStorage(cartKey);
+      const cartId = resolveStoredCartId(cartKey);
       if (!cartId) return;
       setSubmitting(true);
       try {
@@ -540,7 +566,7 @@ export function useCheckoutController({
         }
 
         await checkoutCart(cartId);
-        clearCartIdFromStorage(cartKey);
+        clearCheckoutCartKeys(cartKey);
         clearInstallmentState();
         setStep("confirmation");
       } catch (error) {
