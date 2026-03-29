@@ -107,6 +107,32 @@ function findDuplicateAddress(
   );
 }
 
+function listStoredCartEntries(): Array<{ key: string; cartId: string }> {
+  if (typeof globalThis.window === "undefined") {
+    return [];
+  }
+
+  const entries: Array<{ key: string; cartId: string }> = [];
+  for (let index = 0; index < globalThis.window.localStorage.length; index += 1) {
+    const key = globalThis.window.localStorage.key(index);
+    if (
+      !key ||
+      (key !== DEFAULT_CART_STORAGE_KEY && !key.startsWith(`${DEFAULT_CART_STORAGE_KEY}:`))
+    ) {
+      continue;
+    }
+
+    const cartId = globalThis.window.localStorage.getItem(key);
+    if (!cartId) {
+      continue;
+    }
+
+    entries.push({ key, cartId });
+  }
+
+  return entries;
+}
+
 function resolveStoredCartId(cartKey: string): string | null {
   const directCartId = readCartIdFromStorage(cartKey);
   if (directCartId) {
@@ -120,14 +146,40 @@ function resolveStoredCartId(cartKey: string): string | null {
   const fallbackCartId = readCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
   if (fallbackCartId) {
     writeCartIdToStorage(fallbackCartId, cartKey);
+    return fallbackCartId;
   }
-  return fallbackCartId;
+
+  const cartEntries = listStoredCartEntries();
+  const uniqueCartIds = [...new Set(cartEntries.map((entry) => entry.cartId))];
+  if (uniqueCartIds.length !== 1) {
+    return null;
+  }
+
+  const [resolvedCartId] = uniqueCartIds;
+  if (!resolvedCartId) {
+    return null;
+  }
+
+  writeCartIdToStorage(resolvedCartId, cartKey);
+  if (cartKey !== DEFAULT_CART_STORAGE_KEY) {
+    writeCartIdToStorage(resolvedCartId, DEFAULT_CART_STORAGE_KEY);
+  }
+
+  return resolvedCartId;
 }
 
-function clearCheckoutCartKeys(cartKey: string) {
+function clearCheckoutCartKeys(cartKey: string, cartId?: string | null) {
   clearCartIdFromStorage(cartKey);
-  if (cartKey !== DEFAULT_CART_STORAGE_KEY) {
-    clearCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
+  clearCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
+
+  if (typeof globalThis.window === "undefined" || !cartId) {
+    return;
+  }
+
+  for (const entry of listStoredCartEntries()) {
+    if (entry.cartId === cartId) {
+      clearCartIdFromStorage(entry.key);
+    }
   }
 }
 
@@ -419,7 +471,7 @@ export function useCheckoutController({
       const statusLabel = status.statusName || `#${status.statusId ?? "unknown"}`;
 
       if (status.checkoutCompleted) {
-        clearCheckoutCartKeys(cartKey);
+        clearCheckoutCartKeys(cartKey, cartId);
         clearInstallmentState();
         setStep("confirmation");
         return;
@@ -566,7 +618,7 @@ export function useCheckoutController({
         }
 
         await checkoutCart(cartId);
-        clearCheckoutCartKeys(cartKey);
+        clearCheckoutCartKeys(cartKey, cartId);
         clearInstallmentState();
         setStep("confirmation");
       } catch (error) {
