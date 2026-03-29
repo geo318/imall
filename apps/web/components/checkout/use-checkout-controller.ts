@@ -77,10 +77,10 @@ async function getCrystalInvoicePrinter(): Promise<PrintCrystalInstallmentInvoic
       (module) => module.printCrystalInstallmentInvoice,
     );
   }
-  return crystalInvoicePrinterPromise;
+push latest  return crystalInvoicePrinterPromise;
 }
 
-function hasRequiredCredoCustomerData(shippingForm: ShippingFormState): boolean {
+export function hasRequiredCredoCustomerData(shippingForm: ShippingFormState): boolean {
   const mobile = normalizeCredoMobile(shippingForm.phone);
   return Boolean(
     shippingForm.firstName.trim() &&
@@ -107,7 +107,7 @@ function findDuplicateAddress(
   );
 }
 
-function listStoredCartEntries(): Array<{ key: string; cartId: string }> {
+export function listStoredCartEntries(): Array<{ key: string; cartId: string }> {
   if (typeof globalThis.window === "undefined") {
     return [];
   }
@@ -133,18 +133,14 @@ function listStoredCartEntries(): Array<{ key: string; cartId: string }> {
   return entries;
 }
 
-function resolveStoredCartId(cartKey: string): string | null {
+export function resolveStoredCartId(cartKey: string): string | null {
   const directCartId = readCartIdFromStorage(cartKey);
   if (directCartId) {
     return directCartId;
   }
 
-  if (cartKey === DEFAULT_CART_STORAGE_KEY) {
-    return null;
-  }
-
   const fallbackCartId = readCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
-  if (fallbackCartId) {
+  if (fallbackCartId && cartKey !== DEFAULT_CART_STORAGE_KEY) {
     writeCartIdToStorage(fallbackCartId, cartKey);
     return fallbackCartId;
   }
@@ -181,6 +177,10 @@ function clearCheckoutCartKeys(cartKey: string, cartId?: string | null) {
       clearCartIdFromStorage(entry.key);
     }
   }
+}
+
+export function isCredoLaunchReady(cartKey: string, shippingForm: ShippingFormState): boolean {
+  return Boolean(resolveStoredCartId(cartKey)) && hasRequiredCredoCustomerData(shippingForm);
 }
 
 export function useCheckoutController({
@@ -232,7 +232,7 @@ export function useCheckoutController({
 
     return {
       action: "/api/checkout/installments/credo/launch",
-      ready: Boolean(cartId) && hasRequiredCredoCustomerData(shippingForm),
+      ready: isCredoLaunchReady(cartKey, shippingForm),
       fields: {
         cartId: cartId ?? "",
         cartKey,
