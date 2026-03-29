@@ -77,7 +77,7 @@ async function getCrystalInvoicePrinter(): Promise<PrintCrystalInstallmentInvoic
       (module) => module.printCrystalInstallmentInvoice,
     );
   }
-push latest  return crystalInvoicePrinterPromise;
+  return crystalInvoicePrinterPromise;
 }
 
 export function hasRequiredCredoCustomerData(shippingForm: ShippingFormState): boolean {
