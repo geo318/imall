@@ -26,6 +26,7 @@ type PaymentStepProps = {
     action: string;
     fields: Record<string, string>;
     ready: boolean;
+    reason: "missingCart" | "missingCustomerData" | null;
   };
   submitting: boolean;
   checkingStatus: boolean;
@@ -184,7 +185,15 @@ export function PaymentStep({
             name="mode"
             value="server-form"
             className="flex w-full items-center justify-center rounded-lg bg-[#006393] p-[18px] text-[14px] font-tbcx-bold text-white outline-none transition-all hover:bg-[#006393]/90 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
-            disabled={submitting || checkingStatus || !credoLaunchForm.ready}
+            disabled={submitting || checkingStatus}
+            onClick={(event) => {
+              if (credoLaunchForm.ready) {
+                return;
+              }
+
+              event.preventDefault();
+              void onSubmit();
+            }}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -227,6 +236,15 @@ export function PaymentStep({
           </Button>
         )}
       </div>
+      {paymentMethod === "installments" &&
+      installmentProvider === "credo" &&
+      !credoLaunchForm.ready ? (
+        <p className="mt-3 text-sm text-amber-700">
+          {credoLaunchForm.reason === "missingCart"
+            ? t("checkout.installments.missingCart")
+            : t("checkout.installments.missingCredoData")}
+        </p>
+      ) : null}
     </div>
   );
 }

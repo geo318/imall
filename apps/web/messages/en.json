@@ -577,6 +577,7 @@
       "defaultBadge": "Default",
       "saveAddress": "Save this address",
       "saveValidation": "Fill first name, last name, address, and city before saving.",
+      "continueValidation": "Fill first name, last name, email, phone, address, and city before continuing.",
       "savedSuccess": "Address saved.",
       "alreadySaved": "This address is already saved.",
       "saveFailedDefault": "Failed to save address."
@@ -631,6 +632,7 @@
       "statusUnknown": "Unable to detect installment status right now.",
       "notFound": "No installment request was found at the bank yet. Please wait a bit and retry.",
       "invalidRequest": "Installment request details are invalid. Please start a new installment request.",
+      "missingCart": "Your cart session expired. Add the product again and retry installments.",
       "missingCredoData": "Please fill first name, last name, email, phone, and address before starting online installments.",
       "fallbackTitle": "Fallback option",
       "fallbackHint": "If the bank page does not open in this tab, try opening it in a new tab.",

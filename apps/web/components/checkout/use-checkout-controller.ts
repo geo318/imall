@@ -12,6 +12,7 @@ import {
   createMyShippingAddress,
   getMyShippingAddresses,
   type UserShippingAddress,
+  updateMyShippingAddress,
 } from "@/actions/user-addresses";
 import { useTranslations } from "@/i18n/provider";
 import type { CartItem } from "@/lib/api/cart";
@@ -52,6 +53,7 @@ type CredoLaunchFormConfig = {
   action: string;
   fields: Record<string, string>;
   ready: boolean;
+  reason: "missingCart" | "missingCustomerData" | null;
 };
 
 const DEFAULT_CART_STORAGE_KEY = "cart";
@@ -104,6 +106,19 @@ function findDuplicateAddress(
       normalizeAddressValue(address.addressLine1) === normalizeAddressValue(payload.addressLine1) &&
       normalizeAddressValue(address.city) === normalizeAddressValue(payload.city) &&
       normalizeAddressValue(address.postalCode) === normalizeAddressValue(payload.postalCode),
+  );
+}
+
+export function matchingAddressNeedsRefresh(
+  address: UserShippingAddress,
+  shippingForm: ShippingFormState,
+): boolean {
+  const payload = mapShippingFormToAddressInput(shippingForm);
+
+  return (
+    normalizeAddressValue(address.email) !== normalizeAddressValue(payload.email) ||
+    normalizeAddressValue(address.phone) !== normalizeAddressValue(payload.phone) ||
+    normalizeAddressValue(address.region) !== normalizeAddressValue(payload.region)
   );
 }
 
@@ -183,6 +198,21 @@ export function isCredoLaunchReady(cartKey: string, shippingForm: ShippingFormSt
   return Boolean(resolveStoredCartId(cartKey)) && hasRequiredCredoCustomerData(shippingForm);
 }
 
+export function getCredoLaunchBlockReason(
+  cartKey: string,
+  shippingForm: ShippingFormState,
+): "missingCart" | "missingCustomerData" | null {
+  if (!resolveStoredCartId(cartKey)) {
+    return "missingCart";
+  }
+
+  if (!hasRequiredCredoCustomerData(shippingForm)) {
+    return "missingCustomerData";
+  }
+
+  return null;
+}
+
 export function useCheckoutController({
   cartKey,
   initialPaymentMethod = "card",
@@ -225,14 +255,26 @@ export function useCheckoutController({
     () => findDuplicateAddress(savedAddresses, shippingForm),
     [savedAddresses, shippingForm],
   );
+  const existingAddressNeedsRefresh = useMemo(
+    () =>
+      existingAddressMatch
+        ? matchingAddressNeedsRefresh(existingAddressMatch, shippingForm)
+        : false,
+    [existingAddressMatch, shippingForm],
+  );
   const credoLaunchForm = useMemo<CredoLaunchFormConfig>(() => {
     const cartId = typeof globalThis.window !== "undefined" ? resolveStoredCartId(cartKey) : null;
     const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
     const normalizedMobile = normalizeCredoMobile(shippingForm.phone);
+    const reason =
+      typeof globalThis.window !== "undefined"
+        ? getCredoLaunchBlockReason(cartKey, shippingForm)
+        : null;
 
     return {
       action: "/api/checkout/installments/credo/launch",
-      ready: isCredoLaunchReady(cartKey, shippingForm),
+      ready: reason === null,
+      reason,
       fields: {
         cartId: cartId ?? "",
         cartKey,
@@ -423,8 +465,35 @@ export function useCheckoutController({
       });
 
       const duplicate = findDuplicateAddress(savedAddresses, shippingForm);
+      const duplicateNeedsRefresh = duplicate
+        ? matchingAddressNeedsRefresh(duplicate, shippingForm)
+        : false;
 
       if (duplicate) {
+        if (duplicateNeedsRefresh) {
+          try {
+            const updated = await updateMyShippingAddress(duplicate.id, payload);
+            setSavedAddresses((previous) => {
+              const next = previous.map((address) =>
+                address.id === updated.id ? updated : address,
+              );
+              return next.sort((left, right) => Number(right.isDefault) - Number(left.isDefault));
+            });
+            setSelectedAddressId(updated.id);
+            if (manual) {
+              setAddressMessage(t("checkout.shipping.savedSuccess"));
+            }
+            return updated;
+          } catch (error) {
+            if (manual) {
+              const message =
+                error instanceof Error ? error.message : t("checkout.shipping.saveFailedDefault");
+              setErrorMessage(message);
+            }
+            return null;
+          }
+        }
+
         setSelectedAddressId(duplicate.id);
         if (manual) {
           setAddressMessage(t("checkout.shipping.alreadySaved"));
@@ -503,16 +572,24 @@ export function useCheckoutController({
   }, [cartKey, clearInstallmentState, pendingOrderCode, t]);
 
   const continueFromShipping = useCallback(async () => {
-    if (savedAddresses.length === 0) {
+    if (!hasRequiredCredoCustomerData(shippingForm)) {
+      setErrorMessage(t("checkout.shipping.continueValidation"));
+      return;
+    }
+
+    if (savedAddresses.length === 0 || existingAddressNeedsRefresh) {
       await persistCurrentAddress();
     }
     setStep("payment");
-  }, [persistCurrentAddress, savedAddresses.length]);
+  }, [existingAddressNeedsRefresh, persistCurrentAddress, savedAddresses.length, shippingForm, t]);
 
   const submitCheckout = useCallback(
     async (launchMode: CredoLaunchMode = "server-assign") => {
       const cartId = resolveStoredCartId(cartKey);
-      if (!cartId) return;
+      if (!cartId) {
+        setErrorMessage(t("checkout.installments.missingCart"));
+        return;
+      }
       setSubmitting(true);
       try {
         if (paymentMethod === "installments") {
@@ -689,7 +766,7 @@ export function useCheckoutController({
     addressActionPending,
     selectedAddressId,
     addressMessage,
-    saveAddressDisabled: Boolean(existingAddressMatch),
+    saveAddressDisabled: Boolean(existingAddressMatch && !existingAddressNeedsRefresh),
     applySavedAddress,
     persistCurrentAddress,
     handleContinue,

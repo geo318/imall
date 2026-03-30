@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { EMPTY_SHIPPING_FORM } from "./types";
-import { isCredoLaunchReady, resolveStoredCartId } from "./use-checkout-controller";
+import {
+  getCredoLaunchBlockReason,
+  isCredoLaunchReady,
+  matchingAddressNeedsRefresh,
+  resolveStoredCartId,
+} from "./use-checkout-controller";
 
 function createStorage(initialEntries = {}) {
   const storage = new Map(Object.entries(initialEntries));
@@ -95,5 +100,40 @@ describe("use-checkout-controller credo readiness", () => {
 
     expect(resolveStoredCartId("cart")).toBeNull();
     expect(isCredoLaunchReady("cart", shippingForm)).toBe(false);
+  });
+
+  test("reports missing customer data when cart exists but required credo fields are incomplete", () => {
+    globalThis.window.localStorage.setItem("cart", "cart-global-1");
+
+    const shippingForm = createShippingForm({ phone: "" });
+
+    expect(getCredoLaunchBlockReason("cart", shippingForm)).toBe("missingCustomerData");
+    expect(isCredoLaunchReady("cart", shippingForm)).toBe(false);
+  });
+
+  test("matching saved address can be refreshed when email or phone is missing", () => {
+    const shippingForm = createShippingForm();
+
+    expect(
+      matchingAddressNeedsRefresh(
+        {
+          id: "address-1",
+          label: null,
+          firstName: "Giorgi",
+          lastName: "Lomidze",
+          email: null,
+          phone: null,
+          addressLine1: "Tbilisi",
+          city: "Tbilisi",
+          region: null,
+          postalCode: null,
+          country: "GE",
+          isDefault: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        shippingForm,
+      ),
+    ).toBe(true);
   });
 });
