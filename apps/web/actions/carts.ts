@@ -60,7 +60,11 @@ async function backendRequest(
   return response;
 }
 
-async function extractBackendError(response: Response, fallback: string, context: string): Promise<string> {
+async function extractBackendError(
+  response: Response,
+  fallback: string,
+  context: string,
+): Promise<string> {
   const raw = await response.text();
   let message = fallback;
   let parsedBody: Record<string, unknown> | null = null;
@@ -159,7 +163,7 @@ export async function getCart(cartId: string) {
   const response = await backendRequest(`/carts/${cartId}`);
 
   if (!response.ok) {
-    if (response.status === 404) {
+    if (response.status === 404 || response.status === 409) {
       throw new Error("Cart not found");
     }
 

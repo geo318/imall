@@ -2,11 +2,15 @@
 
 import { Button } from "@repo/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { addToCartSafe, createCartSafe, getCart } from "@/actions/carts";
 import { useRouter } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
-import { toast } from "sonner";
-import { addToCartSafe, createCartSafe } from "@/actions/carts";
-import { dispatchCartStorageUpdated, writeCartIdToStorage } from "@/lib/cart-storage";
+import {
+  clearCartIdFromStorage,
+  dispatchCartStorageUpdated,
+  writeCartIdToStorage,
+} from "@/lib/cart-storage";
 import { revalidateCartClient } from "@/lib/revalidate-client";
 
 type Props = {
@@ -29,6 +33,20 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
       const isClient = globalThis.window !== undefined;
       let cartId = isClient ? globalThis.window.localStorage.getItem(key) : null;
 
+      if (cartId) {
+        try {
+          const cart = await getCart(cartId);
+          if (cart.status !== "open") {
+            throw new Error("Cart not found");
+          }
+        } catch {
+          if (isClient) {
+            clearCartIdFromStorage(key);
+          }
+          cartId = null;
+        }
+      }
+
       if (!cartId) {
         const createResult = await createCartSafe();
         if (!createResult.ok) {
@@ -48,9 +66,13 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
         return cartId;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        if (msg.toLowerCase().includes("not found") || msg === "NOT_FOUND") {
+        if (
+          msg.toLowerCase().includes("not found") ||
+          msg.toLowerCase().includes("cart is not open") ||
+          msg === "NOT_FOUND"
+        ) {
           if (isClient) {
-            globalThis.window.localStorage.removeItem(key);
+            clearCartIdFromStorage(key);
           }
           const createResult = await createCartSafe();
           if (!createResult.ok) {
@@ -71,7 +93,9 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
     },
   });
 
-  const addVariantAndNavigate = async (destination: "cart" | "checkout" | "checkoutInstallments") => {
+  const addVariantAndNavigate = async (
+    destination: "cart" | "checkout" | "checkoutInstallments",
+  ) => {
     if (!selectedVariantId) return;
 
     try {

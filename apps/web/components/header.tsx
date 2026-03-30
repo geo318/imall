@@ -27,6 +27,7 @@ import { fetchCategoryTree } from "@/lib/api/categories";
 import {
   CART_STORAGE_KEY,
   CART_STORAGE_UPDATED_EVENT,
+  clearCartIdFromStorage,
   readCartIdFromStorage,
 } from "@/lib/cart-storage";
 import { HeaderFavorites } from "./header-favorites";
@@ -155,7 +156,7 @@ export function Header({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isMenuOpen]);
 
-  const { data: cartData } = useQuery({
+  const { data: cartData, error: cartError } = useQuery({
     queryKey: ["cart", cartId],
     queryFn: () => getCart(cartId as string),
     enabled: Boolean(cartId),
@@ -165,6 +166,19 @@ export function Header({
     refetchOnReconnect: false,
     retry: false,
   });
+
+  useEffect(() => {
+    if (!(cartError instanceof Error)) {
+      return;
+    }
+
+    if (!cartError.message.toLowerCase().includes("not found")) {
+      return;
+    }
+
+    clearCartIdFromStorage(CART_STORAGE_KEY);
+    setCartId(null);
+  }, [cartError]);
 
   const { data: categories = [] } = useQuery({
     queryKey: ["categories-tree", locale],

@@ -279,7 +279,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         .from(carts)
         .where(eq(carts.id, cartId))
         .limit(1);
-      if (!cart) {
+      if (!cart || cart.status !== "open") {
         set.status = 404;
         return { error: "Cart not found" };
       }
@@ -386,12 +386,15 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
 
         // Verify cart exists and user has access
         const [cart] = await tx
-          .select({ id: carts.id, userId: carts.userId })
+          .select({ id: carts.id, userId: carts.userId, status: carts.status })
           .from(carts)
           .where(eq(carts.id, cartId))
           .limit(1);
         if (!cart) {
           throw new Response("Cart not found", { status: 404 });
+        }
+        if (cart.status !== "open") {
+          throw new Response("Cart is not open", { status: 409 });
         }
         // Authorization: If cart has a userId, ensure the authenticated user matches
         if (cart.userId && auth?.userId !== cart.userId) {
@@ -485,6 +488,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
             tenantId: cartItems.tenantId,
             variantId: cartItems.variantId,
             cartUserId: carts.userId,
+            cartStatus: carts.status,
           })
           .from(cartItems)
           .innerJoin(carts, eq(cartItems.cartId, carts.id))
@@ -493,6 +497,9 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
 
         if (!item) {
           throw new Response("Cart item not found", { status: 404 });
+        }
+        if (item.cartStatus !== "open") {
+          throw new Response("Cart is not open", { status: 409 });
         }
 
         // Authorization: If cart has a userId, ensure the authenticated user matches
@@ -545,13 +552,16 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
     try {
       await db.transaction(async (tx) => {
         const [item] = await tx
-          .select({ id: cartItems.id, cartUserId: carts.userId })
+          .select({ id: cartItems.id, cartUserId: carts.userId, cartStatus: carts.status })
           .from(cartItems)
           .innerJoin(carts, eq(cartItems.cartId, carts.id))
           .where(and(eq(cartItems.id, itemId), eq(cartItems.cartId, cartId)))
           .limit(1);
         if (!item) {
           throw new Response("Cart item not found", { status: 404 });
+        }
+        if (item.cartStatus !== "open") {
+          throw new Response("Cart is not open", { status: 409 });
         }
 
         // Authorization: If cart has a userId, ensure the authenticated user matches
