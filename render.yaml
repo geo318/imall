@@ -38,6 +38,14 @@ services:
         sync: false
       - key: CLOUDINARY_DELIVERY_TRANSFORMATION
         sync: false
+      - key: KEEPZ_RSA_STATE_FILE
+        sync: false
+      - key: KEEPZ_DIRECT_SETTLEMENTS_BASE_URL
+        sync: false
+      - key: KEEPZ_DIRECT_SETTLEMENTS_CLIENT_ID
+        sync: false
+      - key: KEEPZ_DIRECT_SETTLEMENTS_CLIENT_SECRET
+        sync: false
 
   - type: web
     name: imall

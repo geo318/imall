@@ -2,6 +2,7 @@ import { db } from "@repo/db";
 import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { bidPayloadSchema, env, listQuerySchema } from "./context";
+import { getKeepzDirectSettlementsDiagnostics } from "./integrations/keepz-direct-settlements";
 import { adminProductsRoutes } from "./routes/admin-products";
 import { adminShopRoutes } from "./routes/admin-shops";
 import { adminUploadRoutes } from "./routes/admin-upload";
@@ -11,6 +12,9 @@ import { categoriesRoutes } from "./routes/categories";
 import { favoritesRoutes } from "./routes/favorites";
 import { imageRoutes } from "./routes/images";
 import { inventoryRoutes } from "./routes/inventory";
+import { getKeepzConfigDiagnostics } from "./integrations/keepz-ecommerce";
+import { keepzCallbackRoutes } from "./routes/keepz-callback";
+import { keepzDirectSettlementsRoutes } from "./routes/keepz-direct-settlements";
 import { allProductsRoutes, productsRoutes } from "./routes/products";
 import { shopsRoutes } from "./routes/shops";
 import { superadminRoutes } from "./routes/superadmin";
@@ -70,8 +74,15 @@ async function logStartupDiagnostics(port: number) {
     merchantId: env.CREDO_MERCHANT_ID || null,
     orderUrl: env.CREDO_WIDGET_ORDER_URL || "https://ganvadeba.credo.ge/widget_api/order.php",
     statusUrl: env.CREDO_WIDGET_STATUS_URL || "https://ganvadeba.credo.ge/widget/api.php",
-    enabled: Boolean(env.CREDO_MERCHANT_ID && env.CREDO_SHARED_SECRET),
+    enabled: Boolean(env.CREDO_MERCHANT_ID),
+    secretConfigured: Boolean(env.CREDO_SHARED_SECRET?.trim()),
   });
+  const keepzDiagnostics = getKeepzConfigDiagnostics();
+  console.log("[API][BOOT] KEEPZ_ECOMMERCE:", {
+    baseUrl: env.KEEPZ_ECOMMERCE_BASE_URL || "https://gateway.dev.keepz.me/ecommerce-service",
+    ...keepzDiagnostics,
+  });
+  console.log("[API][BOOT] KEEPZ_DIRECT_SETTLEMENTS:", getKeepzDirectSettlementsDiagnostics());
 
   console.log("[API][BOOT] Step 2/4: Database probe");
   try {
@@ -162,6 +173,8 @@ const app = new Elysia({ prefix: "/api" })
     }
   })
   .use(cartRoutes) // Single cart (can hold items from multiple shops) - register early to avoid conflicts
+  .use(keepzCallbackRoutes)
+  .use(keepzDirectSettlementsRoutes)
   .use(imageRoutes) // Image serving - register early to avoid conflicts
   .use(shopsRoutes)
   .use(categoriesRoutes)
@@ -183,6 +196,8 @@ const app = new Elysia({ prefix: "/api" })
     console.log("[API]   - /api/products");
     console.log("[API]   - /api/carts");
     console.log("[API]   - /api/carts/:cartId/checkout/installments/*");
+    console.log("[API]   - /api/payments/keepz/callback");
+    console.log("[API]   - /api/payments/keepz/direct-settlements/*");
     console.log("[API]   - /api/inventory");
     console.log("[API]   - /api/auctions");
     console.log("[API]   - /api/users/me/addresses");
@@ -211,6 +226,10 @@ async function bootstrapApi() {
   console.log("[API]   POST /api/carts/:cartId/checkout");
   console.log("[API]   POST /api/carts/:cartId/checkout/installments/start");
   console.log("[API]   POST /api/carts/:cartId/checkout/installments/status");
+  console.log("[API]   POST /api/carts/:cartId/checkout/installments/cancel");
+  console.log("[API]   POST /api/carts/:cartId/checkout/installments/refund");
+  console.log("[API]   POST /api/payments/keepz/callback");
+  console.log("[API]   /api/payments/keepz/direct-settlements/*");
   console.log("[API]   GET  /api/users/me/addresses");
   console.log("[API]   POST /api/users/me/addresses");
   console.log("[API]   GET  /api/users/me/orders");

@@ -20,6 +20,7 @@ import {
   getAvailableStockMap,
   getVariantInventoryStatusMap,
   INVENTORY_REASONS,
+  env,
 } from "../context";
 import {
   type CredoInstallmentProduct,
@@ -27,19 +28,47 @@ import {
   fetchCredoInstallmentStatus,
   validateOrderCodeForCart,
 } from "../integrations/credo-installments";
+import {
+  KeepzApiError,
+  KeepzConfigError,
+  cancelKeepzOrder,
+  createKeepzOrder,
+  getKeepzConfigDiagnostics,
+  getKeepzOrderStatus,
+  isKeepzEcommerceConfigured,
+  refundKeepzOrder,
+} from "../integrations/keepz-ecommerce";
 import { sanitizePersistedImageUrls } from "../utils/image-urls";
 import { logger } from "../utils/logger";
 
 const installmentStartSchema = z.object({
+  provider: z.enum(["credo", "keepz"]).default("credo"),
+  paymentType: z.enum(["card", "installments"]).default("installments"),
   installmentLength: z.coerce.number().int().positive().max(60).optional(),
   clientFullName: z.string().trim().max(128).optional(),
   mobile: z.string().trim().max(32).optional(),
   email: z.string().email().max(256).optional(),
   factAddress: z.string().trim().max(256).optional(),
+  personalNumber: z.string().trim().max(32).optional(),
+  isForeign: z.coerce.boolean().optional(),
 });
 
 const installmentStatusSchema = z.object({
   orderCode: z.string().trim().min(16).max(50),
+  provider: z.enum(["credo", "keepz"]).optional(),
+  paymentType: z.enum(["card", "installments"]).optional(),
+});
+
+const installmentCancelSchema = z.object({
+  orderCode: z.string().trim().min(16).max(50),
+  provider: z.enum(["credo", "keepz"]).optional(),
+});
+
+const installmentRefundSchema = z.object({
+  orderCode: z.string().trim().min(16).max(50),
+  provider: z.enum(["keepz"]).default("keepz"),
+  amount: z.coerce.number().positive(),
+  refundInitiator: z.enum(["INTEGRATOR", "OPERATOR"]).optional(),
 });
 
 const manualInstallmentCheckoutSchema = z.object({
@@ -69,6 +98,11 @@ type CompleteCartCheckoutOptions = {
 
 const CREDO_APPROVED_STATUS_IDS = new Set([3, 4, 12, 5]);
 const CREDO_CANCELLED_STATUS_IDS = new Set([6, 7]);
+const KEEPZ_SUCCESS_STATUSES = new Set(["SUCCESS"]);
+const KEEPZ_CANCELLED_STATUSES = new Set(["FAILED", "CANCELED", "EXPIRED"]);
+const KEEPZ_DESERIALIZE_ERROR_PATTERN = /(can'?t|cannot)\s+deserialize\s+object/i;
+const KEEPZ_DEFAULT_MIN_ORDER_AMOUNT = 1.1;
+const KEEPZ_DEFAULT_MAX_ORDER_AMOUNT = 3000;
 
 function toInstallmentFlowStage(statusId: number | null, fallback: string | null): string | null {
   if (statusId === 5) return "completed";
@@ -79,7 +113,159 @@ function toInstallmentFlowStage(statusId: number | null, fallback: string | null
   return fallback;
 }
 
-async function completeCartCheckout(
+function toKeepzFlowStage(status: string, fallback: string | null): string | null {
+  if (status === "SUCCESS") return "completed";
+  if (status === "PROCESSING") return "pending";
+  if (status === "INITIAL") return "approved";
+  if (status === "CANCELED") return "cancelled";
+  if (status === "EXPIRED") return "expired";
+  if (status === "FAILED") return "failed";
+  if (status === "REFUND_REQUESTED") return "refund_requested";
+  if (status === "PARTIALLY_REFUNDED") return "partially_refunded";
+  if (
+    status === "REFUNDED_BY_OPERATOR" ||
+    status === "REFUNDED_BY_INTEGRATOR" ||
+    status === "REFUNDED_BY_KEEPZ"
+  ) {
+    return "refunded";
+  }
+  if (status === "REFUNDED_FAILED") return "refund_failed";
+  return fallback;
+}
+
+function sanitizeKeepzErrorRaw(raw: unknown): unknown {
+  if (typeof raw === "string") {
+    return raw.length > 800 ? `${raw.slice(0, 800)}…` : raw;
+  }
+
+  if (!raw || typeof raw !== "object") {
+    return raw;
+  }
+
+  const record = raw as Record<string, unknown>;
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "encryptedData" || key === "encryptedKeys") {
+      const length = typeof value === "string" ? value.length : null;
+      sanitized[key] = `<redacted length=${length ?? "n/a"}>`;
+      continue;
+    }
+    if (typeof value === "string" && value.length > 800) {
+      sanitized[key] = `${value.slice(0, 800)}…`;
+      continue;
+    }
+    sanitized[key] = value;
+  }
+
+  return sanitized;
+}
+
+function trimTrailingZeros(amount: number): string {
+  if (!Number.isFinite(amount)) return String(amount);
+  return amount.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function getKeepzOrderAmountLimits(): { minAmount: number; maxAmount: number; misconfigured: boolean } {
+  const configuredMin = env.KEEPZ_MIN_ORDER_AMOUNT ?? KEEPZ_DEFAULT_MIN_ORDER_AMOUNT;
+  const configuredMax = env.KEEPZ_MAX_ORDER_AMOUNT ?? KEEPZ_DEFAULT_MAX_ORDER_AMOUNT;
+  return {
+    minAmount: Math.min(configuredMin, configuredMax),
+    maxAmount: Math.max(configuredMin, configuredMax),
+    misconfigured: configuredMin > configuredMax,
+  };
+}
+
+function normalizeKeepzErrorMessage(error: KeepzApiError): string {
+  const normalized = error.message.trim();
+  if (KEEPZ_DESERIALIZE_ERROR_PATTERN.test(normalized)) {
+    return "Keepz rejected encrypted payload. Check KEEPZ/CREDO RSA keys and merchant credentials.";
+  }
+  if (error.keepzStatusCode === 6026) {
+    const { minAmount, maxAmount } = getKeepzOrderAmountLimits();
+    return `Keepz amount must be in range ${trimTrailingZeros(minAmount)}-${trimTrailingZeros(maxAmount)} GEL.`;
+  }
+  if (!normalized) {
+    return "Keepz request failed";
+  }
+  return normalized;
+}
+
+function buildKeepzErrorResponse(error: KeepzApiError): Record<string, unknown> {
+  const response: Record<string, unknown> = {
+    error: normalizeKeepzErrorMessage(error),
+    statusCode: error.keepzStatusCode,
+    exceptionGroup: error.exceptionGroup,
+  };
+
+  if (env.NODE_ENV === "development") {
+    response.message = error.message;
+    response.debug = sanitizeKeepzErrorRaw(error.raw);
+  }
+
+  return response;
+}
+
+function buildKeepzNotConfiguredResponse() {
+  const response: Record<string, unknown> = {
+    error: "Keepz integration is not configured",
+    code: "KEEPZ_NOT_CONFIGURED",
+  };
+  if (env.NODE_ENV === "development") {
+    response.debug = getKeepzConfigDiagnostics();
+  }
+  return response;
+}
+
+function buildKeepzConfigErrorResponse(error: KeepzConfigError): Record<string, unknown> {
+  const response: Record<string, unknown> = {
+    error: error.message,
+    code: "KEEPZ_NOT_CONFIGURED",
+  };
+  if (env.NODE_ENV === "development") {
+    response.debug = error.details;
+  }
+  return response;
+}
+
+function logKeepzApiError(
+  action: "start" | "status" | "cancel" | "refund",
+  context: Record<string, unknown>,
+  error: KeepzApiError,
+) {
+  logger.error(`[Cart Route] Keepz ${action} failed`, {
+    ...context,
+    httpStatus: error.httpStatus,
+    keepzMessage: error.message,
+    statusCode: error.keepzStatusCode,
+    exceptionGroup: error.exceptionGroup,
+    raw: sanitizeKeepzErrorRaw(error.raw),
+  });
+}
+
+function logKeepzConfigError(
+  action: "start" | "status" | "cancel" | "refund",
+  context: Record<string, unknown>,
+  error: KeepzConfigError,
+) {
+  logger.error(`[Cart Route] Keepz ${action} config error`, {
+    ...context,
+    message: error.message,
+    details: error.details,
+  });
+}
+
+function inferStatusProvider(
+  payload: z.infer<typeof installmentStatusSchema>,
+  cartId: string,
+): "credo" | "keepz" {
+  if (payload.provider) {
+    return payload.provider;
+  }
+
+  return validateOrderCodeForCart(payload.orderCode, cartId) ? "credo" : "keepz";
+}
+
+export async function completeCartCheckout(
   cartId: string,
   authUserId: string | null,
   options: CompleteCartCheckoutOptions = {},
@@ -658,7 +844,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         return { error: "Cart is not open" };
       }
 
-      const cartItemsForCredo = rows.filter(
+      const checkoutItems = rows.filter(
         (
           row,
         ): row is (typeof rows)[number] & {
@@ -679,12 +865,12 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           ),
       );
 
-      if (cartItemsForCredo.length === 0) {
+      if (checkoutItems.length === 0) {
         set.status = 400;
         return { error: "Cart is empty" };
       }
 
-      const distinctTenantIds = new Set(cartItemsForCredo.map((item) => item.tenantId));
+      const distinctTenantIds = new Set(checkoutItems.map((item) => item.tenantId));
       if (distinctTenantIds.size > 1) {
         set.status = 409;
         return {
@@ -693,10 +879,121 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         };
       }
 
-      const firstCartItem = cartItemsForCredo[0];
+      const firstCartItem = checkoutItems[0];
       if (!firstCartItem) {
         set.status = 400;
         return { error: "Cart is empty" };
+      }
+
+      // Reuse stock checks from standard checkout to avoid sending impossible applications.
+      const variantIdsByTenant = new Map<string, Set<string>>();
+      for (const item of checkoutItems) {
+        const tenantVariants = variantIdsByTenant.get(item.tenantId) ?? new Set<string>();
+        tenantVariants.add(item.variantId);
+        variantIdsByTenant.set(item.tenantId, tenantVariants);
+      }
+
+      const stockByTenant = new Map<string, Map<string, number>>();
+      await Promise.all(
+        Array.from(variantIdsByTenant.entries()).map(async ([tenantId, variantIds]) => {
+          stockByTenant.set(tenantId, await getAvailableStockMap(tenantId, Array.from(variantIds)));
+        }),
+      );
+
+      for (const item of checkoutItems) {
+        const available = stockByTenant.get(item.tenantId)?.get(item.variantId) ?? 0;
+        if (available < item.qty) {
+          set.status = 409;
+          return {
+            error: "Insufficient stock",
+            message: `${item.productTitle} has only ${available} available`,
+          };
+        }
+      }
+
+      const subtotal = checkoutItems.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
+
+      if (payload.provider === "keepz") {
+        if (!isKeepzEcommerceConfigured()) {
+          set.status = 503;
+          return buildKeepzNotConfiguredResponse();
+        }
+
+        const callbackUri = (() => {
+          const configured = env.KEEPZ_CALLBACK_URL?.trim();
+          if (configured) {
+            try {
+              const url = new URL(configured);
+              url.searchParams.set("cartId", cartId);
+              url.searchParams.set("paymentType", payload.paymentType);
+              return url.toString();
+            } catch {
+              return configured;
+            }
+          }
+
+          try {
+            const fallback = new URL("/api/payments/keepz/callback", env.BACKEND_URL);
+            fallback.searchParams.set("cartId", cartId);
+            fallback.searchParams.set("paymentType", payload.paymentType);
+            return fallback.toString();
+          } catch {
+            return undefined;
+          }
+        })();
+
+        const commission = payload.paymentType === "installments" ? subtotal * 0.12 : 0;
+        const amount = Number((subtotal + commission).toFixed(2));
+        const { minAmount, maxAmount, misconfigured } = getKeepzOrderAmountLimits();
+        if (misconfigured) {
+          logger.warn("[Cart Route] Keepz amount range env is inverted; using normalized bounds", {
+            configuredMin: env.KEEPZ_MIN_ORDER_AMOUNT,
+            configuredMax: env.KEEPZ_MAX_ORDER_AMOUNT,
+            normalizedMin: minAmount,
+            normalizedMax: maxAmount,
+          });
+        }
+        if (amount < minAmount || amount > maxAmount) {
+          logger.warn("[Cart Route] Keepz start blocked by amount range", {
+            cartId,
+            paymentType: payload.paymentType,
+            amount,
+            minAmount,
+            maxAmount,
+            subtotal: Number(subtotal.toFixed(2)),
+            commission: Number(commission.toFixed(2)),
+          });
+          set.status = 400;
+          return {
+            error: `Keepz amount must be in range ${trimTrailingZeros(minAmount)}-${trimTrailingZeros(maxAmount)} GEL.`,
+            code: "KEEPZ_AMOUNT_OUT_OF_RANGE",
+            amount,
+            minAmount,
+            maxAmount,
+          };
+        }
+        const keepzSession = await createKeepzOrder({
+          amount,
+          integratorOrderId: crypto.randomUUID(),
+          type: payload.paymentType,
+          callbackUri,
+          personalNumber: payload.personalNumber,
+          isForeign: payload.isForeign,
+        });
+
+        logger.info("[Cart Route] Created Keepz checkout session", {
+          cartId,
+          paymentType: payload.paymentType,
+          orderCode: keepzSession.integratorOrderId,
+          redirectUrl: keepzSession.redirectUrl,
+        });
+
+        return {
+          orderCode: keepzSession.integratorOrderId,
+          redirectUrl: keepzSession.redirectUrl,
+          provider: "keepz",
+          paymentType: payload.paymentType,
+        };
       }
 
       const mediatorTenantId = firstCartItem.tenantId;
@@ -717,33 +1014,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         mediatorShopId: mediatorShop?.shopId ?? mediatorTenantId,
       };
 
-      // Reuse stock checks from standard checkout to avoid sending impossible applications.
-      const variantIdsByTenant = new Map<string, Set<string>>();
-      for (const item of cartItemsForCredo) {
-        const tenantVariants = variantIdsByTenant.get(item.tenantId) ?? new Set<string>();
-        tenantVariants.add(item.variantId);
-        variantIdsByTenant.set(item.tenantId, tenantVariants);
-      }
-
-      const stockByTenant = new Map<string, Map<string, number>>();
-      await Promise.all(
-        Array.from(variantIdsByTenant.entries()).map(async ([tenantId, variantIds]) => {
-          stockByTenant.set(tenantId, await getAvailableStockMap(tenantId, Array.from(variantIds)));
-        }),
-      );
-
-      for (const item of cartItemsForCredo) {
-        const available = stockByTenant.get(item.tenantId)?.get(item.variantId) ?? 0;
-        if (available < item.qty) {
-          set.status = 409;
-          return {
-            error: "Insufficient stock",
-            message: `${item.productTitle} has only ${available} available`,
-          };
-        }
-      }
-
-      const credoProducts: CredoInstallmentProduct[] = cartItemsForCredo.map((item) => {
+      const credoProducts: CredoInstallmentProduct[] = checkoutItems.map((item) => {
         const unitPrice = Number(item.price);
         return {
           id: item.variantId,
@@ -755,10 +1026,6 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       });
 
       // 12% commission is charged only for installments and must be included in Credo payload.
-      const subtotal = cartItemsForCredo.reduce(
-        (sum, item) => sum + Number(item.price) * item.qty,
-        0,
-      );
       const commissionTetri = Math.round(subtotal * 0.12 * 100);
       if (commissionTetri > 0) {
         credoProducts.push({
@@ -806,8 +1073,36 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       return {
         orderCode: session.orderCode,
         redirectUrl: session.redirectUrl,
+        provider: "credo",
+        paymentType: "installments",
       };
     } catch (error) {
+      if (error instanceof KeepzConfigError) {
+        logKeepzConfigError(
+          "start",
+          {
+            cartId,
+            paymentType: payload.paymentType,
+            provider: payload.provider,
+          },
+          error,
+        );
+        set.status = 503;
+        return buildKeepzConfigErrorResponse(error);
+      }
+      if (error instanceof KeepzApiError) {
+        logKeepzApiError(
+          "start",
+          {
+            cartId,
+            paymentType: payload.paymentType,
+            provider: payload.provider,
+          },
+          error,
+        );
+        set.status = error.httpStatus || 502;
+        return buildKeepzErrorResponse(error);
+      }
       logger.error("[Cart Route] Failed to start installment checkout", {
         cartId,
         error: error instanceof Error ? error.message : String(error),
@@ -877,6 +1172,230 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       };
     }
   })
+  .post("/:cartId/checkout/installments/cancel", async ({ params, body, auth, set }) => {
+    const { cartId } = params as { cartId: string };
+
+    let payload: z.infer<typeof installmentCancelSchema>;
+    try {
+      payload = installmentCancelSchema.parse(body);
+    } catch (error) {
+      set.status = 400;
+      return {
+        error: "Invalid cancellation payload",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    try {
+      const [cart] = await db
+        .select({ id: carts.id, userId: carts.userId })
+        .from(carts)
+        .where(eq(carts.id, cartId))
+        .limit(1);
+
+      if (!cart) {
+        set.status = 404;
+        return { error: "Cart not found" };
+      }
+
+      if (cart.userId && auth?.userId !== cart.userId) {
+        set.status = 403;
+        return { error: "Forbidden: You don't have access to this cart" };
+      }
+
+      const provider =
+        payload.provider ?? (validateOrderCodeForCart(payload.orderCode, cartId) ? "credo" : "keepz");
+      if (provider !== "keepz") {
+        set.status = 400;
+        return { error: "Cancellation is supported only for Keepz orders" };
+      }
+
+      if (!isKeepzEcommerceConfigured()) {
+        set.status = 503;
+        return buildKeepzNotConfiguredResponse();
+      }
+
+      const cancellation = await cancelKeepzOrder(payload.orderCode);
+      const normalizedStatus = cancellation.status.toUpperCase();
+      const [existingOrder] = await db
+        .select({ id: orders.id, status: orders.status, installmentFlowStage: orders.installmentFlowStage })
+        .from(orders)
+        .where(eq(orders.installmentOrderCode, payload.orderCode))
+        .limit(1);
+
+      if (existingOrder) {
+        const orderPatch: Partial<typeof orders.$inferInsert> = {
+          installmentStatusId: null,
+          installmentStatusName: normalizedStatus,
+          installmentFlowStage: toKeepzFlowStage(normalizedStatus, existingOrder.installmentFlowStage),
+        };
+        if (KEEPZ_CANCELLED_STATUSES.has(normalizedStatus) && existingOrder.status !== "completed") {
+          orderPatch.status = "cancelled";
+        }
+        await db.update(orders).set(orderPatch).where(eq(orders.id, existingOrder.id));
+      }
+
+      return {
+        orderCode: payload.orderCode,
+        statusName: normalizedStatus,
+        statusProvider: "keepz",
+        raw: cancellation.raw,
+      };
+    } catch (error) {
+      if (error instanceof KeepzConfigError) {
+        logKeepzConfigError(
+          "cancel",
+          {
+            cartId,
+            orderCode: payload.orderCode,
+          },
+          error,
+        );
+        set.status = 503;
+        return buildKeepzConfigErrorResponse(error);
+      }
+      if (error instanceof KeepzApiError) {
+        logKeepzApiError(
+          "cancel",
+          {
+            cartId,
+            orderCode: payload.orderCode,
+          },
+          error,
+        );
+        set.status = error.httpStatus || 502;
+        return buildKeepzErrorResponse(error);
+      }
+
+      logger.error("[Cart Route] Failed to cancel installment order", {
+        cartId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      set.status = 500;
+      return {
+        error: "Failed to cancel installment order",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  })
+  .post("/:cartId/checkout/installments/refund", async ({ params, body, auth, set }) => {
+    const { cartId } = params as { cartId: string };
+
+    let payload: z.infer<typeof installmentRefundSchema>;
+    try {
+      payload = installmentRefundSchema.parse(body);
+    } catch (error) {
+      set.status = 400;
+      return {
+        error: "Invalid refund payload",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    try {
+      const [cart] = await db
+        .select({ id: carts.id, userId: carts.userId })
+        .from(carts)
+        .where(eq(carts.id, cartId))
+        .limit(1);
+
+      if (!cart) {
+        set.status = 404;
+        return { error: "Cart not found" };
+      }
+
+      if (cart.userId && auth?.userId !== cart.userId) {
+        set.status = 403;
+        return { error: "Forbidden: You don't have access to this cart" };
+      }
+
+      if (payload.provider !== "keepz") {
+        set.status = 400;
+        return { error: "Refund is supported only for Keepz orders" };
+      }
+
+      if (!isKeepzEcommerceConfigured()) {
+        set.status = 503;
+        return buildKeepzNotConfiguredResponse();
+      }
+
+      const refund = await refundKeepzOrder({
+        integratorOrderId: payload.orderCode,
+        amount: payload.amount,
+        refundInitiator: payload.refundInitiator,
+      });
+      const normalizedStatus = refund.status.toUpperCase();
+      const [existingOrder] = await db
+        .select({ id: orders.id, status: orders.status, installmentFlowStage: orders.installmentFlowStage })
+        .from(orders)
+        .where(eq(orders.installmentOrderCode, payload.orderCode))
+        .limit(1);
+
+      if (existingOrder) {
+        const orderPatch: Partial<typeof orders.$inferInsert> = {
+          installmentStatusId: null,
+          installmentStatusName: normalizedStatus,
+          installmentFlowStage: toKeepzFlowStage(normalizedStatus, existingOrder.installmentFlowStage),
+        };
+
+        if (
+          normalizedStatus === "REFUNDED_BY_OPERATOR" ||
+          normalizedStatus === "REFUNDED_BY_INTEGRATOR" ||
+          normalizedStatus === "REFUNDED_BY_KEEPZ"
+        ) {
+          orderPatch.status = "refunded";
+        } else if (normalizedStatus === "PARTIALLY_REFUNDED") {
+          orderPatch.status = "partially_refunded";
+        }
+
+        await db.update(orders).set(orderPatch).where(eq(orders.id, existingOrder.id));
+      }
+
+      return {
+        orderCode: payload.orderCode,
+        statusName: normalizedStatus,
+        statusProvider: "keepz",
+        raw: refund.raw,
+      };
+    } catch (error) {
+      if (error instanceof KeepzConfigError) {
+        logKeepzConfigError(
+          "refund",
+          {
+            cartId,
+            orderCode: payload.orderCode,
+            amount: payload.amount,
+          },
+          error,
+        );
+        set.status = 503;
+        return buildKeepzConfigErrorResponse(error);
+      }
+      if (error instanceof KeepzApiError) {
+        logKeepzApiError(
+          "refund",
+          {
+            cartId,
+            orderCode: payload.orderCode,
+            amount: payload.amount,
+          },
+          error,
+        );
+        set.status = error.httpStatus || 502;
+        return buildKeepzErrorResponse(error);
+      }
+
+      logger.error("[Cart Route] Failed to refund installment order", {
+        cartId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      set.status = 500;
+      return {
+        error: "Failed to refund installment order",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+  })
   .post("/:cartId/checkout/installments/status", async ({ params, body, auth, set }) => {
     const { cartId } = params as { cartId: string };
 
@@ -908,23 +1427,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         return { error: "Forbidden: You don't have access to this cart" };
       }
 
-      if (!validateOrderCodeForCart(payload.orderCode, cartId)) {
-        set.status = 400;
-        return { error: "Order code does not match this cart" };
-      }
-
-      logger.info("[Cart Route] Syncing Credo installment status", {
-        cartId,
-        orderCode: payload.orderCode,
-      });
-
-      const statusResult = await fetchCredoInstallmentStatus(payload.orderCode);
-      logger.info("[Cart Route] Credo installment status response", {
-        cartId,
-        orderCode: payload.orderCode,
-        statusId: statusResult.statusId,
-        statusName: statusResult.statusName,
-      });
+      const provider = inferStatusProvider(payload, cartId);
       let checkoutCompleted = cart.status === "completed";
       let checkoutResult: CheckoutResult | null = null;
       const [existingOrder] = await db
@@ -937,56 +1440,160 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         .where(eq(orders.installmentOrderCode, payload.orderCode))
         .limit(1);
 
-      const nextFlowStage = toInstallmentFlowStage(
-        statusResult.statusId,
-        existingOrder?.installmentFlowStage ?? null,
-      );
+      if (provider === "credo") {
+        if (!validateOrderCodeForCart(payload.orderCode, cartId)) {
+          set.status = 400;
+          return { error: "Order code does not match this cart" };
+        }
+
+        logger.info("[Cart Route] Syncing Credo installment status", {
+          cartId,
+          orderCode: payload.orderCode,
+        });
+
+        const statusResult = await fetchCredoInstallmentStatus(payload.orderCode);
+        logger.info("[Cart Route] Credo installment status response", {
+          cartId,
+          orderCode: payload.orderCode,
+          statusId: statusResult.statusId,
+          statusName: statusResult.statusName,
+        });
+
+        const nextFlowStage = toInstallmentFlowStage(
+          statusResult.statusId,
+          existingOrder?.installmentFlowStage ?? null,
+        );
+
+        if (existingOrder) {
+          const orderPatch: Partial<typeof orders.$inferInsert> = {
+            installmentStatusId: statusResult.statusId,
+            installmentStatusName: statusResult.statusName,
+            installmentFlowStage: nextFlowStage,
+          };
+
+          if (statusResult.statusId === 5 && existingOrder.status !== "completed") {
+            orderPatch.status = "completed";
+            orderPatch.installmentDeliveredAt = new Date();
+            orderPatch.installmentVerificationCode = null;
+          } else if (
+            CREDO_CANCELLED_STATUS_IDS.has(statusResult.statusId ?? Number.NaN) &&
+            existingOrder.status !== "completed"
+          ) {
+            orderPatch.status = "cancelled";
+          }
+
+          await db.update(orders).set(orderPatch).where(eq(orders.id, existingOrder.id));
+          checkoutCompleted =
+            orderPatch.status === "completed" || existingOrder.status === "completed";
+        } else if (
+          cart.status === "open" &&
+          CREDO_APPROVED_STATUS_IDS.has(statusResult.statusId ?? 0)
+        ) {
+          checkoutResult = await completeCartCheckout(cartId, auth?.userId ?? null, {
+            paymentMethod: "installments_credo",
+            orderStatus: nextFlowStage === "completed" ? "completed" : "approved",
+            installmentOrderCode: payload.orderCode,
+            installmentStatusId: statusResult.statusId,
+            installmentStatusName: statusResult.statusName,
+            installmentFlowStage: nextFlowStage ?? "approved",
+          });
+          checkoutCompleted = true;
+        }
+
+        return {
+          orderCode: payload.orderCode,
+          statusId: statusResult.statusId,
+          statusName: statusResult.statusName,
+          checkoutCompleted,
+          orders: checkoutResult?.orders ?? null,
+          raw: statusResult.raw,
+          statusProvider: "credo",
+        };
+      }
+
+      if (!isKeepzEcommerceConfigured()) {
+        set.status = 503;
+        return buildKeepzNotConfiguredResponse();
+      }
+
+      logger.info("[Cart Route] Syncing Keepz checkout status", {
+        cartId,
+        orderCode: payload.orderCode,
+      });
+
+      const statusResult = await getKeepzOrderStatus(payload.orderCode);
+      const keepzStatus = statusResult.status.toUpperCase();
+      const nextFlowStage = toKeepzFlowStage(keepzStatus, existingOrder?.installmentFlowStage ?? null);
 
       if (existingOrder) {
         const orderPatch: Partial<typeof orders.$inferInsert> = {
-          installmentStatusId: statusResult.statusId,
-          installmentStatusName: statusResult.statusName,
+          installmentStatusId: null,
+          installmentStatusName: keepzStatus,
           installmentFlowStage: nextFlowStage,
         };
 
-        if (statusResult.statusId === 5 && existingOrder.status !== "completed") {
+        if (KEEPZ_SUCCESS_STATUSES.has(keepzStatus) && existingOrder.status !== "completed") {
           orderPatch.status = "completed";
           orderPatch.installmentDeliveredAt = new Date();
           orderPatch.installmentVerificationCode = null;
         } else if (
-          CREDO_CANCELLED_STATUS_IDS.has(statusResult.statusId ?? Number.NaN) &&
+          KEEPZ_CANCELLED_STATUSES.has(keepzStatus) &&
           existingOrder.status !== "completed"
         ) {
           orderPatch.status = "cancelled";
         }
 
         await db.update(orders).set(orderPatch).where(eq(orders.id, existingOrder.id));
-        checkoutCompleted =
-          orderPatch.status === "completed" || existingOrder.status === "completed";
-      } else if (
-        cart.status === "open" &&
-        CREDO_APPROVED_STATUS_IDS.has(statusResult.statusId ?? 0)
-      ) {
+        checkoutCompleted = orderPatch.status === "completed" || existingOrder.status === "completed";
+      } else if (cart.status === "open" && KEEPZ_SUCCESS_STATUSES.has(keepzStatus)) {
         checkoutResult = await completeCartCheckout(cartId, auth?.userId ?? null, {
-          paymentMethod: "installments_credo",
-          orderStatus: nextFlowStage === "completed" ? "completed" : "approved",
+          paymentMethod: payload.paymentType === "card" ? "card_keepz" : "installments_keepz",
+          orderStatus: "completed",
           installmentOrderCode: payload.orderCode,
-          installmentStatusId: statusResult.statusId,
-          installmentStatusName: statusResult.statusName,
-          installmentFlowStage: nextFlowStage ?? "approved",
+          installmentStatusId: null,
+          installmentStatusName: keepzStatus,
+          installmentFlowStage: nextFlowStage ?? "completed",
         });
         checkoutCompleted = true;
       }
 
       return {
         orderCode: payload.orderCode,
-        statusId: statusResult.statusId,
-        statusName: statusResult.statusName,
+        statusId: null,
+        statusName: keepzStatus,
         checkoutCompleted,
         orders: checkoutResult?.orders ?? null,
         raw: statusResult.raw,
+        statusProvider: "keepz",
       };
     } catch (error) {
+      if (error instanceof KeepzConfigError) {
+        logKeepzConfigError(
+          "status",
+          {
+            cartId,
+            orderCode: payload.orderCode,
+            paymentType: payload.paymentType ?? null,
+          },
+          error,
+        );
+        set.status = 503;
+        return buildKeepzConfigErrorResponse(error);
+      }
+      if (error instanceof KeepzApiError) {
+        logKeepzApiError(
+          "status",
+          {
+            cartId,
+            orderCode: payload.orderCode,
+            paymentType: payload.paymentType ?? null,
+          },
+          error,
+        );
+        set.status = error.httpStatus || 502;
+        return buildKeepzErrorResponse(error);
+      }
+
       logger.error("[Cart Route] Failed to sync installment status", {
         cartId,
         error: error instanceof Error ? error.message : String(error),

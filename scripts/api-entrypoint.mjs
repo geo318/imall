@@ -1,4 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { ensureKeepzRsaKeys } from "./ensure-keepz-rsa-keys.mjs";
 
 const now = () => new Date().toISOString();
 
@@ -74,6 +77,13 @@ function parseCloudinaryCredentials() {
   };
 }
 
+function resolveKeepzRsaStateFile() {
+  const configured = process.env.KEEPZ_RSA_STATE_FILE?.trim();
+  if (configured) return configured;
+  if (existsSync("/var/data")) return "/var/data/keepz-rsa-keys.env";
+  return path.resolve(process.cwd(), ".env");
+}
+
 function runChecked(step, command, args) {
   const startedAt = Date.now();
   log(step, `Running: ${[command, ...args].join(" ")}`);
@@ -87,9 +97,11 @@ function runChecked(step, command, args) {
   log(step, `Success in ${durationMs}ms`);
 }
 
-log("1/4", "Container startup diagnostics");
+const keepzRsaStateFile = resolveKeepzRsaStateFile();
+
+log("1/5", "Container startup diagnostics");
 const cloudinary = parseCloudinaryCredentials();
-log("1/4", "Runtime env", {
+log("1/5", "Runtime env", {
   nodeEnv: process.env.NODE_ENV ?? null,
   port: process.env.PORT ?? null,
   renderServiceName: process.env.RENDER_SERVICE_NAME ?? null,
@@ -103,16 +115,31 @@ log("1/4", "Runtime env", {
   cloudinaryConfigured: cloudinary.configured,
   cloudinarySource: cloudinary.source,
   cloudinaryCloudName: cloudinary.cloudName,
+  keepzRsaStateFile,
 });
 
-log("2/4", "Running database migrations (db:push:ci, non-interactive)");
-runChecked("2/4", "bun", ["run", "db:push:ci"]);
+log("2/5", "Ensuring Keepz/Credo RSA keypair");
+const keepzKeyResult = ensureKeepzRsaKeys({
+  env: process.env,
+  envFilePath: keepzRsaStateFile,
+  write: true,
+  targetPrefix: "CREDO",
+  logger: (message) => log("2/5", message),
+});
+log("2/5", "Keepz/Credo RSA state", {
+  generated: keepzKeyResult.generated,
+  source: keepzKeyResult.source,
+  stateFile: keepzRsaStateFile,
+});
 
-log("3/4", "Starting API process");
+log("3/5", "Running database migrations (db:push:ci, non-interactive)");
+runChecked("3/5", "bun", ["run", "db:push:ci"]);
+
+log("4/5", "Starting API process");
 const child = spawn("bun", ["apps/api/dist/index.js"], { stdio: "inherit" });
 
 const forwardSignal = (signal) => {
-  log("3/4", `Forwarding signal ${signal} to API process`);
+  log("4/5", `Forwarding signal ${signal} to API process`);
   child.kill(signal);
 };
 
@@ -122,10 +149,10 @@ process.on("SIGINT", () => forwardSignal("SIGINT"));
 child.on("error", (error) => fail("Failed to spawn API process", error));
 child.on("exit", (code, signal) => {
   if (signal) {
-    log("4/4", `API process exited via signal ${signal}`);
+    log("5/5", `API process exited via signal ${signal}`);
     process.exit(0);
   }
 
-  log("4/4", `API process exited with code ${code ?? 0}`);
+  log("5/5", `API process exited with code ${code ?? 0}`);
   process.exit(code ?? 0);
 });
