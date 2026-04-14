@@ -7,7 +7,8 @@ import {
   CHECKOUT_INSTALLMENT_PAYMENT_TYPE_COOKIE,
   CHECKOUT_INSTALLMENT_PROVIDER_COOKIE,
   CHECKOUT_INSTALLMENT_REDIRECT_URL_COOKIE,
-  normalizeCredoRedirectUrl,
+  normalizeKeepzPersonalNumber,
+  normalizeKeepzRedirectUrl,
 } from "@/components/checkout/credo-launch";
 
 async function getAuthToken(): Promise<string | null> {
@@ -40,34 +41,61 @@ function buildErrorRedirect(request: NextRequest, returnTo: string | null, messa
   return NextResponse.redirect(fallbackUrl);
 }
 
+function parseBackendErrorMessage(rawBody: string, fallbackMessage: string): string {
+  if (!rawBody) return fallbackMessage;
+
+  try {
+    const parsed = JSON.parse(rawBody) as {
+      error?: unknown;
+      message?: unknown;
+      code?: unknown;
+      debug?: unknown;
+    };
+    const message =
+      typeof parsed.error === "string"
+        ? parsed.error
+        : typeof parsed.message === "string"
+          ? parsed.message
+          : null;
+    if (message?.trim()) {
+      if (env.NODE_ENV === "development" && typeof parsed.message === "string") {
+        const normalizedError = message.trim();
+        if (parsed.debug) {
+          return `${normalizedError} [debug available in API logs]`;
+        }
+        return normalizedError;
+      }
+      return message.trim();
+    }
+    if (parsed.code === "KEEPZ_NOT_CONFIGURED") {
+      return "Keepz is not configured. Add Keepz/Credo RSA keys in .env and restart the API.";
+    }
+    return fallbackMessage;
+  } catch {
+    return rawBody.trim() || fallbackMessage;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const cartId = searchParams.get("cartId")?.trim();
   const cartKey = searchParams.get("cartKey")?.trim();
-  const mode = searchParams.get("mode")?.trim() || "server-form";
   const paymentType = searchParams.get("paymentType")?.trim() === "card" ? "card" : "installments";
-  const installmentLength = Number(searchParams.get("installmentLength") || 12);
-  const clientFullName = searchParams.get("clientFullName")?.trim() || undefined;
-  const mobile = searchParams.get("mobile")?.trim() || undefined;
-  const email = searchParams.get("email")?.trim() || undefined;
-  const factAddress = searchParams.get("factAddress")?.trim() || undefined;
+  const personalNumber = normalizeKeepzPersonalNumber(searchParams.get("personalNumber") || "");
+  const isForeign = searchParams.get("isForeign")?.trim() === "true";
   const returnTo = searchParams.get("returnTo")?.trim() || null;
 
   if (!cartId || !cartKey) {
-    return buildErrorRedirect(request, returnTo, "Missing installment cart context.");
+    return buildErrorRedirect(request, returnTo, "Missing checkout cart context.");
   }
 
-  console.info("[checkout.installments.launch] start", {
-    cartId,
-    cartKey,
-    mode,
-    hasClientFullName: Boolean(clientFullName),
-    hasMobile: Boolean(mobile),
-    hasEmail: Boolean(email),
-    hasFactAddress: Boolean(factAddress),
-    installmentLength,
-    paymentType,
-  });
+  if (paymentType === "installments" && !personalNumber) {
+    return buildErrorRedirect(
+      request,
+      returnTo,
+      "Personal number is required for Keepz installment checkout.",
+    );
+  }
 
   try {
     const token = await getAuthToken();
@@ -80,13 +108,10 @@ export async function GET(request: NextRequest) {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          provider: "credo",
+          provider: "keepz",
           paymentType,
-          installmentLength,
-          clientFullName,
-          mobile,
-          email,
-          factAddress,
+          personalNumber: paymentType === "installments" ? personalNumber : undefined,
+          isForeign: paymentType === "installments" ? isForeign : undefined,
         }),
         cache: "no-store",
       },
@@ -94,14 +119,15 @@ export async function GET(request: NextRequest) {
 
     const rawBody = await response.text();
     if (!response.ok) {
-      console.error("[checkout.installments.launch] backend start failed", {
+      const parsedMessage = parseBackendErrorMessage(rawBody, "Failed to start Keepz checkout.");
+      console.error("[checkout.keepz.launch] backend start failed", {
         cartId,
-        mode,
+        paymentType,
         status: response.status,
         statusText: response.statusText,
         body: rawBody || null,
       });
-      return buildErrorRedirect(request, returnTo, "Failed to start Credo installments.");
+      return buildErrorRedirect(request, returnTo, parsedMessage);
     }
 
     const parsed = JSON.parse(rawBody) as {
@@ -109,15 +135,10 @@ export async function GET(request: NextRequest) {
       redirectUrl?: string;
     };
     const orderCode = parsed.orderCode?.trim();
-    const redirectUrl = parsed.redirectUrl ? normalizeCredoRedirectUrl(parsed.redirectUrl) : "";
+    const redirectUrl = parsed.redirectUrl ? normalizeKeepzRedirectUrl(parsed.redirectUrl) : "";
 
     if (!orderCode || !redirectUrl) {
-      console.error("[checkout.installments.launch] missing redirect payload", {
-        cartId,
-        mode,
-        body: parsed,
-      });
-      return buildErrorRedirect(request, returnTo, "Credo redirect payload is incomplete.");
+      return buildErrorRedirect(request, returnTo, "Keepz redirect payload is incomplete.");
     }
 
     const redirectHost = (() => {
@@ -128,24 +149,15 @@ export async function GET(request: NextRequest) {
       }
     })();
 
-    if (!redirectHost.endsWith("credo.ge")) {
-      console.error("[checkout.installments.launch] unexpected redirect host", {
-        cartId,
-        mode,
-        redirectUrl,
-        redirectHost,
-      });
-      return buildErrorRedirect(request, returnTo, "Credo redirect host is invalid.");
+    if (!redirectHost.endsWith("keepz.me")) {
+      return buildErrorRedirect(request, returnTo, "Keepz redirect host is invalid.");
     }
 
-    console.info("[checkout.installments.launch] redirecting", {
-      cartId,
-      cartKey,
-      mode,
-      orderCode,
-      redirectUrl,
-      redirectHost,
-    });
+    try {
+      new URL(redirectUrl);
+    } catch {
+      return buildErrorRedirect(request, returnTo, "Keepz redirect URL is invalid.");
+    }
 
     const redirectResponse = NextResponse.redirect(redirectUrl);
     const cookieOptions = {
@@ -173,7 +185,7 @@ export async function GET(request: NextRequest) {
     );
     redirectResponse.cookies.set(
       CHECKOUT_INSTALLMENT_PROVIDER_COOKIE,
-      encodeURIComponent("credo"),
+      encodeURIComponent("keepz"),
       cookieOptions,
     );
     redirectResponse.cookies.set(
@@ -184,12 +196,11 @@ export async function GET(request: NextRequest) {
 
     return redirectResponse;
   } catch (error) {
-    console.error("[checkout.installments.launch] failed", {
+    console.error("[checkout.keepz.launch] unexpected error", {
       cartId,
-      cartKey,
-      mode,
-      error,
+      paymentType,
+      error: error instanceof Error ? error.message : String(error),
     });
-    return buildErrorRedirect(request, returnTo, "Failed to launch Credo installments.");
+    return buildErrorRedirect(request, returnTo, "Failed to launch Keepz checkout.");
   }
 }

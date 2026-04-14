@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -23,10 +24,15 @@ import {
 } from "@/lib/cart-storage";
 import {
   buildCredoLaunchUrl,
+  buildKeepzLaunchUrl,
   type CredoLaunchMode,
   clearPersistedInstallmentCookies,
   normalizeCredoMobile,
   normalizeCredoRedirectUrl,
+  normalizeKeepzPersonalNumber,
+  normalizeKeepzRedirectUrl,
+  type OnlineCheckoutPaymentType,
+  type OnlineCheckoutProvider,
   readPersistedInstallmentState,
 } from "./credo-launch";
 import {
@@ -49,14 +55,20 @@ type PersistAddressOptions = {
   manual?: boolean;
 };
 
-type CredoLaunchFormConfig = {
+type OnlineLaunchFormConfig = {
   action: string;
   fields: Record<string, string>;
+  provider: OnlineCheckoutProvider;
   ready: boolean;
-  reason: "missingCart" | "missingCustomerData" | null;
+  reason: "missingCart" | "missingCustomerData" | "missingKeepzPersonalNumber" | null;
 };
 
 const DEFAULT_CART_STORAGE_KEY = "cart";
+const INSTALLMENT_STATUS_PING_INTERVAL_MS = 12_000;
+const INSTALLMENT_STATUS_PING_INTERVAL_SLOW_MS = 30_000;
+const INSTALLMENT_STATUS_PING_SLOW_AFTER_MS = 3 * 60_000;
+const INSTALLMENT_STATUS_PING_MAX_WINDOW_MS = 20 * 60_000;
+const INSTALLMENT_STATUS_MAX_ERROR_STREAK = 5;
 
 const normalizeAddressValue = (value?: string | null) => (value ?? "").trim().toLowerCase();
 
@@ -91,6 +103,11 @@ export function hasRequiredCredoCustomerData(shippingForm: ShippingFormState): b
       mobile &&
       shippingForm.address.trim(),
   );
+}
+
+function isValidKeepzPersonalNumber(rawValue: string): boolean {
+  const normalized = normalizeKeepzPersonalNumber(rawValue);
+  return normalized.length === 9 || normalized.length === 11;
 }
 
 function findDuplicateAddress(
@@ -216,7 +233,7 @@ export function getCredoLaunchBlockReason(
 export function useCheckoutController({
   cartKey,
   initialPaymentMethod = "card",
-  initialInstallmentProvider = "credo",
+  initialInstallmentProvider = "keepz",
 }: UseCheckoutControllerOptions) {
   const t = useTranslations();
   const [items, setItems] = useState<CartItem[]>([]);
@@ -228,10 +245,24 @@ export function useCheckoutController({
   const [pendingOrderCode, setPendingOrderCode] = useState<string | null>(null);
   const [pendingRedirectUrl, setPendingRedirectUrl] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [checkingStatus, setCheckingStatus] = useState(false);
   const [installmentProvider, setInstallmentProvider] = useState<InstallmentProvider>(
     initialInstallmentProvider,
   );
+  const [keepzPersonalNumber, setKeepzPersonalNumber] = useState("");
+  const [pendingProvider, setPendingProvider] = useState<OnlineCheckoutProvider | null>(null);
+  const [pendingPaymentType, setPendingPaymentType] = useState<OnlineCheckoutPaymentType | null>(
+    null,
+  );
+  const [pendingInstallmentStartedAtMs, setPendingInstallmentStartedAtMs] = useState<number | null>(
+    null,
+  );
+  const [installmentStatusErrorStreak, setInstallmentStatusErrorStreak] = useState(0);
+  const [isPageActive, setIsPageActive] = useState(() => {
+    if (typeof document === "undefined") {
+      return true;
+    }
+    return !document.hidden && document.visibilityState === "visible" && document.hasFocus();
+  });
   const [shippingForm, setShippingForm] = useState<ShippingFormState>(EMPTY_SHIPPING_FORM);
   const [savedAddresses, setSavedAddresses] = useState<UserShippingAddress[]>([]);
   const [addressesLoading, setAddressesLoading] = useState(true);
@@ -241,6 +272,8 @@ export function useCheckoutController({
 
   const installmentOrderCodeKey = `${cartKey}:installmentOrderCode`;
   const installmentRedirectUrlKey = `${cartKey}:installmentRedirectUrl`;
+  const installmentProviderKey = `${cartKey}:installmentProvider`;
+  const installmentPaymentTypeKey = `${cartKey}:installmentPaymentType`;
   const hasEnoughAddressFieldsToSave = useMemo(
     () =>
       Boolean(
@@ -262,34 +295,67 @@ export function useCheckoutController({
         : false,
     [existingAddressMatch, shippingForm],
   );
-  const credoLaunchForm = useMemo<CredoLaunchFormConfig>(() => {
+  const onlineLaunchForm = useMemo<OnlineLaunchFormConfig>(() => {
     const cartId = typeof globalThis.window !== "undefined" ? resolveStoredCartId(cartKey) : null;
     const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
     const normalizedMobile = normalizeCredoMobile(shippingForm.phone);
+    const normalizedPersonalNumber = normalizeKeepzPersonalNumber(keepzPersonalNumber);
+    const returnTo =
+      typeof globalThis.window !== "undefined"
+        ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
+        : "";
+
+    if (installmentProvider === "keepz") {
+      const fields: Record<string, string> = {
+        cartId: cartId ?? "",
+        cartKey,
+        paymentType: "installments",
+        personalNumber: normalizedPersonalNumber,
+        isForeign: "false",
+        returnTo,
+      };
+      const reason =
+        typeof globalThis.window !== "undefined"
+          ? !resolveStoredCartId(cartKey)
+            ? "missingCart"
+            : !isValidKeepzPersonalNumber(normalizedPersonalNumber)
+              ? "missingKeepzPersonalNumber"
+              : null
+          : null;
+
+      return {
+        provider: "keepz",
+        action: "/api/checkout/installments/keepz/launch",
+        ready: reason === null,
+        reason,
+        fields,
+      };
+    }
+
+    const fields: Record<string, string> = {
+      cartId: cartId ?? "",
+      cartKey,
+      paymentType: "installments",
+      installmentLength: "12",
+      clientFullName: fullName,
+      mobile: normalizedMobile,
+      email: shippingForm.email.trim(),
+      factAddress: shippingForm.address.trim(),
+      returnTo,
+    };
     const reason =
       typeof globalThis.window !== "undefined"
         ? getCredoLaunchBlockReason(cartKey, shippingForm)
         : null;
 
     return {
+      provider: "credo",
       action: "/api/checkout/installments/credo/launch",
       ready: reason === null,
       reason,
-      fields: {
-        cartId: cartId ?? "",
-        cartKey,
-        installmentLength: "12",
-        clientFullName: fullName,
-        mobile: normalizedMobile,
-        email: shippingForm.email.trim(),
-        factAddress: shippingForm.address.trim(),
-        returnTo:
-          typeof globalThis.window !== "undefined"
-            ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
-            : "",
-      },
+      fields,
     };
-  }, [cartKey, shippingForm]);
+  }, [cartKey, installmentProvider, keepzPersonalNumber, shippingForm]);
 
   const hydratePendingInstallmentState = useCallback(() => {
     const localOrderCode =
@@ -300,6 +366,12 @@ export function useCheckoutController({
       typeof globalThis.window !== "undefined"
         ? localStorage.getItem(installmentRedirectUrlKey)
         : null;
+    const localProvider =
+      typeof globalThis.window !== "undefined" ? localStorage.getItem(installmentProviderKey) : null;
+    const localPaymentType =
+      typeof globalThis.window !== "undefined"
+        ? localStorage.getItem(installmentPaymentTypeKey)
+        : null;
     const persistedCookieState =
       typeof document !== "undefined"
         ? readPersistedInstallmentState(cartKey, document.cookie)
@@ -307,9 +379,19 @@ export function useCheckoutController({
 
     const nextOrderCode = localOrderCode || persistedCookieState?.orderCode || null;
     const nextRedirectUrl = localRedirectUrl || persistedCookieState?.redirectUrl || null;
+    const nextProvider =
+      localProvider === "credo" || localProvider === "keepz"
+        ? localProvider
+        : persistedCookieState?.provider || null;
+    const nextPaymentType =
+      localPaymentType === "card" || localPaymentType === "installments"
+        ? localPaymentType
+        : persistedCookieState?.paymentType || null;
 
     setPendingOrderCode(nextOrderCode);
     setPendingRedirectUrl(nextRedirectUrl);
+    setPendingProvider(nextProvider);
+    setPendingPaymentType(nextPaymentType);
 
     if (
       typeof globalThis.window !== "undefined" &&
@@ -325,7 +407,27 @@ export function useCheckoutController({
     ) {
       localStorage.setItem(installmentRedirectUrlKey, persistedCookieState.redirectUrl);
     }
-  }, [cartKey, installmentOrderCodeKey, installmentRedirectUrlKey]);
+    if (
+      typeof globalThis.window !== "undefined" &&
+      persistedCookieState?.provider &&
+      !localProvider
+    ) {
+      localStorage.setItem(installmentProviderKey, persistedCookieState.provider);
+    }
+    if (
+      typeof globalThis.window !== "undefined" &&
+      persistedCookieState?.paymentType &&
+      !localPaymentType
+    ) {
+      localStorage.setItem(installmentPaymentTypeKey, persistedCookieState.paymentType);
+    }
+  }, [
+    cartKey,
+    installmentOrderCodeKey,
+    installmentPaymentTypeKey,
+    installmentProviderKey,
+    installmentRedirectUrlKey,
+  ]);
 
   useEffect(() => {
     setPaymentMethod(initialPaymentMethod);
@@ -384,23 +486,36 @@ export function useCheckoutController({
       return;
     }
 
-    const handleFocus = () => {
-      hydratePendingInstallmentState();
-    };
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
+    const updatePageActivity = () => {
+      const active = !document.hidden && document.visibilityState === "visible" && document.hasFocus();
+      setIsPageActive(active);
+      if (active) {
         hydratePendingInstallmentState();
       }
     };
 
-    globalThis.window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    updatePageActivity();
+    globalThis.window.addEventListener("focus", updatePageActivity);
+    globalThis.window.addEventListener("blur", updatePageActivity);
+    document.addEventListener("visibilitychange", updatePageActivity);
 
     return () => {
-      globalThis.window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      globalThis.window.removeEventListener("focus", updatePageActivity);
+      globalThis.window.removeEventListener("blur", updatePageActivity);
+      document.removeEventListener("visibilitychange", updatePageActivity);
     };
   }, [hydratePendingInstallmentState]);
+
+  useEffect(() => {
+    if (!pendingOrderCode) {
+      setPendingInstallmentStartedAtMs(null);
+      setInstallmentStatusErrorStreak(0);
+      return;
+    }
+
+    setPendingInstallmentStartedAtMs(Date.now());
+    setInstallmentStatusErrorStreak(0);
+  }, [pendingOrderCode]);
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0),
@@ -416,7 +531,10 @@ export function useCheckoutController({
   const total = subtotal + shipping + installmentCommission;
 
   useEffect(() => {
-    if (!onlineInstallmentsAllowed && installmentProvider === "credo") {
+    if (
+      !onlineInstallmentsAllowed &&
+      (installmentProvider === "credo" || installmentProvider === "keepz")
+    ) {
       setInstallmentProvider("crystal");
     }
   }, [installmentProvider, onlineInstallmentsAllowed]);
@@ -424,13 +542,24 @@ export function useCheckoutController({
   const clearInstallmentState = useCallback(() => {
     setPendingOrderCode(null);
     setPendingRedirectUrl(null);
+    setPendingProvider(null);
+    setPendingPaymentType(null);
+    setPendingInstallmentStartedAtMs(null);
+    setInstallmentStatusErrorStreak(0);
     setStatusMessage(null);
     if (globalThis.window) {
       localStorage.removeItem(installmentOrderCodeKey);
       localStorage.removeItem(installmentRedirectUrlKey);
+      localStorage.removeItem(installmentProviderKey);
+      localStorage.removeItem(installmentPaymentTypeKey);
     }
     clearPersistedInstallmentCookies();
-  }, [installmentOrderCodeKey, installmentRedirectUrlKey]);
+  }, [
+    installmentOrderCodeKey,
+    installmentPaymentTypeKey,
+    installmentProviderKey,
+    installmentRedirectUrlKey,
+  ]);
 
   const applySavedAddress = useCallback((address: UserShippingAddress) => {
     setShippingForm(mapAddressToShippingForm(address));
@@ -527,49 +656,141 @@ export function useCheckoutController({
     [hasEnoughAddressFieldsToSave, savedAddresses, shippingForm, t],
   );
 
-  const syncInstallmentStatus = useCallback(async () => {
-    const cartId = resolveStoredCartId(cartKey);
-    if (!cartId || !pendingOrderCode) return;
-
-    setCheckingStatus(true);
-    setErrorMessage(null);
-    setStatusMessage(null);
-
-    try {
-      const status = await syncInstallmentCheckoutStatus(cartId, pendingOrderCode);
-      const statusLabel = status.statusName || `#${status.statusId ?? "unknown"}`;
-
-      if (status.checkoutCompleted) {
-        clearCheckoutCartKeys(cartKey, cartId);
-        clearInstallmentState();
-        setStep("confirmation");
-        return;
+  const installmentStatusQuery = useQuery({
+    queryKey: [
+      "checkout",
+      "installment-status",
+      cartKey,
+      pendingOrderCode,
+      pendingProvider,
+      pendingPaymentType,
+    ],
+    enabled:
+      typeof globalThis.window !== "undefined" &&
+      Boolean(pendingOrderCode) &&
+      step !== "confirmation" &&
+      Boolean(resolveStoredCartId(cartKey)) &&
+      isPageActive &&
+      installmentStatusErrorStreak < INSTALLMENT_STATUS_MAX_ERROR_STREAK &&
+      pendingInstallmentStartedAtMs !== null &&
+      Date.now() - pendingInstallmentStartedAtMs < INSTALLMENT_STATUS_PING_MAX_WINDOW_MS,
+    queryFn: async () => {
+      const cartId = resolveStoredCartId(cartKey);
+      if (!cartId || !pendingOrderCode) {
+        throw new Error("MISSING_PENDING_INSTALLMENT_CONTEXT");
       }
-
-      const normalizedStatus = statusLabel.toUpperCase();
-      if (normalizedStatus === "NO_DATA") {
-        setStatusMessage(t("checkout.installments.notFound"));
-        return;
-      }
+      return syncInstallmentCheckoutStatus(cartId, pendingOrderCode, {
+        provider: pendingProvider ?? undefined,
+        paymentType: pendingPaymentType ?? "installments",
+      });
+    },
+    refetchInterval: () => {
       if (
-        normalizedStatus === "INVALID_REQUEST" ||
-        normalizedStatus === "BAD_REQUEST" ||
-        normalizedStatus === "EMPTY_REQUEST"
+        !pendingInstallmentStartedAtMs ||
+        !isPageActive ||
+        installmentStatusErrorStreak >= INSTALLMENT_STATUS_MAX_ERROR_STREAK
       ) {
-        setStatusMessage(t("checkout.installments.invalidRequest"));
-        return;
+        return false;
       }
 
-      setStatusMessage(t("checkout.installments.statusWithLabel", { status: statusLabel }));
-    } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("[checkout] syncInstallmentStatus failed", error);
+      const elapsedMs = Date.now() - pendingInstallmentStartedAtMs;
+      if (elapsedMs >= INSTALLMENT_STATUS_PING_MAX_WINDOW_MS) {
+        return false;
       }
-      setErrorMessage(t("checkout.installments.syncFailed"));
-    } finally {
-      setCheckingStatus(false);
+      if (elapsedMs >= INSTALLMENT_STATUS_PING_SLOW_AFTER_MS) {
+        return INSTALLMENT_STATUS_PING_INTERVAL_SLOW_MS;
+      }
+      return INSTALLMENT_STATUS_PING_INTERVAL_MS;
+    },
+    refetchIntervalInBackground: false,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const checkingStatus = installmentStatusQuery.isFetching;
+
+  useEffect(() => {
+    const status = installmentStatusQuery.data;
+    if (!status) return;
+
+    setErrorMessage(null);
+    setInstallmentStatusErrorStreak(0);
+    const cartId = resolveStoredCartId(cartKey);
+    const statusLabel = status.statusName || `#${status.statusId ?? "unknown"}`;
+
+    if (status.checkoutCompleted) {
+      if (cartId) {
+        clearCheckoutCartKeys(cartKey, cartId);
+      }
+      clearInstallmentState();
+      setStep("confirmation");
+      return;
     }
-  }, [cartKey, clearInstallmentState, pendingOrderCode, t]);
+
+    const normalizedStatus = statusLabel.toUpperCase();
+    if (normalizedStatus === "NO_DATA") {
+      setStatusMessage(t("checkout.installments.notFound"));
+      return;
+    }
+    if (
+      normalizedStatus === "INVALID_REQUEST" ||
+      normalizedStatus === "BAD_REQUEST" ||
+      normalizedStatus === "EMPTY_REQUEST"
+    ) {
+      setStatusMessage(t("checkout.installments.invalidRequest"));
+      return;
+    }
+
+    setStatusMessage(t("checkout.installments.statusWithLabel", { status: statusLabel }));
+  }, [cartKey, clearInstallmentState, installmentStatusQuery.data, t]);
+
+  useEffect(() => {
+    const error = installmentStatusQuery.error;
+    if (!error) return;
+
+    if (error instanceof Error && error.message === "MISSING_PENDING_INSTALLMENT_CONTEXT") {
+      return;
+    }
+    if (process.env.NODE_ENV === "development") {
+      console.error("[checkout] installment status ping failed", error);
+    }
+    setInstallmentStatusErrorStreak((previous) => {
+      const next = previous + 1;
+      if (next >= INSTALLMENT_STATUS_MAX_ERROR_STREAK) {
+        setStatusMessage(t("checkout.installments.pollingStopped"));
+        setErrorMessage(t("checkout.installments.syncFailed"));
+      }
+      return next;
+    });
+  }, [installmentStatusQuery.error, t]);
+
+  useEffect(() => {
+    if (!isPageActive || !pendingOrderCode || step === "confirmation") {
+      return;
+    }
+    if (
+      pendingInstallmentStartedAtMs &&
+      Date.now() - pendingInstallmentStartedAtMs >= INSTALLMENT_STATUS_PING_MAX_WINDOW_MS
+    ) {
+      setStatusMessage(t("checkout.installments.pollingStopped"));
+      return;
+    }
+    if (installmentStatusErrorStreak >= INSTALLMENT_STATUS_MAX_ERROR_STREAK) {
+      return;
+    }
+    if (!installmentStatusQuery.isFetching) {
+      void installmentStatusQuery.refetch();
+    }
+  }, [
+    installmentStatusErrorStreak,
+    installmentStatusQuery.isFetching,
+    installmentStatusQuery.refetch,
+    isPageActive,
+    pendingInstallmentStartedAtMs,
+    pendingOrderCode,
+    step,
+    t,
+  ]);
 
   const continueFromShipping = useCallback(async () => {
     if (!hasRequiredCredoCustomerData(shippingForm)) {
@@ -592,41 +813,11 @@ export function useCheckoutController({
       }
       setSubmitting(true);
       try {
-        if (paymentMethod === "installments") {
-          if (!onlineInstallmentsAllowed && installmentProvider === "credo") {
-            setErrorMessage(t("checkout.payment.onlineInstallmentsMultiVendorError"));
-            return;
-          }
-
-          if (installmentProvider === "credo" && !hasRequiredCredoCustomerData(shippingForm)) {
-            setErrorMessage(t("checkout.installments.missingCredoData"));
-            return;
-          }
-
-          if (installmentProvider === "crystal") {
-            const printCrystalInstallmentInvoice = await getCrystalInvoicePrinter();
-            await printCrystalInstallmentInvoice({
-              buyer: shippingForm,
-              items,
-              subtotal,
-              shipping,
-              installmentCommission,
-              total,
-            });
-            toast.success(t("checkout.installments.manual.invoiceGenerated"));
-            return;
-          }
-
-          const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
-          const normalizedMobile = normalizeCredoMobile(shippingForm.phone);
-          const launchUrl = buildCredoLaunchUrl({
+        if (paymentMethod === "card" && onlineInstallmentsAllowed) {
+          const launchUrl = buildKeepzLaunchUrl({
             cartId,
             cartKey,
-            installmentLength: 12,
-            clientFullName: fullName || undefined,
-            mobile: normalizedMobile || undefined,
-            email: shippingForm.email.trim() || undefined,
-            factAddress: shippingForm.address.trim() || undefined,
+            paymentType: "card",
             returnTo:
               typeof globalThis.window !== "undefined"
                 ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
@@ -646,7 +837,7 @@ export function useCheckoutController({
             if (launchMode === "server-popup") {
               const popup = globalThis.window.open(
                 launchUrl,
-                "credo_installments",
+                "keepz_card_checkout",
                 "popup=yes,width=520,height=820",
               );
               if (!popup) {
@@ -666,30 +857,161 @@ export function useCheckoutController({
           }
 
           const session = await startInstallmentCheckout(cartId, {
+            provider: "keepz",
+            paymentType: "card",
+          });
+
+          const normalizedRedirectUrl = normalizeKeepzRedirectUrl(session.redirectUrl);
+          localStorage.setItem(installmentOrderCodeKey, session.orderCode);
+          localStorage.setItem(installmentRedirectUrlKey, normalizedRedirectUrl);
+          localStorage.setItem(installmentProviderKey, "keepz");
+          localStorage.setItem(installmentPaymentTypeKey, "card");
+          writeCartIdToStorage(cartId, cartKey);
+          setPendingOrderCode(session.orderCode);
+          setPendingRedirectUrl(normalizedRedirectUrl);
+          setPendingProvider("keepz");
+          setPendingPaymentType("card");
+          globalThis.window.location.replace(normalizedRedirectUrl);
+          return;
+        }
+
+        if (paymentMethod === "installments") {
+          if (
+            !onlineInstallmentsAllowed &&
+            (installmentProvider === "credo" || installmentProvider === "keepz")
+          ) {
+            setErrorMessage(t("checkout.payment.onlineInstallmentsMultiVendorError"));
+            return;
+          }
+
+          if (installmentProvider === "credo" && !hasRequiredCredoCustomerData(shippingForm)) {
+            setErrorMessage(t("checkout.installments.missingCredoData"));
+            return;
+          }
+
+          const normalizedPersonalNumber = normalizeKeepzPersonalNumber(keepzPersonalNumber);
+          if (installmentProvider === "keepz" && !isValidKeepzPersonalNumber(normalizedPersonalNumber)) {
+            setErrorMessage(t("checkout.installments.missingKeepzPersonalNumber"));
+            return;
+          }
+
+          if (installmentProvider === "crystal") {
+            const printCrystalInstallmentInvoice = await getCrystalInvoicePrinter();
+            await printCrystalInstallmentInvoice({
+              buyer: shippingForm,
+              items,
+              subtotal,
+              shipping,
+              installmentCommission,
+              total,
+            });
+            toast.success(t("checkout.installments.manual.invoiceGenerated"));
+            return;
+          }
+
+          const fullName = `${shippingForm.firstName} ${shippingForm.lastName}`.trim();
+          const normalizedMobile = normalizeCredoMobile(shippingForm.phone);
+          const launchUrl =
+            installmentProvider === "keepz"
+              ? buildKeepzLaunchUrl({
+                  cartId,
+                  cartKey,
+                  paymentType: "installments",
+                  personalNumber: normalizedPersonalNumber,
+                  isForeign: false,
+                  returnTo:
+                    typeof globalThis.window !== "undefined"
+                      ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
+                      : undefined,
+                })
+              : buildCredoLaunchUrl({
+                  cartId,
+                  cartKey,
+                  installmentLength: 12,
+                  clientFullName: fullName || undefined,
+                  mobile: normalizedMobile || undefined,
+                  email: shippingForm.email.trim() || undefined,
+                  factAddress: shippingForm.address.trim() || undefined,
+                  returnTo:
+                    typeof globalThis.window !== "undefined"
+                      ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
+                      : undefined,
+                });
+
+          if (launchMode !== "direct-replace") {
+            if (launchMode === "server-new-tab") {
+              const newTab = globalThis.window.open(launchUrl, "_blank");
+              if (!newTab) {
+                throw new Error(t("checkout.installments.popupBlocked"));
+              }
+              hydratePendingInstallmentState();
+              return;
+            }
+
+            if (launchMode === "server-popup") {
+              const popup = globalThis.window.open(
+                launchUrl,
+                "installment_checkout",
+                "popup=yes,width=520,height=820",
+              );
+              if (!popup) {
+                throw new Error(t("checkout.installments.popupBlocked"));
+              }
+              hydratePendingInstallmentState();
+              return;
+            }
+
+            if (launchMode === "server-replace") {
+              globalThis.window.location.replace(launchUrl);
+              return;
+            }
+
+            globalThis.window.location.assign(launchUrl);
+            return;
+          }
+
+          const session = await startInstallmentCheckout(cartId, {
+            provider: installmentProvider === "keepz" ? "keepz" : "credo",
+            paymentType: "installments",
             installmentLength: 12,
             clientFullName: fullName || undefined,
             mobile: normalizedMobile || undefined,
             email: shippingForm.email.trim() || undefined,
             factAddress: shippingForm.address.trim() || undefined,
+            personalNumber:
+              installmentProvider === "keepz" ? normalizedPersonalNumber || undefined : undefined,
+            isForeign: installmentProvider === "keepz" ? false : undefined,
           });
 
           localStorage.setItem(installmentOrderCodeKey, session.orderCode);
-          const normalizedRedirectUrl = normalizeCredoRedirectUrl(session.redirectUrl);
-          const redirectHost = (() => {
-            try {
-              return new URL(normalizedRedirectUrl).hostname.toLowerCase();
-            } catch {
-              return "";
+          const resolvedProvider = session.provider || (installmentProvider === "keepz" ? "keepz" : "credo");
+          const resolvedPaymentType = session.paymentType || "installments";
+          const normalizedRedirectUrl =
+            resolvedProvider === "keepz"
+              ? normalizeKeepzRedirectUrl(session.redirectUrl)
+              : normalizeCredoRedirectUrl(session.redirectUrl);
+
+          if (resolvedProvider === "credo") {
+            const redirectHost = (() => {
+              try {
+                return new URL(normalizedRedirectUrl).hostname.toLowerCase();
+              } catch {
+                return "";
+              }
+            })();
+            if (!redirectHost.endsWith("credo.ge")) {
+              throw new Error(`Unexpected installment redirect host: ${redirectHost || "unknown"}`);
             }
-          })();
-          if (!redirectHost.endsWith("credo.ge")) {
-            throw new Error(`Unexpected installment redirect host: ${redirectHost || "unknown"}`);
           }
 
           localStorage.setItem(installmentRedirectUrlKey, normalizedRedirectUrl);
+          localStorage.setItem(installmentProviderKey, resolvedProvider);
+          localStorage.setItem(installmentPaymentTypeKey, resolvedPaymentType);
           writeCartIdToStorage(cartId, cartKey);
           setPendingOrderCode(session.orderCode);
           setPendingRedirectUrl(normalizedRedirectUrl);
+          setPendingProvider(resolvedProvider);
+          setPendingPaymentType(resolvedPaymentType);
           globalThis.window.location.replace(normalizedRedirectUrl);
           return;
         }
@@ -711,8 +1033,11 @@ export function useCheckoutController({
       hydratePendingInstallmentState,
       installmentCommission,
       installmentOrderCodeKey,
+      installmentPaymentTypeKey,
+      installmentProviderKey,
       installmentRedirectUrlKey,
       installmentProvider,
+      keepzPersonalNumber,
       items,
       onlineInstallmentsAllowed,
       paymentMethod,
@@ -756,8 +1081,9 @@ export function useCheckoutController({
     checkingStatus,
     installmentProvider,
     setInstallmentProvider,
+    keepzPersonalNumber,
+    setKeepzPersonalNumber,
     onlineInstallmentsAllowed,
-    syncInstallmentStatus,
     clearInstallmentState,
     shippingForm,
     handleShippingFieldChange,
@@ -770,7 +1096,7 @@ export function useCheckoutController({
     applySavedAddress,
     persistCurrentAddress,
     handleContinue,
-    credoLaunchForm,
+    onlineLaunchForm,
     subtotal,
     shipping,
     installmentCommission,

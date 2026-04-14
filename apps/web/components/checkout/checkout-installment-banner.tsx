@@ -8,8 +8,6 @@ type CheckoutInstallmentBannerProps = {
   pendingRedirectUrl: string | null;
   statusMessage: string | null;
   checkingStatus: boolean;
-  submitting: boolean;
-  onSyncStatus: () => Promise<void> | void;
   onClear: () => void;
 };
 
@@ -18,8 +16,6 @@ export function CheckoutInstallmentBanner({
   pendingRedirectUrl,
   statusMessage,
   checkingStatus,
-  submitting,
-  onSyncStatus,
   onClear,
 }: CheckoutInstallmentBannerProps) {
   const t = useTranslations();
@@ -44,20 +40,13 @@ export function CheckoutInstallmentBanner({
             {t("checkout.installments.openBankPage")}
           </Button>
         ) : null}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => void onSyncStatus()}
-          disabled={checkingStatus || submitting}
-        >
-          {checkingStatus
-            ? t("checkout.installments.checkingStatus")
-            : t("checkout.installments.checkStatus")}
-        </Button>
         <Button type="button" variant="ghost" onClick={onClear}>
           {t("checkout.installments.clearPending")}
         </Button>
       </div>
+      {checkingStatus ? (
+        <p className="mt-3 text-sm text-slate-700">{t("checkout.installments.checkingStatus")}</p>
+      ) : null}
       {statusMessage ? <p className="mt-3 text-sm text-slate-700">{statusMessage}</p> : null}
     </div>
   );

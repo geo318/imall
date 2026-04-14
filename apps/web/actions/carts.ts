@@ -302,16 +302,22 @@ export async function checkoutCart(cartId: string): Promise<void> {
 }
 
 export type StartInstallmentCheckoutInput = {
+  provider?: "credo" | "keepz";
+  paymentType?: "card" | "installments";
   installmentLength?: number;
   clientFullName?: string;
   mobile?: string;
   email?: string;
   factAddress?: string;
+  personalNumber?: string;
+  isForeign?: boolean;
 };
 
 export type StartInstallmentCheckoutResult = {
   orderCode: string;
   redirectUrl: string;
+  provider?: "credo" | "keepz";
+  paymentType?: "card" | "installments";
 };
 
 export async function startInstallmentCheckout(
@@ -324,6 +330,9 @@ export async function startInstallmentCheckout(
     hasMobile: Boolean(payload.mobile?.trim()),
     hasEmail: Boolean(payload.email?.trim()),
     hasFactAddress: Boolean(payload.factAddress?.trim()),
+    provider: payload.provider ?? "credo",
+    paymentType: payload.paymentType ?? "installments",
+    hasPersonalNumber: Boolean(payload.personalNumber?.trim()),
     installmentLength: payload.installmentLength ?? null,
   });
 
@@ -358,15 +367,24 @@ export type InstallmentStatusResult = {
   statusId: number | null;
   statusName: string;
   checkoutCompleted: boolean;
+  statusProvider?: "credo" | "keepz";
 };
 
 export async function syncInstallmentCheckoutStatus(
   cartId: string,
   orderCode: string,
+  options: {
+    provider?: "credo" | "keepz";
+    paymentType?: "card" | "installments";
+  } = {},
 ): Promise<InstallmentStatusResult> {
   const response = await backendRequest(`/carts/${cartId}/checkout/installments/status`, {
     method: "POST",
-    body: { orderCode },
+    body: {
+      orderCode,
+      provider: options.provider,
+      paymentType: options.paymentType,
+    },
   });
 
   if (!response.ok) {

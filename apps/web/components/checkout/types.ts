@@ -2,7 +2,7 @@ import type { UserShippingAddress, UserShippingAddressInput } from "@/actions/us
 
 export type CheckoutStep = "shipping" | "payment" | "confirmation";
 export type CheckoutPaymentMethod = "card" | "paypal" | "installments";
-export type InstallmentProvider = "credo" | "crystal";
+export type InstallmentProvider = "credo" | "keepz" | "crystal";
 
 export type ShippingFormState = {
   firstName: string;

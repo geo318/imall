@@ -111,7 +111,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
       }
 
       if (destination === "checkoutInstallments") {
-        router.push("/checkout?payment=installments&provider=credo");
+        router.push("/checkout?payment=installments&provider=keepz");
         return;
       }
 

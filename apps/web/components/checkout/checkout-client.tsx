@@ -27,7 +27,11 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
   const initialPaymentMethod: CheckoutPaymentMethod =
     requestedPayment === "installments" ? "installments" : "card";
   const initialInstallmentProvider: InstallmentProvider =
-    requestedProvider === "crystal" ? "crystal" : "credo";
+    requestedProvider === "crystal"
+      ? "crystal"
+      : requestedProvider === "credo"
+        ? "credo"
+        : "keepz";
   const checkout = useCheckoutController({
     cartKey,
     initialPaymentMethod,
@@ -58,8 +62,6 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
           pendingRedirectUrl={checkout.pendingRedirectUrl}
           statusMessage={checkout.statusMessage}
           checkingStatus={checkout.checkingStatus}
-          submitting={checkout.submitting}
-          onSyncStatus={checkout.syncInstallmentStatus}
           onClear={checkout.clearInstallmentState}
         />
 
@@ -96,10 +98,12 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
                 onPaymentMethodChange={checkout.setPaymentMethod}
                 installmentProvider={checkout.installmentProvider}
                 onInstallmentProviderChange={checkout.setInstallmentProvider}
+                keepzPersonalNumber={checkout.keepzPersonalNumber}
+                onKeepzPersonalNumberChange={checkout.setKeepzPersonalNumber}
                 onlineInstallmentsAllowed={checkout.onlineInstallmentsAllowed}
                 onBack={() => checkout.setStep("shipping")}
                 onSubmit={checkout.handleContinue}
-                credoLaunchForm={checkout.credoLaunchForm}
+                onlineLaunchForm={checkout.onlineLaunchForm}
                 submitting={checkout.submitting}
                 checkingStatus={checkout.checkingStatus}
               />

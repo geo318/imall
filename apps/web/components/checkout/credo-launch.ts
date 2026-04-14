@@ -1,6 +1,11 @@
 export const CHECKOUT_INSTALLMENT_CART_KEY_COOKIE = "checkout_installment_cart_key";
 export const CHECKOUT_INSTALLMENT_ORDER_CODE_COOKIE = "checkout_installment_order_code";
 export const CHECKOUT_INSTALLMENT_REDIRECT_URL_COOKIE = "checkout_installment_redirect_url";
+export const CHECKOUT_INSTALLMENT_PROVIDER_COOKIE = "checkout_installment_provider";
+export const CHECKOUT_INSTALLMENT_PAYMENT_TYPE_COOKIE = "checkout_installment_payment_type";
+
+export type OnlineCheckoutProvider = "credo" | "keepz";
+export type OnlineCheckoutPaymentType = "card" | "installments";
 
 export type CredoLaunchMode =
   | "server-assign"
@@ -9,7 +14,9 @@ export type CredoLaunchMode =
   | "server-popup"
   | "direct-replace";
 
-type CredoLaunchUrlInput = {
+type LaunchUrlInput = {
+  provider: OnlineCheckoutProvider;
+  paymentType?: OnlineCheckoutPaymentType;
   cartId: string;
   cartKey: string;
   installmentLength?: number;
@@ -17,8 +24,14 @@ type CredoLaunchUrlInput = {
   mobile?: string;
   email?: string;
   factAddress?: string;
+  personalNumber?: string;
+  isForeign?: boolean;
   returnTo?: string;
 };
+
+type CredoLaunchUrlInput = Omit<LaunchUrlInput, "provider" | "paymentType" | "personalNumber" | "isForeign">;
+
+type KeepzLaunchUrlInput = Omit<LaunchUrlInput, "provider" | "installmentLength" | "clientFullName" | "mobile" | "email" | "factAddress">;
 
 export function normalizeCredoRedirectUrl(rawUrl: string): string {
   const trimmed = rawUrl.trim();
@@ -35,6 +48,21 @@ export function normalizeCredoRedirectUrl(rawUrl: string): string {
   }
 }
 
+export function normalizeKeepzRedirectUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return trimmed;
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.hostname.endsWith("keepz.me") && parsed.protocol === "http:") {
+      parsed.protocol = "https:";
+    }
+    return parsed.toString();
+  } catch {
+    return trimmed;
+  }
+}
+
 export function normalizeCredoMobile(rawValue: string): string {
   const digits = rawValue.replace(/\D/g, "");
   if (digits.startsWith("995") && digits.length >= 12) {
@@ -43,29 +71,59 @@ export function normalizeCredoMobile(rawValue: string): string {
   return digits;
 }
 
-export function buildCredoLaunchUrl({
+export function normalizeKeepzPersonalNumber(rawValue: string): string {
+  return rawValue.replace(/\D/g, "");
+}
+
+function buildInstallmentLaunchUrl({
+  provider,
+  paymentType = "installments",
   cartId,
   cartKey,
-  installmentLength = 12,
+  installmentLength,
   clientFullName,
   mobile,
   email,
   factAddress,
+  personalNumber,
+  isForeign,
   returnTo,
-}: CredoLaunchUrlInput): string {
+}: LaunchUrlInput): string {
   const params = new URLSearchParams({
     cartId,
     cartKey,
-    installmentLength: String(installmentLength),
+    paymentType,
   });
 
-  if (clientFullName?.trim()) params.set("clientFullName", clientFullName.trim());
-  if (mobile?.trim()) params.set("mobile", mobile.trim());
-  if (email?.trim()) params.set("email", email.trim());
-  if (factAddress?.trim()) params.set("factAddress", factAddress.trim());
+  if (provider === "credo") {
+    params.set("installmentLength", String(installmentLength ?? 12));
+    if (clientFullName?.trim()) params.set("clientFullName", clientFullName.trim());
+    if (mobile?.trim()) params.set("mobile", mobile.trim());
+    if (email?.trim()) params.set("email", email.trim());
+    if (factAddress?.trim()) params.set("factAddress", factAddress.trim());
+  } else {
+    if (personalNumber?.trim()) params.set("personalNumber", personalNumber.trim());
+    if (typeof isForeign === "boolean") params.set("isForeign", String(isForeign));
+  }
+
   if (returnTo?.trim()) params.set("returnTo", returnTo.trim());
 
-  return `/api/checkout/installments/credo/launch?${params.toString()}`;
+  return `/api/checkout/installments/${provider}/launch?${params.toString()}`;
+}
+
+export function buildCredoLaunchUrl(input: CredoLaunchUrlInput): string {
+  return buildInstallmentLaunchUrl({
+    ...input,
+    provider: "credo",
+    paymentType: "installments",
+  });
+}
+
+export function buildKeepzLaunchUrl(input: KeepzLaunchUrlInput): string {
+  return buildInstallmentLaunchUrl({
+    ...input,
+    provider: "keepz",
+  });
 }
 
 function parseCookieString(cookieString: string) {
@@ -108,14 +166,32 @@ export function readPersistedInstallmentState(cartKey: string, cookieString?: st
 
   const orderCode = decodeCookieValue(parsed[CHECKOUT_INSTALLMENT_ORDER_CODE_COOKIE]);
   const redirectUrl = decodeCookieValue(parsed[CHECKOUT_INSTALLMENT_REDIRECT_URL_COOKIE]);
+  const provider = decodeCookieValue(parsed[CHECKOUT_INSTALLMENT_PROVIDER_COOKIE]);
+  const paymentType = decodeCookieValue(parsed[CHECKOUT_INSTALLMENT_PAYMENT_TYPE_COOKIE]);
   if (!orderCode) {
     return null;
   }
 
+  const normalizedProvider: OnlineCheckoutProvider =
+    provider === "credo" || provider === "keepz" ? provider : "credo";
+  const normalizedPaymentType: OnlineCheckoutPaymentType =
+    paymentType === "card" ? "card" : "installments";
+
+  const normalizedRedirectUrl =
+    normalizedProvider === "keepz"
+      ? redirectUrl
+        ? normalizeKeepzRedirectUrl(redirectUrl)
+        : null
+      : redirectUrl
+        ? normalizeCredoRedirectUrl(redirectUrl)
+        : null;
+
   return {
     cartKey: persistedCartKey,
     orderCode,
-    redirectUrl: redirectUrl ? normalizeCredoRedirectUrl(redirectUrl) : null,
+    redirectUrl: normalizedRedirectUrl,
+    provider: normalizedProvider,
+    paymentType: normalizedPaymentType,
   };
 }
 
@@ -129,6 +205,8 @@ export function clearPersistedInstallmentCookies() {
     CHECKOUT_INSTALLMENT_CART_KEY_COOKIE,
     CHECKOUT_INSTALLMENT_ORDER_CODE_COOKIE,
     CHECKOUT_INSTALLMENT_REDIRECT_URL_COOKIE,
+    CHECKOUT_INSTALLMENT_PROVIDER_COOKIE,
+    CHECKOUT_INSTALLMENT_PAYMENT_TYPE_COOKIE,
   ]) {
     // biome-ignore lint/suspicious/noDocumentCookie: cookie-store is not consistently available in target mobile browsers.
     document.cookie = `${name}=; expires=${expires}; path=/; SameSite=Lax`;
