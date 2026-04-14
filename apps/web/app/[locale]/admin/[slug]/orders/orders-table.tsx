@@ -2,13 +2,14 @@
 
 import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
+import { Input } from "@repo/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { Fragment, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { useTranslations } from "@/i18n/provider";
 import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
-const ORDER_STATUSES = ["pending", "processing", "completed", "cancelled"] as const;
+const ORDER_STATUSES = ["approved", "pending", "processing", "completed", "cancelled"] as const;
 
 type OrderLineItem = {
   id: string;
@@ -22,6 +23,15 @@ type OrderLineItem = {
 type OrderEntry = {
   id: string;
   status: string;
+  paymentMethod: string;
+  userId: string | null;
+  installmentOrderCode: string | null;
+  installmentStatusId: number | null;
+  installmentStatusName: string | null;
+  installmentFlowStage: string | null;
+  installmentVerificationCode: string | null;
+  installmentStockConfirmedAt: string | null;
+  installmentDeliveredAt: string | null;
   total: string;
   currency: string | null;
   createdAt: string;
@@ -45,6 +55,7 @@ type Props = {
 };
 
 const statusBadgeStyles: Record<string, string> = {
+  approved: "bg-indigo-100 text-indigo-900",
   pending: "bg-amber-100 text-amber-900",
   processing: "bg-blue-100 text-blue-900",
   completed: "bg-emerald-100 text-emerald-900",
@@ -71,6 +82,7 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
   const [isPending, startTransition] = useTransition();
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [installmentCodes, setInstallmentCodes] = useState<Record<string, string>>({});
   const [statusChanges, setStatusChanges] = useState<Record<string, string>>(() =>
     Object.fromEntries(orders.map((order) => [order.id, order.status])),
   );
@@ -78,10 +90,73 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
   useEffect(() => {
     setRows(orders);
     setStatusChanges(Object.fromEntries(orders.map((order) => [order.id, order.status])));
+    setInstallmentCodes(
+      Object.fromEntries(
+        orders
+          .filter((order) => Boolean(order.installmentVerificationCode))
+          .map((order) => [order.id, order.installmentVerificationCode ?? ""]),
+      ),
+    );
   }, [orders]);
+
+  const isCredoInstallmentOrder = (order: OrderEntry) =>
+    order.paymentMethod === "installments_credo" && Boolean(order.installmentOrderCode);
 
   const handleChange = (orderId: string, status: string) => {
     setStatusChanges((prev) => ({ ...prev, [orderId]: status }));
+  };
+
+  const handleInstallmentAction = (
+    orderId: string,
+    action: "confirm_stock" | "verify_code",
+    code?: string,
+  ) => {
+    startTransition(async () => {
+      setSelectedOrder(orderId);
+      try {
+        const response = await fetch(`/api/admin/${shopSlug}/orders`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId, action, code }),
+        });
+
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error || tr("adminOrders.toasts.updateFailed", "Update failed"));
+        }
+
+        const payload = await response.json();
+        setRows((prev) =>
+          prev.map((order) =>
+            order.id === orderId
+              ? {
+                  ...order,
+                  status: payload.status ?? order.status,
+                  installmentFlowStage: payload.installmentFlowStage ?? order.installmentFlowStage,
+                  installmentVerificationCode:
+                    payload.verificationCode ?? order.installmentVerificationCode,
+                }
+              : order,
+          ),
+        );
+
+        if (action === "confirm_stock") {
+          setInstallmentCodes((prev) => ({ ...prev, [orderId]: "" }));
+          toast.success(tr("adminOrders.toasts.stockConfirmed", "Stock confirmed"));
+        } else {
+          setInstallmentCodes((prev) => ({ ...prev, [orderId]: "" }));
+          toast.success(tr("adminOrders.toasts.deliveryConfirmed", "Delivery confirmed"));
+        }
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : tr("adminOrders.toasts.updateFailed", "Failed to update order"),
+        );
+      } finally {
+        setSelectedOrder(null);
+      }
+    });
   };
 
   const handleUpdate = (orderId: string) => {
@@ -193,7 +268,9 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    <Badge className={`capitalize ${paymentBadgeStyles[order.paymentStatus] || ""}`}>
+                    <Badge
+                      className={`capitalize ${paymentBadgeStyles[order.paymentStatus] || ""}`}
+                    >
                       {tr(`adminOrders.paymentStatus.${order.paymentStatus}`, order.paymentStatus)}
                     </Badge>
                   </td>
@@ -208,42 +285,75 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                     </div>
                   </td>
                   <td className="px-4 py-4 font-semibold">
-                    {formatCurrencyAmount(Number(order.total), order.currency ?? DEFAULT_CURRENCY_CODE)}
+                    {formatCurrencyAmount(
+                      Number(order.total),
+                      order.currency ?? DEFAULT_CURRENCY_CODE,
+                    )}
                   </td>
                   <td className="px-4 py-4 text-sm text-muted-foreground">
                     {new Date(order.createdAt).toLocaleString()}
                   </td>
                   <td className="px-4 py-4">
-                    <div className="space-y-2">
-                      <Select
-                        name={`status-${order.id}`}
-                        value={statusChanges[order.id]}
-                        onValueChange={(value) => handleChange(order.id, value)}
-                      >
-                        <SelectTrigger className="w-full text-left">
-                          <SelectValue placeholder={tr("adminOrders.actions.status", "Status")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ORDER_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {tr(
-                                `adminOrders.statuses.${status}`,
-                                status.charAt(0).toUpperCase() + status.slice(1),
+                    {isCredoInstallmentOrder(order) ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-mono text-muted-foreground">
+                          {order.installmentOrderCode}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {tr(
+                            `adminOrders.installments.stage.${order.installmentFlowStage ?? "unknown"}`,
+                            order.installmentFlowStage ?? "unknown",
+                          )}
+                        </p>
+
+                        {order.installmentFlowStage === "approved" ? (
+                          <Button
+                            size="sm"
+                            onClick={() => handleInstallmentAction(order.id, "confirm_stock")}
+                            disabled={isPending && selectedOrder === order.id}
+                          >
+                            {isPending && selectedOrder === order.id
+                              ? tr("adminOrders.actions.saving", "Saving...")
+                              : tr("adminOrders.installments.confirmStock", "Confirm stock")}
+                          </Button>
+                        ) : null}
+
+                        {order.installmentFlowStage === "pending" ? (
+                          <div className="space-y-2">
+                            <Input
+                              value={installmentCodes[order.id] ?? ""}
+                              onChange={(event) =>
+                                setInstallmentCodes((prev) => ({
+                                  ...prev,
+                                  [order.id]: event.target.value,
+                                }))
+                              }
+                              placeholder={tr(
+                                "adminOrders.installments.codePlaceholder",
+                                "Enter code",
                               )}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleUpdate(order.id)}
-                          disabled={isPending && selectedOrder === order.id}
-                        >
-                          {isPending && selectedOrder === order.id
-                            ? tr("adminOrders.actions.saving", "Saving...")
-                            : tr("adminOrders.actions.save", "Save")}
-                        </Button>
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                handleInstallmentAction(
+                                  order.id,
+                                  "verify_code",
+                                  (installmentCodes[order.id] || "").trim(),
+                                )
+                              }
+                              disabled={
+                                (isPending && selectedOrder === order.id) ||
+                                !(installmentCodes[order.id] || "").trim()
+                              }
+                            >
+                              {isPending && selectedOrder === order.id
+                                ? tr("adminOrders.actions.saving", "Saving...")
+                                : tr("adminOrders.installments.verifyCode", "Submit code")}
+                            </Button>
+                          </div>
+                        ) : null}
+
                         <Button
                           size="sm"
                           variant="outline"
@@ -256,7 +366,51 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                             : tr("adminOrders.actions.details", "Details")}
                         </Button>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Select
+                          name={`status-${order.id}`}
+                          value={statusChanges[order.id]}
+                          onValueChange={(value) => handleChange(order.id, value)}
+                        >
+                          <SelectTrigger className="w-full text-left">
+                            <SelectValue placeholder={tr("adminOrders.actions.status", "Status")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ORDER_STATUSES.map((status) => (
+                              <SelectItem key={status} value={status}>
+                                {tr(
+                                  `adminOrders.statuses.${status}`,
+                                  status.charAt(0).toUpperCase() + status.slice(1),
+                                )}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleUpdate(order.id)}
+                            disabled={isPending && selectedOrder === order.id}
+                          >
+                            {isPending && selectedOrder === order.id
+                              ? tr("adminOrders.actions.saving", "Saving...")
+                              : tr("adminOrders.actions.save", "Save")}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              setExpandedOrder((prev) => (prev === order.id ? null : order.id))
+                            }
+                          >
+                            {expandedOrder === order.id
+                              ? tr("adminOrders.actions.hide", "Hide")
+                              : tr("adminOrders.actions.details", "Details")}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </td>
                 </tr>
                 {expandedOrder === order.id && (
@@ -317,7 +471,10 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                               <span className="text-muted-foreground">
                                 {tr("adminOrders.details.tracking", "Tracking")}
                               </span>
-                              <span>{order.trackingNumber ?? tr("adminOrders.details.notAssigned", "Not assigned")}</span>
+                              <span>
+                                {order.trackingNumber ??
+                                  tr("adminOrders.details.notAssigned", "Not assigned")}
+                              </span>
                             </div>
                             <div className="flex items-center justify-between">
                               <span className="text-muted-foreground">
@@ -330,6 +487,24 @@ export function OrdersTable({ shopSlug, orders, isMock = false }: Props) {
                                 )}
                               </span>
                             </div>
+                            {isCredoInstallmentOrder(order) ? (
+                              <>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">
+                                    {tr("adminOrders.installments.orderCode", "Order code")}
+                                  </span>
+                                  <span className="font-mono text-xs">
+                                    {order.installmentOrderCode}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">
+                                    {tr("adminOrders.installments.credoStatus", "Credo status")}
+                                  </span>
+                                  <span>{order.installmentStatusName || "--"}</span>
+                                </div>
+                              </>
+                            ) : null}
                           </div>
                         </div>
                       </div>

@@ -10,6 +10,16 @@ import { OrdersTable } from "./orders-table";
 type ApiOrderEntry = {
   id: string;
   status: string;
+  paymentMethod: string;
+  userId: string | null;
+  customerEmail: string | null;
+  installmentOrderCode: string | null;
+  installmentStatusId: number | null;
+  installmentStatusName: string | null;
+  installmentFlowStage: string | null;
+  installmentVerificationCode: string | null;
+  installmentStockConfirmedAt: string | null;
+  installmentDeliveredAt: string | null;
   total: string;
   currency: string | null;
   createdAt: string;
@@ -65,8 +75,8 @@ async function fetchProducts(slug: string): Promise<ApiProduct[]> {
 function normalizeOrders(orders: ApiOrderEntry[]): OrderEntry[] {
   return orders.map((order) => ({
     ...order,
-    customerName: "Guest checkout",
-    customerEmail: "guest@example.com",
+    customerName: order.customerEmail?.split("@")[0] || "Guest checkout",
+    customerEmail: order.customerEmail || "guest@example.com",
     paymentStatus: order.status === "completed" ? "paid" : "pending",
     fulfillmentStatus:
       order.status === "completed"
@@ -132,6 +142,15 @@ function buildMockOrders(products: ApiProduct[]): OrderEntry[] {
     return {
       id: `MOCK-${product.id.slice(0, 8)}`,
       status,
+      paymentMethod: "card",
+      userId: null,
+      installmentOrderCode: null,
+      installmentStatusId: null,
+      installmentStatusName: null,
+      installmentFlowStage: null,
+      installmentVerificationCode: null,
+      installmentStockConfirmedAt: null,
+      installmentDeliveredAt: null,
       total: total.toFixed(2),
       currency: variant?.currency ?? product.currency ?? DEFAULT_CURRENCY_CODE,
       createdAt,

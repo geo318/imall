@@ -11,6 +11,10 @@ function serializeOrder(order: {
   shopName: string | null;
   status: string | null;
   paymentMethod: string;
+  installmentOrderCode: string | null;
+  installmentStatusName: string | null;
+  installmentFlowStage: string | null;
+  installmentVerificationCode: string | null;
   total: string;
   currency: string;
   createdAt: Date;
@@ -23,6 +27,10 @@ function serializeOrder(order: {
     shopName: order.shopName,
     status: order.status,
     paymentMethod: order.paymentMethod,
+    installmentOrderCode: order.installmentOrderCode,
+    installmentStatusName: order.installmentStatusName,
+    installmentFlowStage: order.installmentFlowStage,
+    installmentVerificationCode: order.installmentVerificationCode,
     total: order.total,
     currency: order.currency,
     createdAt: order.createdAt.toISOString(),
@@ -60,6 +68,10 @@ export const userOrderRoutes = new Elysia({
           shopName: tenants.name,
           status: orders.status,
           paymentMethod: orders.paymentMethod,
+          installmentOrderCode: orders.installmentOrderCode,
+          installmentStatusName: orders.installmentStatusName,
+          installmentFlowStage: orders.installmentFlowStage,
+          installmentVerificationCode: orders.installmentVerificationCode,
           total: orders.total,
           currency: orders.currency,
           createdAt: orders.createdAt,
@@ -74,6 +86,10 @@ export const userOrderRoutes = new Elysia({
           orders.tenantId,
           orders.status,
           orders.paymentMethod,
+          orders.installmentOrderCode,
+          orders.installmentStatusName,
+          orders.installmentFlowStage,
+          orders.installmentVerificationCode,
           orders.total,
           orders.currency,
           orders.createdAt,

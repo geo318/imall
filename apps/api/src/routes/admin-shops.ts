@@ -17,6 +17,7 @@ import {
   shopSettings,
   tenants,
   tenantVariantOptions,
+  users,
   variantOptionValues,
   variants,
 } from "@repo/db";
@@ -25,6 +26,7 @@ import { and, asc, desc, eq, inArray, ne, sql, sum } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { adminOrSuperadminGuard, getTenantIdBySlug } from "../context";
+import { markCredoInstallmentAsDelivered } from "../integrations/credo-additional-services";
 
 const settingsSchema = z.object({
   name: z.string().min(1).optional(),
@@ -85,8 +87,17 @@ async function generateShopSlug(name: string, tenantId: string, currentSlug?: st
 }
 
 const orderStatusSchema = z.object({
-  status: z.enum(["pending", "processing", "completed", "cancelled"]),
+  status: z.enum(["approved", "pending", "processing", "completed", "cancelled"]),
 });
+
+const installmentCodeSchema = z.object({
+  code: z.string().trim().min(4).max(16),
+});
+
+function generateInstallmentVerificationCode(): string {
+  const randomNumber = Math.floor(Math.random() * 900000) + 100000;
+  return String(randomNumber);
+}
 
 const optionalNumber = z.preprocess((value) => {
   if (value === null || value === undefined || value === "") return undefined;
@@ -431,10 +442,7 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
     ]);
 
     const valuesByOptionId = new Map<string, string[]>();
-    const valueItemsByOptionId = new Map<
-      string,
-      Array<{ value: string; thumbnailUrl?: string }>
-    >();
+    const valueItemsByOptionId = new Map<string, Array<{ value: string; thumbnailUrl?: string }>>();
     for (const row of valueRows) {
       const existing = valuesByOptionId.get(row.optionId) ?? [];
       if (!existing.includes(row.value)) {
@@ -616,11 +624,22 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
       .select({
         id: orders.id,
         status: orders.status,
+        paymentMethod: orders.paymentMethod,
+        userId: orders.userId,
+        customerEmail: users.email,
         total: orders.total,
         currency: orders.currency,
         createdAt: orders.createdAt,
+        installmentOrderCode: orders.installmentOrderCode,
+        installmentStatusId: orders.installmentStatusId,
+        installmentStatusName: orders.installmentStatusName,
+        installmentFlowStage: orders.installmentFlowStage,
+        installmentVerificationCode: orders.installmentVerificationCode,
+        installmentStockConfirmedAt: orders.installmentStockConfirmedAt,
+        installmentDeliveredAt: orders.installmentDeliveredAt,
       })
       .from(orders)
+      .leftJoin(users, eq(users.id, orders.userId))
       .where(eq(orders.tenantId, tenantId))
       .orderBy(desc(orders.createdAt))
       .limit(20);
@@ -660,6 +679,128 @@ export const adminShopRoutes = new Elysia({ prefix: "/admin/:shopSlug" })
 
     await db.update(orders).set({ status }).where(eq(orders.id, orderId));
     return { id: orderId, status };
+  })
+  .post("/orders/:orderId/installments/confirm-stock", async ({ params, set }) => {
+    const { shopSlug, orderId } = params as { shopSlug: string; orderId: string };
+    const tenantId = await getTenantIdBySlug(shopSlug);
+
+    const [order] = await db
+      .select({
+        id: orders.id,
+        status: orders.status,
+        paymentMethod: orders.paymentMethod,
+        installmentOrderCode: orders.installmentOrderCode,
+        installmentFlowStage: orders.installmentFlowStage,
+      })
+      .from(orders)
+      .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenantId)))
+      .limit(1);
+
+    if (!order) {
+      set.status = 404;
+      return { error: "Order not found" };
+    }
+
+    if (order.paymentMethod !== "installments_credo" || !order.installmentOrderCode) {
+      set.status = 409;
+      return { error: "Order is not a Credo installment order" };
+    }
+
+    if (order.status === "completed") {
+      set.status = 409;
+      return { error: "Order is already completed" };
+    }
+
+    if (order.installmentFlowStage && order.installmentFlowStage !== "approved") {
+      set.status = 409;
+      return { error: "Order is not in approved stage" };
+    }
+
+    const nextCode = generateInstallmentVerificationCode();
+    const now = new Date();
+    await db
+      .update(orders)
+      .set({
+        status: "pending",
+        installmentFlowStage: "pending",
+        installmentVerificationCode: nextCode,
+        installmentStockConfirmedAt: now,
+      })
+      .where(eq(orders.id, order.id));
+
+    return {
+      id: order.id,
+      status: "pending",
+      installmentFlowStage: "pending",
+      verificationCode: nextCode,
+    };
+  })
+  .post("/orders/:orderId/installments/verify-code", async ({ params, body, set }) => {
+    const { shopSlug, orderId } = params as { shopSlug: string; orderId: string };
+    const payload = installmentCodeSchema.parse(body);
+    const tenantId = await getTenantIdBySlug(shopSlug);
+
+    const [order] = await db
+      .select({
+        id: orders.id,
+        status: orders.status,
+        paymentMethod: orders.paymentMethod,
+        installmentOrderCode: orders.installmentOrderCode,
+        installmentVerificationCode: orders.installmentVerificationCode,
+      })
+      .from(orders)
+      .where(and(eq(orders.id, orderId), eq(orders.tenantId, tenantId)))
+      .limit(1);
+
+    if (!order) {
+      set.status = 404;
+      return { error: "Order not found" };
+    }
+
+    if (order.paymentMethod !== "installments_credo" || !order.installmentOrderCode) {
+      set.status = 409;
+      return { error: "Order is not a Credo installment order" };
+    }
+
+    if (!order.installmentVerificationCode) {
+      set.status = 409;
+      return { error: "Verification code is not generated yet" };
+    }
+
+    if (payload.code !== order.installmentVerificationCode) {
+      set.status = 400;
+      return { error: "Verification code is invalid" };
+    }
+
+    try {
+      await markCredoInstallmentAsDelivered(order.installmentOrderCode);
+    } catch (error) {
+      set.status = 502;
+      return {
+        error: "Failed to mark order as delivered in Credo",
+        message: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    const now = new Date();
+    await db
+      .update(orders)
+      .set({
+        status: "completed",
+        installmentStatusId: 5,
+        installmentStatusName: "CLOSED_SUCCESSFULLY",
+        installmentFlowStage: "completed",
+        installmentDeliveredAt: now,
+        installmentVerificationCode: null,
+      })
+      .where(eq(orders.id, order.id));
+
+    return {
+      id: order.id,
+      status: "completed",
+      installmentFlowStage: "completed",
+      deliveredAt: now.toISOString(),
+    };
   })
   // Payouts and ledger
   .get("/payouts", async ({ params }) => {

@@ -35,16 +35,37 @@ export async function PATCH(
 ) {
   try {
     const { shopSlug } = await params;
-    const { orderId, status } = await request.json();
+    const { orderId, status, action, code } = await request.json();
 
-    if (!orderId || typeof status !== "string") {
+    if (!orderId || typeof orderId !== "string") {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
-    const response = await backendRequest(`/admin/${shopSlug}/orders/${orderId}`, {
-      method: "PATCH",
-      body: { status },
-    });
+    let response: Response;
+    if (action === "confirm_stock") {
+      response = await backendRequest(
+        `/admin/${shopSlug}/orders/${orderId}/installments/confirm-stock`,
+        {
+          method: "POST",
+        },
+      );
+    } else if (action === "verify_code") {
+      response = await backendRequest(
+        `/admin/${shopSlug}/orders/${orderId}/installments/verify-code`,
+        {
+          method: "POST",
+          body: { code },
+        },
+      );
+    } else {
+      if (typeof status !== "string") {
+        return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+      }
+      response = await backendRequest(`/admin/${shopSlug}/orders/${orderId}`, {
+        method: "PATCH",
+        body: { status },
+      });
+    }
 
     if (!response.ok) {
       return await handleBackendError(response, "Failed to update order");

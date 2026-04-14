@@ -14,6 +14,10 @@ type UserOrder = {
   shopName: string | null;
   status: string | null;
   paymentMethod: string;
+  installmentOrderCode: string | null;
+  installmentStatusName: string | null;
+  installmentFlowStage: string | null;
+  installmentVerificationCode: string | null;
   total: string;
   currency: string;
   createdAt: string;
@@ -44,6 +48,7 @@ export default function AccountOrdersPage() {
   const [orders, setOrders] = useState<UserOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [revealedCodes, setRevealedCodes] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -142,12 +147,44 @@ export default function AccountOrdersPage() {
                   <p className="text-sm text-slate-600">
                     {t("accountOrders.paymentMethod", { method: order.paymentMethod })}
                   </p>
+                  {order.paymentMethod.startsWith("installments_") ? (
+                    <p className="text-sm text-slate-600">
+                      {t("accountOrders.installmentStatus", {
+                        status: order.installmentFlowStage || order.installmentStatusName || "--",
+                      })}
+                    </p>
+                  ) : null}
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-medium text-slate-900">
                       {formatCurrencyAmount(order.total, order.currency)}
                     </p>
                     <p className="text-xs text-slate-500">{formatDateTime(order.createdAt)}</p>
                   </div>
+                  {order.paymentMethod === "installments_credo" &&
+                  order.installmentFlowStage === "pending" &&
+                  order.installmentVerificationCode ? (
+                    <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                      <button
+                        type="button"
+                        className="text-sm font-semibold text-emerald-800 underline-offset-2 hover:underline"
+                        onClick={() =>
+                          setRevealedCodes((previous) => ({
+                            ...previous,
+                            [order.id]: !previous[order.id],
+                          }))
+                        }
+                      >
+                        {revealedCodes[order.id]
+                          ? t("accountOrders.hideCode")
+                          : t("accountOrders.viewCode")}
+                      </button>
+                      {revealedCodes[order.id] ? (
+                        <p className="mt-2 font-mono text-lg tracking-widest text-emerald-900">
+                          {order.installmentVerificationCode}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
