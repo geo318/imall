@@ -196,9 +196,12 @@ export function resolveStoredCartId(cartKey: string): string | null {
   return resolvedCartId;
 }
 
-function clearCheckoutCartKeys(cartKey: string, cartId?: string | null) {
+export function clearCheckoutCartKeys(cartKey: string, cartId?: string | null) {
   clearCartIdFromStorage(cartKey);
-  clearCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
+  const defaultCartId = readCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
+  if (cartKey === DEFAULT_CART_STORAGE_KEY || (cartId && defaultCartId === cartId)) {
+    clearCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
+  }
 
   if (typeof globalThis.window === "undefined" || !cartId) {
     return;

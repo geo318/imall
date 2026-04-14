@@ -1,11 +1,15 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { Link, useSearchParams } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import { CheckoutConfirmation } from "./checkout-confirmation";
+import { resolveCheckoutErrorMessage, shouldShowCheckoutErrorToast } from "./checkout-errors";
 import { CheckoutInstallmentBanner } from "./checkout-installment-banner";
 import { CheckoutProgress } from "./checkout-progress";
+import { sanitizeCheckoutCartKey } from "./checkout-routing";
 import { CheckoutSkeleton } from "./checkout-skeleton";
 import { OrderSummary } from "./order-summary";
 import { PaymentStep } from "./payment-step";
@@ -23,7 +27,9 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
   const searchParams = useSearchParams();
   const requestedPayment = searchParams.get("payment");
   const requestedProvider = searchParams.get("provider");
+  const requestedCartKey = searchParams.get("cartKey");
   const installmentLaunchError = searchParams.get("installment_error");
+  const safeCartKey = sanitizeCheckoutCartKey(requestedCartKey, cartKey);
   const initialPaymentMethod: CheckoutPaymentMethod =
     requestedPayment === "installments" ? "installments" : "card";
   const initialInstallmentProvider: InstallmentProvider =
@@ -33,10 +39,29 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
         ? "credo"
         : "keepz";
   const checkout = useCheckoutController({
-    cartKey,
+    cartKey: safeCartKey,
     initialPaymentMethod,
     initialInstallmentProvider,
   });
+  const lastErrorToastRef = useRef<string | null>(null);
+  const checkoutErrorMessage = resolveCheckoutErrorMessage(
+    checkout.errorMessage,
+    installmentLaunchError,
+  );
+
+  useEffect(() => {
+    if (!checkoutErrorMessage) {
+      lastErrorToastRef.current = null;
+      return;
+    }
+
+    if (!shouldShowCheckoutErrorToast(checkoutErrorMessage, lastErrorToastRef.current)) {
+      return;
+    }
+
+    lastErrorToastRef.current = checkoutErrorMessage;
+    toast.error(checkoutErrorMessage);
+  }, [checkoutErrorMessage]);
 
   if (checkout.loading) {
     return <CheckoutSkeleton label={t("checkout.loading")} />;
@@ -65,9 +90,9 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
           onClear={checkout.clearInstallmentState}
         />
 
-        {checkout.errorMessage || installmentLaunchError ? (
+        {checkoutErrorMessage ? (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {checkout.errorMessage || installmentLaunchError}
+            {checkoutErrorMessage}
           </div>
         ) : null}
 

@@ -12,6 +12,12 @@ import {
   writeCartIdToStorage,
 } from "@/lib/cart-storage";
 import { revalidateCartClient } from "@/lib/revalidate-client";
+import {
+  buildBuyNowCheckoutHref,
+  createIsolatedBuyNowCart,
+  BUY_NOW_CART_KEY,
+  DEFAULT_CART_KEY,
+} from "./product-buttons.logic";
 
 type Props = {
   selectedVariantId: string | null;
@@ -27,11 +33,10 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const cartMutation = useMutation({
-    mutationFn: async ({ variantId }: { variantId: string }) => {
-      const key = "cart";
+  const addToCartMutation = useMutation({
+    mutationFn: async ({ variantId, cartKey }: { variantId: string; cartKey: string }) => {
       const isClient = globalThis.window !== undefined;
-      let cartId = isClient ? globalThis.window.localStorage.getItem(key) : null;
+      let cartId = isClient ? globalThis.window.localStorage.getItem(cartKey) : null;
 
       if (cartId) {
         try {
@@ -41,7 +46,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
           }
         } catch {
           if (isClient) {
-            clearCartIdFromStorage(key);
+            clearCartIdFromStorage(cartKey);
           }
           cartId = null;
         }
@@ -54,7 +59,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
         }
         cartId = createResult.data.id;
         if (isClient) {
-          writeCartIdToStorage(cartId, key);
+          writeCartIdToStorage(cartId, cartKey);
         }
       }
 
@@ -72,7 +77,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
           msg === "NOT_FOUND"
         ) {
           if (isClient) {
-            clearCartIdFromStorage(key);
+            clearCartIdFromStorage(cartKey);
           }
           const createResult = await createCartSafe();
           if (!createResult.ok) {
@@ -80,7 +85,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
           }
           cartId = createResult.data.id;
           if (isClient) {
-            writeCartIdToStorage(cartId, key);
+            writeCartIdToStorage(cartId, cartKey);
           }
           const retryAddResult = await addToCartSafe(cartId, variantId, 1);
           if (!retryAddResult.ok) {
@@ -93,15 +98,31 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
     },
   });
 
+  const buyNowMutation = useMutation({
+    mutationFn: async ({ variantId }: { variantId: string }) => createIsolatedBuyNowCart(variantId),
+  });
+
   const addVariantAndNavigate = async (
     destination: "cart" | "checkout" | "checkoutInstallments",
   ) => {
     if (!selectedVariantId) return;
 
     try {
-      const cartId = await cartMutation.mutateAsync({ variantId: selectedVariantId });
+      if (destination === "checkout") {
+        const buyNowCartId = await buyNowMutation.mutateAsync({ variantId: selectedVariantId });
+        await queryClient.invalidateQueries({ queryKey: ["cart", buyNowCartId] });
+        dispatchCartStorageUpdated(buyNowCartId, BUY_NOW_CART_KEY);
+        await revalidateCartClient();
+        router.push(buildBuyNowCheckoutHref());
+        return;
+      }
+
+      const cartId = await addToCartMutation.mutateAsync({
+        variantId: selectedVariantId,
+        cartKey: DEFAULT_CART_KEY,
+      });
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
-      dispatchCartStorageUpdated(cartId, "cart");
+      dispatchCartStorageUpdated(cartId, DEFAULT_CART_KEY);
       await revalidateCartClient();
 
       if (destination === "cart") {
@@ -128,7 +149,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
       <Button
         className="w-full"
         size="lg"
-        disabled={isDisabled || cartMutation.isPending}
+        disabled={isDisabled || addToCartMutation.isPending || buyNowMutation.isPending}
         onClick={() => void addVariantAndNavigate("cart")}
       >
         {isSoldOut ? t("productButtons.soldOut") : t("productButtons.addToCart")}
@@ -137,7 +158,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
         className="w-full"
         size="lg"
         variant="outline"
-        disabled={isDisabled || cartMutation.isPending}
+        disabled={isDisabled || addToCartMutation.isPending || buyNowMutation.isPending}
         onClick={() => void addVariantAndNavigate("checkout")}
       >
         {t("productButtons.buyNow")}
@@ -146,7 +167,7 @@ export function ProductButtons({ selectedVariantId, isDisabled, isSoldOut }: Pro
         className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50"
         size="lg"
         variant="outline"
-        disabled={isDisabled || cartMutation.isPending}
+        disabled={isDisabled || addToCartMutation.isPending || buyNowMutation.isPending}
         onClick={() => void addVariantAndNavigate("checkoutInstallments")}
       >
         {t("productButtons.buyWithInstallments")}
