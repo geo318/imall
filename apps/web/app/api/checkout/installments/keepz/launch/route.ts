@@ -35,8 +35,29 @@ async function getAuthToken(): Promise<string | null> {
   }
 }
 
+function getRequestOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = forwardedHost || request.headers.get("host") || request.nextUrl.host;
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const protocol =
+    forwardedProto ||
+    (host.includes("localhost") || host.startsWith("127.0.0.1")
+      ? "http"
+      : request.nextUrl.protocol.replace(":", "") || "https");
+
+  return `${protocol}://${host}`;
+}
+
+function normalizeReturnPath(returnTo: string | null): string {
+  if (!returnTo) return "/";
+  if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+    return returnTo;
+  }
+  return "/";
+}
+
 function buildErrorRedirect(request: NextRequest, returnTo: string | null, message: string) {
-  const fallbackUrl = new URL(returnTo || "/", request.nextUrl.origin);
+  const fallbackUrl = new URL(normalizeReturnPath(returnTo), getRequestOrigin(request));
   fallbackUrl.searchParams.set("installment_error", message);
   return NextResponse.redirect(fallbackUrl);
 }
