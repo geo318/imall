@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { EMPTY_SHIPPING_FORM } from "./types";
 import {
+  clearCheckoutCartKeys,
   getCredoLaunchBlockReason,
   isCredoLaunchReady,
   matchingAddressNeedsRefresh,
@@ -109,6 +110,26 @@ describe("use-checkout-controller credo readiness", () => {
 
     expect(getCredoLaunchBlockReason("cart", shippingForm)).toBe("missingCustomerData");
     expect(isCredoLaunchReady("cart", shippingForm)).toBe(false);
+  });
+
+  test("clearing buy-now cart key does not clear default cart when IDs differ", () => {
+    globalThis.window.localStorage.setItem("cart", "cart-default-1");
+    globalThis.window.localStorage.setItem("cart:buy-now", "cart-buy-now-1");
+
+    clearCheckoutCartKeys("cart:buy-now", "cart-buy-now-1");
+
+    expect(globalThis.window.localStorage.getItem("cart")).toBe("cart-default-1");
+    expect(globalThis.window.localStorage.getItem("cart:buy-now")).toBeNull();
+  });
+
+  test("clearing buy-now cart key clears default cart when IDs match", () => {
+    globalThis.window.localStorage.setItem("cart", "cart-shared-1");
+    globalThis.window.localStorage.setItem("cart:buy-now", "cart-shared-1");
+
+    clearCheckoutCartKeys("cart:buy-now", "cart-shared-1");
+
+    expect(globalThis.window.localStorage.getItem("cart")).toBeNull();
+    expect(globalThis.window.localStorage.getItem("cart:buy-now")).toBeNull();
   });
 
   test("matching saved address can be refreshed when email or phone is missing", () => {
