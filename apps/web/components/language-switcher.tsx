@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { defaultLocale, type Locale, locales } from "@/i18n/config";
 import { usePathname, useSearchParams } from "@/i18n/navigation.client";
 import { cn } from "@/lib/utils";
@@ -12,23 +12,27 @@ const localeLabels: Record<Locale, string> = {
   ru: "RU",
 };
 
+// Stable module-level pattern — never recreated on render.
+const localePattern = new RegExp(`^/(${locales.join("|")})(?=/|$)`);
+
 export function LanguageSwitcher({ className }: { className?: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const localePattern = new RegExp(`^/(${locales.join("|")})(?=/|$)`);
+
   const match = pathname.match(localePattern);
   const current = (match?.[1] as Locale) ?? defaultLocale;
-  const [selected, setSelected] = useState<Locale>(current);
+
+  // Track which locale the user clicked during a pending transition.
+  // No useEffect needed — when isPending clears, current has already updated.
+  const [pendingLocale, setPendingLocale] = useState<Locale | null>(null);
+  const selected = isPending && pendingLocale !== null ? pendingLocale : current;
+
   const withoutLocale = pathname.replace(localePattern, "") || "/";
   const basePath = withoutLocale.startsWith("/") ? withoutLocale : `/${withoutLocale}`;
   const query = searchParams.toString();
   const selectedIndex = useMemo(() => Math.max(0, locales.indexOf(selected)), [selected]);
-
-  useEffect(() => {
-    setSelected(current);
-  }, [current]);
 
   return (
     <div
@@ -62,7 +66,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
             disabled={isPending || isSelected}
             onClick={() => {
               if (isSelected) return;
-              setSelected(locale);
+              setPendingLocale(locale);
               startTransition(() => {
                 router.replace(fullHref, { scroll: false });
               });

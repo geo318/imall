@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useContext } from "react";
-import type { Dictionary } from "./types";
+import { createContext, useContext, useMemo } from "react";
 import type { Locale } from "./config";
 import { createTranslator, type Translator } from "./translator";
+import type { Dictionary } from "./types";
 
 type I18nContextValue = {
   locale: Locale;
@@ -21,7 +21,11 @@ export function I18nProvider({
   messages: Dictionary;
   children: React.ReactNode;
 }) {
-  return <I18nContext.Provider value={{ locale, messages }}>{children}</I18nContext.Provider>;
+  // Stable object reference — only changes when locale or messages change (i.e. on locale switch).
+  // Without this, every render of the layout would create a new context value and
+  // force all useContext(I18nContext) consumers to rerender.
+  const value = useMemo(() => ({ locale, messages }), [locale, messages]);
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
 export function useTranslations(): Translator {
@@ -29,7 +33,9 @@ export function useTranslations(): Translator {
   if (!context) {
     throw new Error("useTranslations must be used within I18nProvider");
   }
-  return createTranslator(context.messages);
+  // Memoize per messages reference — createTranslator allocates closures on every call.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => createTranslator(context.messages), [context.messages]);
 }
 
 export function useLocale() {
