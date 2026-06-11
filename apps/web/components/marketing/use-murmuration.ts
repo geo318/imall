@@ -37,6 +37,7 @@ let cachedMurmurationSnapshot: MurmurationSnapshot | null = null;
 export function useMurmuration(
   canvasRef: RefObject<HTMLCanvasElement | null>,
   iconNodes: ReadonlyArray<IconNode>,
+  prefersReducedMotion: boolean,
 ) {
   const iconNodesRef = useRef<ReadonlyArray<IconNode>>([]);
 
@@ -50,8 +51,6 @@ export function useMurmuration(
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const isCoarsePointer = window.matchMedia("(pointer: coarse)").matches;
     const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
     const cores = navigator.hardwareConcurrency ?? 8;
@@ -424,5 +423,5 @@ export function useMurmuration(
         window.removeEventListener("mousemove", onMove);
       }
     };
-  }, [canvasRef]);
+  }, [canvasRef, prefersReducedMotion]);
 }

@@ -162,7 +162,7 @@ export function HeroBackground() {
     };
   }, []);
 
-  useMurmuration(canvasRef, iconNodes);
+  useMurmuration(canvasRef, iconNodes, prefersReducedMotion);
 
   return (
     <div ref={layerRef} className="absolute inset-0">
