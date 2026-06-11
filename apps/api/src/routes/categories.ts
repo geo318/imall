@@ -1,5 +1,5 @@
-import { categories, categoryRelations, db } from "@repo/db";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { categories, categoryRelations, db, products, tenants } from "@repo/db";
+import { and, asc, count, desc, eq, isNull, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
 import { withCachedResponse } from "../utils/response-cache";
@@ -34,7 +34,74 @@ function pickLocalizedName(category: CategoryRow, locale: z.infer<typeof categor
   return category.name;
 }
 
-export const categoriesRoutes = new Elysia({ prefix: "/categories" }).get(
+export const categoriesRoutes = new Elysia({ prefix: "/categories" })
+  .get(
+  "/top",
+  async ({ query, set }) => {
+    const locale = categoryLocaleSchema.parse(query?.locale ?? "en");
+    const limit = Math.min(Math.max(1, Number(query?.limit ?? 3) || 3), 20);
+    const cacheKey = `categories:top:${locale}:${limit}`;
+
+    const payload = await withCachedResponse(cacheKey, 86_400_000, async () => {
+      const rows = await db
+        .select({
+          key: products.category,
+          productCount: count(products.id).as("product_count"),
+          name: categories.name,
+          nameEn: categories.nameEn,
+          nameKa: categories.nameKa,
+          nameRu: categories.nameRu,
+          categorySlug: categories.slug,
+          icon: categories.icon,
+        })
+        .from(products)
+        .innerJoin(tenants, eq(products.tenantId, tenants.id))
+        .leftJoin(categories, eq(categories.categoryKey, products.category))
+        .where(
+          and(
+            sql`${products.deletedAt} IS NULL`,
+            eq(products.draft, false),
+            eq(tenants.canSell, true),
+          ),
+        )
+        .groupBy(
+          products.category,
+          categories.name,
+          categories.nameEn,
+          categories.nameKa,
+          categories.nameRu,
+          categories.slug,
+          categories.icon,
+        )
+        .orderBy(desc(count(products.id)))
+        .limit(limit);
+
+      return rows.map((row) => ({
+        key: row.key,
+        name: pickLocalizedName(
+          {
+            id: "",
+            slug: row.categorySlug ?? row.key,
+            categoryKey: row.key,
+            name: row.name ?? row.key,
+            nameEn: row.nameEn,
+            nameKa: row.nameKa,
+            nameRu: row.nameRu,
+            icon: row.icon ?? "📦",
+          },
+          locale,
+        ),
+        icon: row.icon ?? "📦",
+        categorySlug: row.categorySlug ?? null,
+        productCount: Number(row.productCount),
+      }));
+    });
+
+    set.headers["Cache-Control"] = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400";
+    return payload;
+  },
+)
+  .get(
   "/tree",
   async ({ query, set }) => {
     const locale = categoryLocaleSchema.parse(query?.locale ?? "en");

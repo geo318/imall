@@ -12,6 +12,7 @@ export const CACHE_TAGS = {
   AUCTION: "auction",
   ORDERS: "orders",
   INVENTORY: "inventory",
+  CATEGORIES: "categories",
 } as const;
 
 /**
