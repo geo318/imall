@@ -3,13 +3,23 @@ import { getSpotlightShops } from "@/app/actions/shops";
 import { getCurrentLocale, Link } from "@/i18n/navigation.server";
 import { getTranslations } from "@/i18n/server";
 
-const BASE_DATE_MS = new Date("2026-01-01").getTime();
+// Base = today so displayed totals start under 300 and grow 10-20/day from here.
+const BASE_DATE_MS = new Date("2026-06-12").getTime();
 
 const VENDOR_SEED_STATS = [
-  { products: 47, salesBase: 58,  salesPerDay: 1 },
-  { products: 32, salesBase: 34,  salesPerDay: 1 },
-  { products: 83, salesBase: 89,  salesPerDay: 1 },
+  { products: 47, salesBase: 180, vendorSeed: 11 },
+  { products: 32, salesBase: 220, vendorSeed: 37 },
+  { products: 83, salesBase: 260, vendorSeed: 73 },
 ];
+
+// Deterministic 10-20 increment per vendor per day — same for all users on a given day.
+function computeSales(salesBase: number, daysSince: number, vendorSeed: number): number {
+  let total = salesBase;
+  for (let d = 0; d < daysSince; d++) {
+    total += 10 + ((d * 1_234_567 + vendorSeed) >>> 0) % 11;
+  }
+  return total;
+}
 
 function formatCategory(category: string | null) {
   if (!category) return null;
@@ -45,9 +55,9 @@ export async function VendorSpotlight() {
 
         <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-3">
           {vendors.map((vendor, index) => {
-            const seed = VENDOR_SEED_STATS[index] ?? { products: 25, salesBase: 500, salesPerDay: 3 };
+            const seed = VENDOR_SEED_STATS[index] ?? { products: 25, salesBase: 180, vendorSeed: 99 };
             const productCount = vendor.productCount > 0 ? vendor.productCount : seed.products;
-            const salesCount = vendor.salesCount > 0 ? vendor.salesCount : seed.salesBase + daysSinceBase * seed.salesPerDay;
+            const salesCount = vendor.salesCount > 0 ? vendor.salesCount : computeSales(seed.salesBase, daysSinceBase, seed.vendorSeed);
 
             return (
               <Link
