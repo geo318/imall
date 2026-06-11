@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
       }
     })();
 
-    if (!redirectHost.endsWith("credo.ge")) {
+    if (redirectHost !== "credo.ge" && !redirectHost.endsWith(".credo.ge")) {
       console.error("[checkout.installments.launch] unexpected redirect host", {
         cartId,
         mode,

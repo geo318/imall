@@ -5,8 +5,8 @@ type CacheEntry<T> = {
 
 const CACHE_ENABLED = process.env.API_RESPONSE_CACHE_ENABLED !== "false";
 const CACHE_MAX_ENTRIES = Math.max(
-  100,
-  Number.parseInt(process.env.API_RESPONSE_CACHE_MAX_ENTRIES ?? "2000", 10) || 2000,
+  50,
+  Number.parseInt(process.env.API_RESPONSE_CACHE_MAX_ENTRIES ?? "500", 10) || 500,
 );
 
 const cache = new Map<string, CacheEntry<unknown>>();
@@ -16,18 +16,17 @@ function isExpired(entry: CacheEntry<unknown>) {
   return entry.expiresAt <= Date.now();
 }
 
+// Background cleanup prevents eviction from spiking on individual writes.
+setInterval(() => {
+  for (const [key, entry] of cache.entries()) {
+    if (isExpired(entry)) cache.delete(key);
+  }
+}, 30_000).unref?.();
+
 function evictIfNeeded() {
   if (cache.size <= CACHE_MAX_ENTRIES) return;
 
-  // Prefer evicting expired entries first.
-  for (const [key, entry] of cache.entries()) {
-    if (isExpired(entry)) {
-      cache.delete(key);
-      if (cache.size <= CACHE_MAX_ENTRIES) return;
-    }
-  }
-
-  // Then evict oldest entries (Map preserves insertion order).
+  // Evict oldest entries (Map preserves insertion order).
   while (cache.size > CACHE_MAX_ENTRIES) {
     const oldestKey = cache.keys().next().value;
     if (!oldestKey) return;
@@ -83,14 +82,10 @@ export async function withCachedResponse<T>(
 
 export function invalidateCachedResponses(predicate: (key: string) => boolean) {
   for (const key of cache.keys()) {
-    if (predicate(key)) {
-      cache.delete(key);
-    }
+    if (predicate(key)) cache.delete(key);
   }
   for (const key of inflight.keys()) {
-    if (predicate(key)) {
-      inflight.delete(key);
-    }
+    if (predicate(key)) inflight.delete(key);
   }
 }
 

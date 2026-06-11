@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
       }
     })();
 
-    if (!redirectHost.endsWith("keepz.me")) {
+    if (redirectHost !== "keepz.me" && !redirectHost.endsWith(".keepz.me")) {
       return buildErrorRedirect(request, returnTo, "Keepz redirect host is invalid.");
     }
 

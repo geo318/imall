@@ -30,7 +30,6 @@ import { Elysia } from "elysia";
 import { z } from "zod";
 import { getVariantInventoryStatusMap, listQuerySchema } from "../context";
 import { sanitizePersistedImageUrls } from "../utils/image-urls";
-import { logger } from "../utils/logger";
 import { withCachedResponse } from "../utils/response-cache";
 
 const DEFAULT_CURRENCY = "GEL";
@@ -550,9 +549,8 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
   .get("/", async ({ query, set }) => {
     try {
       const { limit } = listQuerySchema.parse(query);
-      const seed = timeBucketSeed();
-      const cacheKey = `products:any:${limit}:${seed}`;
-      const result = await withCachedResponse(cacheKey, 15_000, async () => {
+      const cacheKey = `products:any:${limit}`;
+      const result = await withCachedResponse(cacheKey, 30_000, async () => {
         type ProductRow = {
           id: string;
           slug: string;
@@ -570,13 +568,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           eq(tenants.canSell, true),
         );
 
-        // Avoid `ORDER BY random()` full-table sort and avoid global COUNT(*) scans.
-        // Pull a bounded, indexed "recent window", rotate slightly by time bucket,
-        // then do deterministic in-memory shuffle.
-        const candidateSize = Math.min(Math.max(limit * 8, limit), 400);
-        const windowOffset = (seed % 6) * Math.max(1, Math.floor(limit / 2));
-
-        let candidateRows = (await db
+        const rows = (await db
           .select({
             id: products.id,
             slug: products.slug,
@@ -591,35 +583,7 @@ export const allProductsRoutes = new Elysia({ prefix: "/products" })
           .innerJoin(tenants, eq(products.tenantId, tenants.id))
           .where(baseWhere)
           .orderBy(desc(products.createdAt))
-          .limit(candidateSize)
-          .offset(windowOffset)) as ProductRow[];
-
-        if (candidateRows.length === 0 && windowOffset > 0) {
-          candidateRows = (await db
-            .select({
-              id: products.id,
-              slug: products.slug,
-              title: products.title,
-              description: products.description,
-              imageUrls: products.imageUrls,
-              createdAt: products.createdAt,
-              tenantSlug: tenants.shopSlug,
-              tenantName: tenants.name,
-            })
-            .from(products)
-            .innerJoin(tenants, eq(products.tenantId, tenants.id))
-            .where(baseWhere)
-            .orderBy(desc(products.createdAt))
-            .limit(candidateSize)) as ProductRow[];
-        }
-
-        const rows = seededShuffle(candidateRows, seed).slice(0, limit);
-        logger.debug("[All Products Route] Selected rows", {
-          candidateSize,
-          windowOffset,
-          requestedLimit: limit,
-          returned: rows.length,
-        });
+          .limit(limit)) as ProductRow[];
 
         if (rows.length === 0) {
           return [];

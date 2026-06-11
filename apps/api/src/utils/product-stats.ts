@@ -2,7 +2,15 @@ import { db, productStats, products } from "@repo/db";
 import { eq, sql } from "drizzle-orm";
 
 const PRODUCT_TENANT_CACHE_LIMIT = 10_000;
-const productTenantCache = new Map<string, string>();
+const PRODUCT_TENANT_CACHE_TTL_MS = 10 * 60_000;
+const productTenantCache = new Map<string, { tenantId: string; expiresAt: number }>();
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of productTenantCache) {
+    if (entry.expiresAt <= now) productTenantCache.delete(key);
+  }
+}, 60_000).unref();
 
 export type StatsDelta = {
   viewsTotal?: number;
@@ -13,8 +21,9 @@ export type StatsDelta = {
 };
 
 async function getProductTenantId(productId: string) {
+  const now = Date.now();
   const cached = productTenantCache.get(productId);
-  if (cached) return cached;
+  if (cached && cached.expiresAt > now) return cached.tenantId;
 
   const [product] = await db
     .select({ tenantId: products.tenantId })
@@ -26,11 +35,11 @@ async function getProductTenantId(productId: string) {
     return null;
   }
 
-  productTenantCache.set(productId, product.tenantId);
-  if (productTenantCache.size > PRODUCT_TENANT_CACHE_LIMIT) {
+  if (productTenantCache.size >= PRODUCT_TENANT_CACHE_LIMIT) {
     const firstKey = productTenantCache.keys().next().value;
     if (firstKey) productTenantCache.delete(firstKey);
   }
+  productTenantCache.set(productId, { tenantId: product.tenantId, expiresAt: now + PRODUCT_TENANT_CACHE_TTL_MS });
 
   return product.tenantId;
 }

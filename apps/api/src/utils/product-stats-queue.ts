@@ -10,6 +10,9 @@ const MAX_PENDING_PRODUCTS = Math.max(
   Number.parseInt(process.env.PRODUCT_STATS_MAX_PENDING_PRODUCTS ?? "5000", 10) || 5000,
 );
 
+// Flush N products concurrently; keeps DB connection pool from being overwhelmed.
+const FLUSH_CONCURRENCY = 25;
+
 let started = false;
 let flushing = false;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
@@ -33,13 +36,26 @@ async function flushPendingProductStats() {
   const snapshot = new Map(pending);
   pending.clear();
 
+  const entries = Array.from(snapshot);
+
   try {
-    for (const [productId, delta] of snapshot) {
-      await recordProductStatsDelta(productId, delta);
+    for (let i = 0; i < entries.length; i += FLUSH_CONCURRENCY) {
+      const chunk = entries.slice(i, i + FLUSH_CONCURRENCY);
+      const results = await Promise.allSettled(
+        chunk.map(([productId, delta]) => recordProductStatsDelta(productId, delta)),
+      );
+      results.forEach((result, j) => {
+        if (result.status === "rejected") {
+          const entry = chunk[j];
+          if (entry) {
+            const [productId, delta] = entry;
+            pending.set(productId, mergeDelta(pending.get(productId), delta));
+          }
+        }
+      });
     }
   } catch (error) {
     logger.error("[ProductStatsQueue] Flush failed:", error);
-    // Re-queue best-effort deltas so transient failures are retried.
     for (const [productId, delta] of snapshot) {
       pending.set(productId, mergeDelta(pending.get(productId), delta));
     }
@@ -68,4 +84,3 @@ export function startProductStatsQueue() {
     flushTimer.unref();
   }
 }
-

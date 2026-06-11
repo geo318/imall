@@ -68,25 +68,27 @@ async function releaseAuctionCloserLock() {
   }
 }
 
-async function closeExpiredAuctions() {
+async function closeExpiredAuctions(): Promise<number> {
   const now = new Date();
   const expired = await db
-    .select({
-      id: auctions.id,
-      tenantId: auctions.tenantId,
-    })
+    .select({ id: auctions.id, tenantId: auctions.tenantId })
     .from(auctions)
     .where(and(eq(auctions.status, "active"), lte(auctions.endsAt, now)))
     .limit(50);
 
+  if (expired.length === 0) return 0;
+
+  await Promise.all(
+    expired.map((auction) =>
+      db.update(auctions).set({ status: "finished" }).where(eq(auctions.id, auction.id)),
+    ),
+  );
+
   for (const auction of expired) {
-    await db.update(auctions).set({ status: "finished" }).where(eq(auctions.id, auction.id));
-    broadcastBidEvent(auction.id, {
-      type: "auction.finished",
-      auctionId: auction.id,
-      reason: "time",
-    });
+    broadcastBidEvent(auction.id, { type: "auction.finished", auctionId: auction.id, reason: "time" });
   }
+
+  return expired.length;
 }
 
 export const auctionsRoutes = new Elysia({
@@ -558,17 +560,22 @@ export function startAuctionCloser() {
   let disabled = false;
   let inFlight = false;
 
+  const schedule = (delayMs: number) => {
+    setTimeout(() => { void tick(); }, delayMs);
+  };
+
   const tick = async () => {
     if (disabled) return;
-    if (inFlight) return;
+    if (inFlight) { schedule(30_000); return; }
     inFlight = true;
     let lockAcquired = false;
+    let closed = 0;
 
     try {
       lockAcquired = await tryAcquireAuctionCloserLock();
-      if (!lockAcquired) return;
-
-      await closeExpiredAuctions();
+      if (lockAcquired) {
+        closed = await closeExpiredAuctions();
+      }
     } catch (err) {
       if (isMissingAuctionsTableError(err)) {
         disabled = true;
@@ -584,10 +591,12 @@ export function startAuctionCloser() {
       }
       inFlight = false;
     }
+
+    if (!disabled) {
+      // Back off to 5 min when nothing is expiring; stay at 30s when auctions are actively closing.
+      schedule(closed > 0 ? 30_000 : 5 * 60_000);
+    }
   };
 
   void tick();
-  setInterval(() => {
-    void tick();
-  }, 30_000);
 }

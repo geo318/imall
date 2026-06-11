@@ -28,6 +28,12 @@ function toKeepzFlowStage(status: string, fallback: string | null): string | nul
   return fallback;
 }
 
+/**
+ * Parses the Keepz callback body. Only RSA/AES-encrypted payloads are accepted;
+ * plain-text callbacks cannot be cryptographically verified and are rejected.
+ * The encryption envelope proves the message originated from Keepz (only Keepz
+ * has our public key to encrypt an AES key we can decrypt with our private key).
+ */
 function parseCallbackBody(body: unknown): {
   orderCode: string;
   status: string;
@@ -42,31 +48,25 @@ function parseCallbackBody(body: unknown): {
   const encryptedData = payload.encryptedData;
   const encryptedKeys = payload.encryptedKeys;
 
-  if (encryptedData && encryptedKeys) {
-    const decrypted = decryptKeepzEnvelope({ encryptedData, encryptedKeys });
-    if (!decrypted || typeof decrypted !== "object") {
-      return null;
-    }
-    const decryptedPayload = decrypted as Record<string, unknown>;
-    const orderCode =
-      typeof decryptedPayload.integratorOrderId === "string"
-        ? decryptedPayload.integratorOrderId.trim()
-        : "";
-    const status =
-      typeof decryptedPayload.status === "string" ? decryptedPayload.status.trim().toUpperCase() : "";
-    if (!orderCode || !status) {
-      return null;
-    }
-    return { orderCode, status, raw: decrypted };
-  }
-
-  const orderCode = payload.integratorOrderId?.trim() || "";
-  const status = payload.status?.trim().toUpperCase() || "";
-  if (!orderCode || !status) {
+  if (!encryptedData || !encryptedKeys) {
     return null;
   }
 
-  return { orderCode, status, raw: payload };
+  const decrypted = decryptKeepzEnvelope({ encryptedData, encryptedKeys });
+  if (!decrypted || typeof decrypted !== "object") {
+    return null;
+  }
+  const decryptedPayload = decrypted as Record<string, unknown>;
+  const orderCode =
+    typeof decryptedPayload.integratorOrderId === "string"
+      ? decryptedPayload.integratorOrderId.trim()
+      : "";
+  const status =
+    typeof decryptedPayload.status === "string" ? decryptedPayload.status.trim().toUpperCase() : "";
+  if (!orderCode || !status) {
+    return null;
+  }
+  return { orderCode, status, raw: decrypted };
 }
 
 export const keepzCallbackRoutes = new Elysia({
@@ -88,12 +88,22 @@ export const keepzCallbackRoutes = new Elysia({
   try {
     const event = parseCallbackBody(body);
     if (!event) {
-      logger.warn("[Keepz Callback] Ignoring malformed callback payload");
+      const rawBody =
+        body && typeof body === "object" ? (body as Record<string, unknown>) : null;
+      const hasEncryptedFields =
+        rawBody && ("encryptedData" in rawBody || "encryptedKeys" in rawBody);
+      if (!hasEncryptedFields) {
+        logger.warn(
+          "[Keepz Callback] Rejected unencrypted callback — only RSA/AES payloads are accepted",
+        );
+      } else {
+        logger.warn("[Keepz Callback] Ignoring malformed or undecryptable callback payload");
+      }
       set.status = 200;
       return { received: true };
     }
 
-    logger.info("[Keepz Callback] Received callback", {
+    logger.info("[Keepz Callback] Received verified callback", {
       orderCode: event.orderCode,
       status: event.status,
       hasCartId: Boolean(cartId),
@@ -133,6 +143,9 @@ export const keepzCallbackRoutes = new Elysia({
       return { received: true };
     }
 
+    // No order in DB yet — cart was open when Keepz sent this callback.
+    // Complete the cart checkout. The cartId in the query string was set by
+    // our own server when creating the Keepz order, so it's trusted here.
     if (cartId && KEEPZ_SUCCESS_STATUSES.has(event.status)) {
       const [cart] = await db
         .select({ id: carts.id, status: carts.status, userId: carts.userId })

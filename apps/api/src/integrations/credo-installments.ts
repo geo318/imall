@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { env } from "../context";
 
 const DEFAULT_CREDO_ORDER_URL = "https://ganvadeba.credo.ge/widget_api/order.php";
@@ -77,9 +77,13 @@ function getCredoMerchantId(): string {
 }
 
 function getCredoSecret(): string {
-  // Some merchant accounts run with an empty Credo "password".
-  // In that mode, hash formulas still work with an empty suffix.
-  return env.CREDO_SHARED_SECRET?.trim() ?? "";
+  const secret = env.CREDO_SHARED_SECRET?.trim() ?? "";
+  // An empty secret means order codes are deterministically forgeable.
+  // Set CREDO_SHARED_SECRET in env unless the merchant explicitly runs without one.
+  if (!secret) {
+    console.warn("[Credo] CREDO_SHARED_SECRET is empty — order code signatures are weak");
+  }
+  return secret;
 }
 
 function getOrderUrl(): string {
@@ -127,7 +131,10 @@ export function validateOrderCodeForCart(orderCode: string, cartId: string): boo
   const expectedSignature = md5(
     `${cartId}:${parsed.timestampPart}:${parsed.noncePart}:${secret}`,
   ).slice(0, 10);
-  return expectedSignature === parsed.signature;
+  // Constant-time comparison prevents timing side-channel attacks.
+  const a = Buffer.from(expectedSignature);
+  const b = Buffer.from(parsed.signature);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function buildCheckHash(products: CredoInstallmentProduct[], secret: string): string {

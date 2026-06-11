@@ -68,7 +68,6 @@ const installmentRefundSchema = z.object({
   orderCode: z.string().trim().min(16).max(50),
   provider: z.enum(["keepz"]).default("keepz"),
   amount: z.coerce.number().positive(),
-  refundInitiator: z.enum(["INTEGRATOR", "OPERATOR"]).optional(),
 });
 
 const manualInstallmentCheckoutSchema = z.object({
@@ -271,44 +270,46 @@ export async function completeCartCheckout(
   options: CompleteCartCheckoutOptions = {},
 ): Promise<CheckoutResult> {
   return db.transaction(async (tx) => {
-    // Get cart and all items
-    const cartWithItems = await tx
+    // Lock the cart row for the transaction's duration. Concurrent checkout
+    // calls block here; when they resume they see status "completed" and
+    // throw 409 — preventing double orders without extra idempotency logic.
+    const [cart] = await tx
+      .select({ id: carts.id, status: carts.status, userId: carts.userId })
+      .from(carts)
+      .where(eq(carts.id, cartId))
+      .for("update");
+
+    if (!cart) {
+      throw new Response("Cart not found", { status: 404 });
+    }
+
+    const cartUserId = cart.userId;
+    if (cartUserId && authUserId !== cartUserId) {
+      throw new Response("Forbidden: You don't have access to this cart", { status: 403 });
+    }
+
+    if (cart.status !== "open") {
+      throw new Response("Cart is not open", { status: 409 });
+    }
+
+    // Fetch items (cart row already locked above)
+    const itemRows = await tx
       .select({
-        cartId: carts.id,
-        status: carts.status,
-        userId: carts.userId,
         variantId: cartItems.variantId,
-        tenantId: cartItems.tenantId, // Each item's tenant
+        tenantId: cartItems.tenantId,
         qty: cartItems.qty,
         price: variants.price,
         currency: variants.currency,
         productId: variants.productId,
       })
-      .from(carts)
-      .leftJoin(cartItems, eq(cartItems.cartId, carts.id))
-      .leftJoin(variants, eq(cartItems.variantId, variants.id))
-      .where(eq(carts.id, cartId));
+      .from(cartItems)
+      .innerJoin(variants, eq(cartItems.variantId, variants.id))
+      .where(eq(cartItems.cartId, cartId));
 
-    if (cartWithItems.length === 0) {
-      throw new Response("Cart not found", { status: 404 });
-    }
-
-    // Authorization: If cart has a userId, ensure the authenticated user matches
-    const cartUserId = cartWithItems[0]?.userId;
-    if (cartUserId && authUserId !== cartUserId) {
-      throw new Response("Forbidden: You don't have access to this cart", {
-        status: 403,
-      });
-    }
-
-    if (cartWithItems[0]?.status !== "open") {
-      throw new Response("Cart is not open", { status: 409 });
-    }
-
-    const items = cartWithItems.filter(
+    const items = itemRows.filter(
       (
         row,
-      ): row is (typeof cartWithItems)[number] & {
+      ): row is (typeof itemRows)[number] & {
         variantId: string;
         tenantId: string;
         qty: number;
@@ -381,17 +382,18 @@ export async function completeCartCheckout(
         throw new Response("Order creation failed", { status: 500 });
       }
 
-      for (const item of tenantItems) {
-        await tx.insert(orderItems).values({
+      await tx.insert(orderItems).values(
+        tenantItems.map((item) => ({
           id: crypto.randomUUID(),
           tenantId,
           orderId: order.id,
           variantId: item.variantId,
           qty: item.qty,
           unitPrice: item.price,
-        });
-
-        await tx.insert(inventoryLedger).values({
+        })),
+      );
+      await tx.insert(inventoryLedger).values(
+        tenantItems.map((item) => ({
           id: crypto.randomUUID(),
           tenantId,
           variantId: item.variantId,
@@ -399,8 +401,8 @@ export async function completeCartCheckout(
           reason: INVENTORY_REASONS.SALE,
           refType: "order",
           refId: order.id,
-        });
-      }
+        })),
+      );
 
       createdOrders.push({ orderId: order.id, tenantId, total, currency });
     }
@@ -1314,6 +1316,30 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         return { error: "Refund is supported only for Keepz orders" };
       }
 
+      // Validate the order exists and is in a refundable state before
+      // calling the payment provider — prevents self-refund on incomplete orders.
+      const [existingOrderForRefund] = await db
+        .select({ id: orders.id, status: orders.status, total: orders.total })
+        .from(orders)
+        .where(eq(orders.installmentOrderCode, payload.orderCode))
+        .limit(1);
+
+      if (!existingOrderForRefund) {
+        set.status = 404;
+        return { error: "Order not found for this order code" };
+      }
+
+      if (existingOrderForRefund.status !== "completed") {
+        set.status = 409;
+        return { error: "Only completed orders can be refunded" };
+      }
+
+      const orderTotal = Number(existingOrderForRefund.total);
+      if (!Number.isFinite(orderTotal) || payload.amount > orderTotal) {
+        set.status = 400;
+        return { error: "Refund amount exceeds order total", maxRefundable: orderTotal };
+      }
+
       if (!isKeepzEcommerceConfigured()) {
         set.status = 503;
         return buildKeepzNotConfiguredResponse();
@@ -1322,7 +1348,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       const refund = await refundKeepzOrder({
         integratorOrderId: payload.orderCode,
         amount: payload.amount,
-        refundInitiator: payload.refundInitiator,
+        refundInitiator: "INTEGRATOR",
       });
       const normalizedStatus = refund.status.toUpperCase();
       const [existingOrder] = await db
