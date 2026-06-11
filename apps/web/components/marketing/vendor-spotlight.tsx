@@ -3,12 +3,12 @@ import { getSpotlightShops } from "@/app/actions/shops";
 import { getCurrentLocale, Link } from "@/i18n/navigation.server";
 import { getTranslations } from "@/i18n/server";
 
-const BASE_DATE_MS = new Date("2025-01-01").getTime();
+const BASE_DATE_MS = new Date("2026-01-01").getTime();
 
 const VENDOR_SEED_STATS = [
-  { products: 47, salesBase: 1_240, salesPerDay: 8 },
-  { products: 32, salesBase: 890,   salesPerDay: 5 },
-  { products: 83, salesBase: 2_100, salesPerDay: 12 },
+  { products: 47, salesBase: 58,  salesPerDay: 1 },
+  { products: 32, salesBase: 34,  salesPerDay: 1 },
+  { products: 83, salesBase: 89,  salesPerDay: 1 },
 ];
 
 function formatCategory(category: string | null) {
