@@ -214,7 +214,6 @@ export function ShopProducts({ shopSlug }: Props) {
       return lastPage.nextOffset ?? undefined;
     },
     initialPageParam: 0,
-    maxPages: 5,
     staleTime: 60_000,
     gcTime: 10 * 60_000,
     refetchOnWindowFocus: false,
