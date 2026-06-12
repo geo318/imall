@@ -2,7 +2,7 @@
 
 import { env } from "@repo/shared";
 import { cacheLife, cacheTag } from "next/cache";
-import { CACHE_TAGS } from "@/lib/constants";
+import { CACHE_TAGS, safeTag } from "@/lib/constants";
 
 export type TopCategory = {
   key: string;
@@ -14,8 +14,9 @@ export type TopCategory = {
 
 export async function getTopCategories(limit = 3, locale = "en"): Promise<TopCategory[]> {
   "use cache";
-  cacheLife({ stale: 86_400, revalidate: 86_400, expire: 86_400 * 2 });
+  cacheLife({ stale: 300, expire: 3_600 }); // 5m stale, 1h expire
   cacheTag(CACHE_TAGS.CATEGORIES);
+  cacheTag(safeTag(`${CACHE_TAGS.CATEGORIES}-${locale}`));
 
   try {
     const url = new URL(`${env.BACKEND_URL}/api/categories/top`);

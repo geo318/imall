@@ -63,7 +63,7 @@ export type ProductSearchResponse = {
  */
 export async function getShopProducts(shopSlug: string, limit = 20): Promise<Product[]> {
   "use cache";
-  cacheLife({ stale: 60, expire: 3600 }); // 1m stale, 1h expire
+  cacheLife({ stale: 30, expire: 120 }); // 30s stale, 2m expire
   cacheTag(CACHE_TAGS.PRODUCTS);
   cacheTag(safeTag(`${CACHE_TAGS.SHOP}-${shopSlug}`));
 
@@ -99,7 +99,7 @@ export async function searchShopProducts(
   },
 ): Promise<ProductSearchResponse> {
   "use cache";
-  cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
+  cacheLife({ stale: 20, expire: 60 }); // 20s stale, 1m expire — high cardinality (search params)
   cacheTag(CACHE_TAGS.PRODUCTS);
   cacheTag(safeTag(`${CACHE_TAGS.SHOP}-${shopSlug}`));
 
@@ -132,7 +132,7 @@ export async function searchShopProducts(
  */
 export async function getProductByIdentifier(productIdentifier: string): Promise<Product> {
   "use cache";
-  cacheLife({ stale: 30, expire: 1800 }); // 30s stale, 30m expire
+  cacheLife({ stale: 30, expire: 120 }); // 30s stale, 2m expire
   cacheTag(CACHE_TAGS.PRODUCT);
   cacheTag(safeTag(`${CACHE_TAGS.PRODUCT}-${productIdentifier}`));
 
@@ -156,7 +156,7 @@ export async function getProductByIdentifier(productIdentifier: string): Promise
  */
 export async function getProductBySlug(shopSlug: string, productSlug: string): Promise<Product> {
   "use cache";
-  cacheLife({ stale: 30, expire: 1800 }); // 30s stale, 30m expire
+  cacheLife({ stale: 30, expire: 120 }); // 30s stale, 2m expire
   cacheTag(CACHE_TAGS.PRODUCT);
   cacheTag(safeTag(`${CACHE_TAGS.SHOP}-${shopSlug}`));
 
@@ -206,7 +206,7 @@ export async function getAnyProducts(limit = 20): Promise<Product[]> {
  */
 export async function searchProducts(params: ProductSearchParams): Promise<ProductSearchResponse> {
   "use cache";
-  cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
+  cacheLife({ stale: 20, expire: 60 }); // 20s stale, 1m expire — high cardinality
   cacheTag(CACHE_TAGS.PRODUCTS);
 
   const response = await backendRequest("/products/search", {

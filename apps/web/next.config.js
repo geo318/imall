@@ -109,9 +109,13 @@ const dedupedRemotePatterns = Array.from(
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Enable Cache Components for PPR (Partial Prerendering)
-  // Use 'use cache' directive granularly in functions/components that don't access runtime APIs
-  cacheComponents: true,
+  // Toggle via NEXT_CACHE_COMPONENTS=false to disable without touching source.
+  // 'use cache' directives remain in source — they become no-ops when this is off.
+  cacheComponents: process.env.NEXT_CACHE_COMPONENTS !== "false",
+  // Hard cap on the in-process 'use cache' LRU store. Without this, unbounded
+  // unique keys (search queries, product slugs) grow until OOM. 50 MB leaves
+  // ~400 MB for the rest of the 512 MB container.
+  cacheMaxMemorySize: 50 * 1024 * 1024,
   turbopack: {},
   images: {
     remotePatterns: dedupedRemotePatterns,

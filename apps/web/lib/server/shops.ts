@@ -16,7 +16,7 @@ export type Shop = {
  */
 export async function getShopsServer(limit = 50): Promise<Shop[]> {
   "use cache";
-  cacheLife({ stale: 300, expire: 3600 }); // 5m stale, 1h expire
+  cacheLife({ stale: 120, expire: 300 }); // 2m stale, 5m expire
   cacheTag(CACHE_TAGS.SHOPS);
 
   try {

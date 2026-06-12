@@ -132,7 +132,7 @@ export type ShopProfile = Shop & {
  */
 export async function getShops(limit = 50): Promise<Shop[]> {
   "use cache";
-  cacheLife({ stale: 300, expire: 3600 }); // 5m stale, 1h expire
+  cacheLife({ stale: 120, expire: 300 }); // 2m stale, 5m expire
   cacheTag(CACHE_TAGS.SHOPS);
 
   // Public endpoint - no auth token needed
@@ -153,7 +153,7 @@ export async function getShops(limit = 50): Promise<Shop[]> {
  */
 export async function getSpotlightShops(limit = 4): Promise<SpotlightShop[]> {
   "use cache";
-  cacheLife({ stale: 120, expire: 1800 }); // 2m stale, 30m expire
+  cacheLife({ stale: 120, expire: 300 }); // 2m stale, 5m expire
   cacheTag(CACHE_TAGS.SHOPS);
 
   try {
@@ -223,7 +223,7 @@ export async function getMyShops(): Promise<MyShop[]> {
  */
 export async function getShopProfile(shopSlug: string): Promise<ShopProfile | null> {
   "use cache";
-  cacheLife({ stale: 120, expire: 1800 }); // 2m stale, 30m expire
+  cacheLife({ stale: 60, expire: 120 }); // 1m stale, 2m expire
   cacheTag(CACHE_TAGS.SHOPS);
   cacheTag(safeTag(`${CACHE_TAGS.SHOP}-${shopSlug}`));
 
