@@ -29,7 +29,8 @@ type ResolvedCacheEntry = ResolvedCacheInput & { expiresAt: number };
 
 const RESOLVED_CACHE_HIT_TTL = 5 * 60 * 1000;
 const RESOLVED_CACHE_MISS_TTL = 30_000;
-const RESOLVED_CACHE_MAX = 10_000;
+const RESOLVED_CACHE_MAX = 2_000;
+const RESOLVED_CACHE_TARGET = Math.floor(RESOLVED_CACHE_MAX * 0.75);
 const resolvedCache = new Map<string, ResolvedCacheEntry>();
 
 function getCachedResolved(key: string): ResolvedCacheInput | null {
@@ -44,20 +45,31 @@ function getCachedResolved(key: string): ResolvedCacheInput | null {
 
 function setCachedResolved(key: string, result: ResolvedCacheInput) {
   if (resolvedCache.size >= RESOLVED_CACHE_MAX) {
-    const firstKey = resolvedCache.keys().next().value;
-    if (firstKey) resolvedCache.delete(firstKey);
+    const now = Date.now();
+    const maxCandidates = resolvedCache.size - RESOLVED_CACHE_TARGET;
+    const trimCandidates: string[] = [];
+    for (const [k, e] of resolvedCache) {
+      if (e.expiresAt <= now) {
+        resolvedCache.delete(k);
+      } else if (trimCandidates.length < maxCandidates) {
+        trimCandidates.push(k);
+      }
+    }
+    const excess = resolvedCache.size - RESOLVED_CACHE_TARGET;
+    for (const k of trimCandidates.slice(0, excess)) {
+      resolvedCache.delete(k);
+    }
   }
   const ttl = result.type === "miss" ? RESOLVED_CACHE_MISS_TTL : RESOLVED_CACHE_HIT_TTL;
   resolvedCache.set(key, { ...result, expiresAt: Date.now() + ttl });
 }
 
-// Periodic cleanup so eviction doesn't accumulate
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of resolvedCache.entries()) {
     if (entry.expiresAt <= now) resolvedCache.delete(key);
   }
-}, 60_000).unref();
+}, 15_000).unref();
 
 // --- Helpers ---
 

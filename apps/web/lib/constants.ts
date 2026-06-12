@@ -29,6 +29,12 @@ export const CACHE_LIFE = {
   STATIC: "hours" as const, // 1 hour for static content
 } as const;
 
+const CACHE_TAG_MAX_LENGTH = 256;
+
+export function safeTag(tag: string): string {
+  return tag.length > CACHE_TAG_MAX_LENGTH ? tag.slice(0, CACHE_TAG_MAX_LENGTH) : tag;
+}
+
 // Legacy exports for backward compatibility during migration
 export const REVALIDATE_TAGS = CACHE_TAGS;
 export const REVALIDATE_TIMES = {

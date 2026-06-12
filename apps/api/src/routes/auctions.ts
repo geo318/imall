@@ -21,6 +21,18 @@ const subscriptions: AuctionSubscriptions = {};
 const AUCTION_CLOSER_LOCK_KEY_1 = 27017;
 const AUCTION_CLOSER_LOCK_KEY_2 = 1;
 
+// Periodic sweep removes zombie sockets that lost TCP without firing close().
+setInterval(() => {
+  for (const auctionId of Object.keys(subscriptions)) {
+    const set = subscriptions[auctionId];
+    if (!set) continue;
+    for (const ws of set) {
+      if (ws.readyState !== 1) set.delete(ws);
+    }
+    if (set.size === 0) delete subscriptions[auctionId];
+  }
+}, 30_000).unref?.();
+
 function getErrorCode(error: unknown): string | undefined {
   if (!error || typeof error !== "object") return undefined;
 
@@ -46,8 +58,14 @@ function broadcastBidEvent(auctionId: string, payload: unknown) {
   for (const ws of sockets) {
     if (ws.readyState === 1) {
       ws.send(message);
+    } else {
+      // Remove dead connections eagerly instead of waiting for close event.
+      // Bun may not fire close() for silently-dropped TCP connections (e.g. mobile
+      // network switches), so zombie sockets accumulate indefinitely without this.
+      sockets.delete(ws);
     }
   }
+  if (sockets.size === 0) delete subscriptions[auctionId];
 }
 
 async function tryAcquireAuctionCloserLock() {
@@ -550,7 +568,11 @@ export const auctionsRoutes = new Elysia({
       const subs = wsData.subscriptions;
       if (subs) {
         for (const auctionId of subs) {
-          subscriptions[auctionId]?.delete(ws as AuctionSocket);
+          const set = subscriptions[auctionId];
+          if (set) {
+            set.delete(ws as AuctionSocket);
+            if (set.size === 0) delete subscriptions[auctionId];
+          }
         }
       }
     },

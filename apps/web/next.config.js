@@ -116,6 +116,22 @@ const nextConfig = {
   images: {
     remotePatterns: dedupedRemotePatterns,
   },
+  async headers() {
+    return [
+      {
+        // Prevent browsers from caching stale HTML/JS bundles that contain outdated
+        // Server Action IDs. Clients holding old bundles call actions that no longer
+        // exist after a new deployment, causing "Failed to find Server Action" errors.
+        source: "/((?!_next/static|_next/image|favicon.ico).*)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "no-cache, must-revalidate",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

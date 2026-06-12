@@ -1,6 +1,6 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
-import { CACHE_TAGS } from "@/lib/constants";
+import { CACHE_TAGS, safeTag } from "@/lib/constants";
 
 /**
  * API route for revalidating caches after mutations
@@ -22,8 +22,7 @@ export async function POST(request: NextRequest) {
           tag.startsWith(`${CACHE_TAGS.SHOP}-`) ||
           tag.startsWith(`${CACHE_TAGS.CART}-`)
         ) {
-          // In Next.js 16 route handlers, revalidateTag may require type assertion
-          (revalidateTag as (tag: string) => void)(tag);
+          revalidateTag(safeTag(tag), "max");
         }
       }
     }

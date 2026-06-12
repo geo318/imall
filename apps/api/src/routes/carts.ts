@@ -1607,6 +1607,16 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         return buildKeepzConfigErrorResponse(error);
       }
       if (error instanceof KeepzApiError) {
+        if (error.httpStatus === 404) {
+          return {
+            orderCode: payload.orderCode,
+            statusId: null,
+            statusName: "PENDING",
+            checkoutCompleted: false,
+            orders: null,
+            statusProvider: "keepz",
+          };
+        }
         logKeepzApiError(
           "status",
           {

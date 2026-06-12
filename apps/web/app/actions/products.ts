@@ -2,7 +2,7 @@
 
 import { env } from "@repo/shared";
 import { cacheLife, cacheTag } from "next/cache";
-import { CACHE_TAGS } from "@/lib/constants";
+import { CACHE_TAGS, safeTag } from "@/lib/constants";
 import type { Product } from "@/lib/types/products";
 
 /**
@@ -65,7 +65,7 @@ export async function getShopProducts(shopSlug: string, limit = 20): Promise<Pro
   "use cache";
   cacheLife({ stale: 60, expire: 3600 }); // 1m stale, 1h expire
   cacheTag(CACHE_TAGS.PRODUCTS);
-  cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
+  cacheTag(safeTag(`${CACHE_TAGS.SHOP}-${shopSlug}`));
 
   // Public endpoint - no auth token needed
   const response = await backendRequest(`/shops/${shopSlug}/products`, {
@@ -101,7 +101,7 @@ export async function searchShopProducts(
   "use cache";
   cacheLife({ stale: 60, expire: 300 }); // 1m stale, 5m expire
   cacheTag(CACHE_TAGS.PRODUCTS);
-  cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
+  cacheTag(safeTag(`${CACHE_TAGS.SHOP}-${shopSlug}`));
 
   // Public endpoint - no auth token needed
   const response = await backendRequest(`/shops/${shopSlug}/products`, {
@@ -134,7 +134,7 @@ export async function getProductByIdentifier(productIdentifier: string): Promise
   "use cache";
   cacheLife({ stale: 30, expire: 1800 }); // 30s stale, 30m expire
   cacheTag(CACHE_TAGS.PRODUCT);
-  cacheTag(`${CACHE_TAGS.PRODUCT}-${productIdentifier}`);
+  cacheTag(safeTag(`${CACHE_TAGS.PRODUCT}-${productIdentifier}`));
 
   // Public endpoint - no auth token needed
   const response = await backendRequest(`/products/${productIdentifier}`, {
@@ -158,7 +158,7 @@ export async function getProductBySlug(shopSlug: string, productSlug: string): P
   "use cache";
   cacheLife({ stale: 30, expire: 1800 }); // 30s stale, 30m expire
   cacheTag(CACHE_TAGS.PRODUCT);
-  cacheTag(`${CACHE_TAGS.SHOP}-${shopSlug}`);
+  cacheTag(safeTag(`${CACHE_TAGS.SHOP}-${shopSlug}`));
 
   // Public endpoint - no auth token needed
   const response = await backendRequest(`/shops/${shopSlug}/products/${productSlug}`, {

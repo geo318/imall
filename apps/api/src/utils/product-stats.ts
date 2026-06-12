@@ -1,7 +1,8 @@
 import { db, productStats, products } from "@repo/db";
 import { eq, sql } from "drizzle-orm";
 
-const PRODUCT_TENANT_CACHE_LIMIT = 10_000;
+const PRODUCT_TENANT_CACHE_LIMIT = 2_000;
+const PRODUCT_TENANT_CACHE_TARGET = Math.floor(PRODUCT_TENANT_CACHE_LIMIT * 0.75);
 const PRODUCT_TENANT_CACHE_TTL_MS = 10 * 60_000;
 const productTenantCache = new Map<string, { tenantId: string; expiresAt: number }>();
 
@@ -10,7 +11,7 @@ setInterval(() => {
   for (const [key, entry] of productTenantCache) {
     if (entry.expiresAt <= now) productTenantCache.delete(key);
   }
-}, 60_000).unref();
+}, 15_000).unref();
 
 export type StatsDelta = {
   viewsTotal?: number;
@@ -36,8 +37,20 @@ async function getProductTenantId(productId: string) {
   }
 
   if (productTenantCache.size >= PRODUCT_TENANT_CACHE_LIMIT) {
-    const firstKey = productTenantCache.keys().next().value;
-    if (firstKey) productTenantCache.delete(firstKey);
+    const now2 = Date.now();
+    const maxCandidates = productTenantCache.size - PRODUCT_TENANT_CACHE_TARGET;
+    const trimCandidates: string[] = [];
+    for (const [k, e] of productTenantCache) {
+      if (e.expiresAt <= now2) {
+        productTenantCache.delete(k);
+      } else if (trimCandidates.length < maxCandidates) {
+        trimCandidates.push(k);
+      }
+    }
+    const excess = productTenantCache.size - PRODUCT_TENANT_CACHE_TARGET;
+    for (const k of trimCandidates.slice(0, excess)) {
+      productTenantCache.delete(k);
+    }
   }
   productTenantCache.set(productId, { tenantId: product.tenantId, expiresAt: now + PRODUCT_TENANT_CACHE_TTL_MS });
 
