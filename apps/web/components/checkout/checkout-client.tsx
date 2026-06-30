@@ -81,8 +81,6 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
         <CheckoutInstallmentBanner
           pendingOrderCode={checkout.pendingOrderCode}
           pendingRedirectUrl={checkout.pendingRedirectUrl}
-          statusMessage={checkout.statusMessage}
-          checkingStatus={checkout.checkingStatus}
           onClear={checkout.clearInstallmentState}
         />
 

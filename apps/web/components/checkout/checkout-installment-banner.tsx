@@ -6,16 +6,12 @@ import { useTranslations } from "@/i18n/provider";
 type CheckoutInstallmentBannerProps = {
   pendingOrderCode: string | null;
   pendingRedirectUrl: string | null;
-  statusMessage: string | null;
-  checkingStatus: boolean;
   onClear: () => void;
 };
 
 export function CheckoutInstallmentBanner({
   pendingOrderCode,
   pendingRedirectUrl,
-  statusMessage,
-  checkingStatus,
   onClear,
 }: CheckoutInstallmentBannerProps) {
   const t = useTranslations();
@@ -44,10 +40,6 @@ export function CheckoutInstallmentBanner({
           {t("checkout.installments.clearPending")}
         </Button>
       </div>
-      {checkingStatus ? (
-        <p className="mt-3 text-sm text-slate-700">{t("checkout.installments.checkingStatus")}</p>
-      ) : null}
-      {statusMessage ? <p className="mt-3 text-sm text-slate-700">{statusMessage}</p> : null}
     </div>
   );
 }

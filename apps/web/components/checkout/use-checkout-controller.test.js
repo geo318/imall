@@ -125,12 +125,14 @@ describe("use-checkout-controller credo readiness", () => {
     );
   });
 
-  test("does not manually refetch after each installment status query settles", async () => {
+  test("installment status polling is removed entirely", async () => {
     const source = await Bun.file(
       new URL("./use-checkout-controller.ts", import.meta.url),
     ).text();
 
-    expect(source).not.toContain("installmentStatusQuery.refetch");
+    expect(source).not.toContain("installmentStatusQuery");
+    expect(source).not.toContain("syncInstallmentCheckoutStatus");
+    expect(source).not.toContain("refetchInterval");
   });
 
   test("clearing buy-now cart key does not clear default cart when IDs differ", () => {

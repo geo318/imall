@@ -1,14 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  checkoutCart,
-  getCart,
-  startInstallmentCheckout,
-  syncInstallmentCheckoutStatus,
-} from "@/actions/carts";
+import { checkoutCart, getCart, startInstallmentCheckout } from "@/actions/carts";
 import {
   createMyShippingAddress,
   getMyShippingAddresses,
@@ -64,11 +58,6 @@ type OnlineLaunchFormConfig = {
 };
 
 const DEFAULT_CART_STORAGE_KEY = "cart";
-const INSTALLMENT_STATUS_PING_INTERVAL_MS = 12_000;
-const INSTALLMENT_STATUS_PING_INTERVAL_SLOW_MS = 30_000;
-const INSTALLMENT_STATUS_PING_SLOW_AFTER_MS = 3 * 60_000;
-const INSTALLMENT_STATUS_PING_MAX_WINDOW_MS = 20 * 60_000;
-const INSTALLMENT_STATUS_MAX_ERROR_STREAK = 5;
 
 const normalizeAddressValue = (value?: string | null) => (value ?? "").trim().toLowerCase();
 
@@ -265,7 +254,6 @@ export function useCheckoutController({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingOrderCode, setPendingOrderCode] = useState<string | null>(null);
   const [pendingRedirectUrl, setPendingRedirectUrl] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [installmentProvider, setInstallmentProvider] = useState<InstallmentProvider>(
     initialInstallmentProvider,
   );
@@ -274,16 +262,6 @@ export function useCheckoutController({
   const [pendingPaymentType, setPendingPaymentType] = useState<OnlineCheckoutPaymentType | null>(
     null,
   );
-  const [pendingInstallmentStartedAtMs, setPendingInstallmentStartedAtMs] = useState<number | null>(
-    null,
-  );
-  const [installmentStatusErrorStreak, setInstallmentStatusErrorStreak] = useState(0);
-  const [isPageActive, setIsPageActive] = useState(() => {
-    if (typeof document === "undefined") {
-      return true;
-    }
-    return !document.hidden && document.visibilityState === "visible" && document.hasFocus();
-  });
   const [shippingForm, setShippingForm] = useState<ShippingFormState>(EMPTY_SHIPPING_FORM);
   const [savedAddresses, setSavedAddresses] = useState<UserShippingAddress[]>([]);
   const [addressesLoading, setAddressesLoading] = useState(true);
@@ -511,37 +489,13 @@ export function useCheckoutController({
       return;
     }
 
-    const updatePageActivity = () => {
-      const active =
-        !document.hidden && document.visibilityState === "visible" && document.hasFocus();
-      setIsPageActive(active);
-      if (active) {
-        hydratePendingInstallmentState();
-      }
-    };
+    const onFocus = () => hydratePendingInstallmentState();
 
-    updatePageActivity();
-    globalThis.window.addEventListener("focus", updatePageActivity);
-    globalThis.window.addEventListener("blur", updatePageActivity);
-    document.addEventListener("visibilitychange", updatePageActivity);
-
+    globalThis.window.addEventListener("focus", onFocus);
     return () => {
-      globalThis.window.removeEventListener("focus", updatePageActivity);
-      globalThis.window.removeEventListener("blur", updatePageActivity);
-      document.removeEventListener("visibilitychange", updatePageActivity);
+      globalThis.window.removeEventListener("focus", onFocus);
     };
   }, [hydratePendingInstallmentState]);
-
-  useEffect(() => {
-    if (!pendingOrderCode) {
-      setPendingInstallmentStartedAtMs(null);
-      setInstallmentStatusErrorStreak(0);
-      return;
-    }
-
-    setPendingInstallmentStartedAtMs(Date.now());
-    setInstallmentStatusErrorStreak(0);
-  }, [pendingOrderCode]);
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0),
@@ -569,9 +523,6 @@ export function useCheckoutController({
     setPendingRedirectUrl(null);
     setPendingProvider(null);
     setPendingPaymentType(null);
-    setPendingInstallmentStartedAtMs(null);
-    setInstallmentStatusErrorStreak(0);
-    setStatusMessage(null);
     if (globalThis.window) {
       localStorage.removeItem(installmentOrderCodeKey);
       localStorage.removeItem(installmentRedirectUrlKey);
@@ -680,114 +631,6 @@ export function useCheckoutController({
     },
     [hasEnoughAddressFieldsToSave, savedAddresses, shippingForm, t],
   );
-
-  const installmentStatusQuery = useQuery({
-    queryKey: [
-      "checkout",
-      "installment-status",
-      cartKey,
-      pendingOrderCode,
-      pendingProvider,
-      pendingPaymentType,
-    ],
-    enabled:
-      typeof globalThis.window !== "undefined" &&
-      Boolean(pendingOrderCode) &&
-      step !== "confirmation" &&
-      Boolean(resolveStoredCartId(cartKey)) &&
-      isPageActive &&
-      installmentStatusErrorStreak < INSTALLMENT_STATUS_MAX_ERROR_STREAK &&
-      pendingInstallmentStartedAtMs !== null &&
-      Date.now() - pendingInstallmentStartedAtMs < INSTALLMENT_STATUS_PING_MAX_WINDOW_MS,
-    queryFn: async () => {
-      const cartId = resolveStoredCartId(cartKey);
-      if (!cartId || !pendingOrderCode) {
-        throw new Error("MISSING_PENDING_INSTALLMENT_CONTEXT");
-      }
-      return syncInstallmentCheckoutStatus(cartId, pendingOrderCode, {
-        provider: pendingProvider ?? undefined,
-        paymentType: pendingPaymentType ?? "installments",
-      });
-    },
-    refetchInterval: () => {
-      if (
-        !pendingInstallmentStartedAtMs ||
-        !isPageActive ||
-        installmentStatusErrorStreak >= INSTALLMENT_STATUS_MAX_ERROR_STREAK
-      ) {
-        return false;
-      }
-
-      const elapsedMs = Date.now() - pendingInstallmentStartedAtMs;
-      if (elapsedMs >= INSTALLMENT_STATUS_PING_MAX_WINDOW_MS) {
-        return false;
-      }
-      if (elapsedMs >= INSTALLMENT_STATUS_PING_SLOW_AFTER_MS) {
-        return INSTALLMENT_STATUS_PING_INTERVAL_SLOW_MS;
-      }
-      return INSTALLMENT_STATUS_PING_INTERVAL_MS;
-    },
-    refetchIntervalInBackground: false,
-    retry: false,
-    refetchOnWindowFocus: false,
-  });
-
-  const checkingStatus = installmentStatusQuery.isFetching;
-
-  useEffect(() => {
-    const status = installmentStatusQuery.data;
-    if (!status) return;
-
-    setErrorMessage(null);
-    setInstallmentStatusErrorStreak(0);
-    const cartId = resolveStoredCartId(cartKey);
-    const statusLabel = status.statusName || `#${status.statusId ?? "unknown"}`;
-
-    if (status.checkoutCompleted) {
-      if (cartId) {
-        clearCheckoutCartKeys(cartKey, cartId);
-      }
-      clearInstallmentState();
-      setStep("confirmation");
-      return;
-    }
-
-    const normalizedStatus = statusLabel.toUpperCase();
-    if (normalizedStatus === "NO_DATA") {
-      setStatusMessage(t("checkout.installments.notFound"));
-      return;
-    }
-    if (
-      normalizedStatus === "INVALID_REQUEST" ||
-      normalizedStatus === "BAD_REQUEST" ||
-      normalizedStatus === "EMPTY_REQUEST"
-    ) {
-      setStatusMessage(t("checkout.installments.invalidRequest"));
-      return;
-    }
-
-    setStatusMessage(t("checkout.installments.statusWithLabel", { status: statusLabel }));
-  }, [cartKey, clearInstallmentState, installmentStatusQuery.data, t]);
-
-  useEffect(() => {
-    const error = installmentStatusQuery.error;
-    if (!error) return;
-
-    if (error instanceof Error && error.message === "MISSING_PENDING_INSTALLMENT_CONTEXT") {
-      return;
-    }
-    if (process.env.NODE_ENV === "development") {
-      console.error("[checkout] installment status ping failed", error);
-    }
-    setInstallmentStatusErrorStreak((previous) => {
-      const next = previous + 1;
-      if (next >= INSTALLMENT_STATUS_MAX_ERROR_STREAK) {
-        setStatusMessage(t("checkout.installments.pollingStopped"));
-        setErrorMessage(t("checkout.installments.syncFailed"));
-      }
-      return next;
-    });
-  }, [installmentStatusQuery.error, t]);
 
   const continueFromShipping = useCallback(async () => {
     if (items.length === 0) {
@@ -1084,8 +927,6 @@ export function useCheckoutController({
     setErrorMessage,
     pendingOrderCode,
     pendingRedirectUrl,
-    statusMessage,
-    checkingStatus,
     installmentProvider,
     setInstallmentProvider,
     keepzPersonalNumber,
