@@ -16,11 +16,11 @@ import { z } from "zod";
 import {
   authPlugin,
   cartItemSchema,
+  env,
   getAvailableStock,
   getAvailableStockMap,
   getVariantInventoryStatusMap,
   INVENTORY_REASONS,
-  env,
 } from "../context";
 import {
   type CredoInstallmentProduct,
@@ -29,13 +29,13 @@ import {
   validateOrderCodeForCart,
 } from "../integrations/credo-installments";
 import {
-  KeepzApiError,
-  KeepzConfigError,
   cancelKeepzOrder,
   createKeepzOrder,
   getKeepzConfigDiagnostics,
   getKeepzOrderStatus,
   isKeepzEcommerceConfigured,
+  KeepzApiError,
+  KeepzConfigError,
   refundKeepzOrder,
 } from "../integrations/keepz-ecommerce";
 import { sanitizePersistedImageUrls } from "../utils/image-urls";
@@ -52,6 +52,41 @@ const installmentStartSchema = z.object({
   personalNumber: z.string().trim().max(32).optional(),
   isForeign: z.coerce.boolean().optional(),
 });
+
+type InstallmentStartPayload = z.infer<typeof installmentStartSchema>;
+
+export function getMissingCredoCustomerFields(payload: InstallmentStartPayload): string[] {
+  if (payload.provider !== "credo") return [];
+
+  const fields: Array<[string, string | undefined]> = [
+    ["clientFullName", payload.clientFullName],
+    ["mobile", payload.mobile],
+    ["email", payload.email],
+    ["factAddress", payload.factAddress],
+  ];
+
+  return fields.filter(([, value]) => !value?.trim()).map(([field]) => field);
+}
+
+const IMALL_FALLBACK_CLIENT_NAME = "iMall Support";
+const IMALL_FALLBACK_EMAIL = "contact@imall.ge";
+const IMALL_FALLBACK_ADDRESS = "Kostava Ave. 4, Tbilisi, Georgia 0105";
+// TODO: replace with the real iMall support line before launch.
+const IMALL_FALLBACK_MOBILE = "595000000";
+
+export function applyCredoCustomerFallbacks(
+  payload: InstallmentStartPayload,
+): InstallmentStartPayload {
+  if (payload.provider !== "credo") return payload;
+
+  return {
+    ...payload,
+    clientFullName: payload.clientFullName?.trim() || IMALL_FALLBACK_CLIENT_NAME,
+    mobile: payload.mobile?.trim() || IMALL_FALLBACK_MOBILE,
+    email: payload.email?.trim() || IMALL_FALLBACK_EMAIL,
+    factAddress: payload.factAddress?.trim() || IMALL_FALLBACK_ADDRESS,
+  };
+}
 
 const installmentStatusSchema = z.object({
   orderCode: z.string().trim().min(16).max(50),
@@ -164,7 +199,11 @@ function trimTrailingZeros(amount: number): string {
   return amount.toFixed(2).replace(/\.?0+$/, "");
 }
 
-function getKeepzOrderAmountLimits(): { minAmount: number; maxAmount: number; misconfigured: boolean } {
+function getKeepzOrderAmountLimits(): {
+  minAmount: number;
+  maxAmount: number;
+  misconfigured: boolean;
+} {
   const configuredMin = env.KEEPZ_MIN_ORDER_AMOUNT ?? KEEPZ_DEFAULT_MIN_ORDER_AMOUNT;
   const configuredMax = env.KEEPZ_MAX_ORDER_AMOUNT ?? KEEPZ_DEFAULT_MAX_ORDER_AMOUNT;
   return {
@@ -811,6 +850,24 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       };
     }
 
+    if (payload.provider === "credo" && payload.paymentType !== "installments") {
+      set.status = 400;
+      return {
+        error: "Credo supports installment checkout only",
+        code: "CREDO_INVALID_PAYMENT_TYPE",
+      };
+    }
+
+    payload = applyCredoCustomerFallbacks(payload);
+
+    if (payload.provider === "credo" && !env.CREDO_MERCHANT_ID?.trim()) {
+      set.status = 503;
+      return {
+        error: "Credo installments are not configured",
+        code: "CREDO_NOT_CONFIGURED",
+      };
+    }
+
     try {
       const rows = await db
         .select({
@@ -873,13 +930,6 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       }
 
       const distinctTenantIds = new Set(checkoutItems.map((item) => item.tenantId));
-      if (distinctTenantIds.size > 1) {
-        set.status = 409;
-        return {
-          error: "Online installments are available only for single-vendor carts",
-          code: "INSTALLMENTS_SINGLE_VENDOR_REQUIRED",
-        };
-      }
 
       const firstCartItem = checkoutItems[0];
       if (!firstCartItem) {
@@ -1010,9 +1060,10 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         .limit(1);
       const mediatorShopNumberMatch = mediatorShop?.shopSlug?.match(/\d+/);
       const mediatorShopNumber = mediatorShopNumberMatch?.[0];
+      const isMultiVendorCart = distinctTenantIds.size > 1;
       const credoMeta = {
-        mediatorShopName: mediatorShop?.shopName ?? "",
-        mediatorShopNumber: mediatorShopNumber ?? "",
+        mediatorShopName: isMultiVendorCart ? "iMall" : mediatorShop?.shopName ?? "",
+        mediatorShopNumber: isMultiVendorCart ? "" : mediatorShopNumber ?? "",
         mediatorShopId: mediatorShop?.shopId ?? mediatorTenantId,
       };
 
@@ -1206,7 +1257,8 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       }
 
       const provider =
-        payload.provider ?? (validateOrderCodeForCart(payload.orderCode, cartId) ? "credo" : "keepz");
+        payload.provider ??
+        (validateOrderCodeForCart(payload.orderCode, cartId) ? "credo" : "keepz");
       if (provider !== "keepz") {
         set.status = 400;
         return { error: "Cancellation is supported only for Keepz orders" };
@@ -1220,7 +1272,11 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       const cancellation = await cancelKeepzOrder(payload.orderCode);
       const normalizedStatus = cancellation.status.toUpperCase();
       const [existingOrder] = await db
-        .select({ id: orders.id, status: orders.status, installmentFlowStage: orders.installmentFlowStage })
+        .select({
+          id: orders.id,
+          status: orders.status,
+          installmentFlowStage: orders.installmentFlowStage,
+        })
         .from(orders)
         .where(eq(orders.installmentOrderCode, payload.orderCode))
         .limit(1);
@@ -1229,9 +1285,15 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         const orderPatch: Partial<typeof orders.$inferInsert> = {
           installmentStatusId: null,
           installmentStatusName: normalizedStatus,
-          installmentFlowStage: toKeepzFlowStage(normalizedStatus, existingOrder.installmentFlowStage),
+          installmentFlowStage: toKeepzFlowStage(
+            normalizedStatus,
+            existingOrder.installmentFlowStage,
+          ),
         };
-        if (KEEPZ_CANCELLED_STATUSES.has(normalizedStatus) && existingOrder.status !== "completed") {
+        if (
+          KEEPZ_CANCELLED_STATUSES.has(normalizedStatus) &&
+          existingOrder.status !== "completed"
+        ) {
           orderPatch.status = "cancelled";
         }
         await db.update(orders).set(orderPatch).where(eq(orders.id, existingOrder.id));
@@ -1352,7 +1414,11 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       });
       const normalizedStatus = refund.status.toUpperCase();
       const [existingOrder] = await db
-        .select({ id: orders.id, status: orders.status, installmentFlowStage: orders.installmentFlowStage })
+        .select({
+          id: orders.id,
+          status: orders.status,
+          installmentFlowStage: orders.installmentFlowStage,
+        })
         .from(orders)
         .where(eq(orders.installmentOrderCode, payload.orderCode))
         .limit(1);
@@ -1361,7 +1427,10 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         const orderPatch: Partial<typeof orders.$inferInsert> = {
           installmentStatusId: null,
           installmentStatusName: normalizedStatus,
-          installmentFlowStage: toKeepzFlowStage(normalizedStatus, existingOrder.installmentFlowStage),
+          installmentFlowStage: toKeepzFlowStage(
+            normalizedStatus,
+            existingOrder.installmentFlowStage,
+          ),
         };
 
         if (
@@ -1549,7 +1618,10 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
 
       const statusResult = await getKeepzOrderStatus(payload.orderCode);
       const keepzStatus = statusResult.status.toUpperCase();
-      const nextFlowStage = toKeepzFlowStage(keepzStatus, existingOrder?.installmentFlowStage ?? null);
+      const nextFlowStage = toKeepzFlowStage(
+        keepzStatus,
+        existingOrder?.installmentFlowStage ?? null,
+      );
 
       if (existingOrder) {
         const orderPatch: Partial<typeof orders.$inferInsert> = {
@@ -1570,7 +1642,8 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         }
 
         await db.update(orders).set(orderPatch).where(eq(orders.id, existingOrder.id));
-        checkoutCompleted = orderPatch.status === "completed" || existingOrder.status === "completed";
+        checkoutCompleted =
+          orderPatch.status === "completed" || existingOrder.status === "completed";
       } else if (cart.status === "open" && KEEPZ_SUCCESS_STATUSES.has(keepzStatus)) {
         checkoutResult = await completeCartCheckout(cartId, auth?.userId ?? null, {
           paymentMethod: payload.paymentType === "card" ? "card_keepz" : "installments_keepz",

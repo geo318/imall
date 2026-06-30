@@ -61,12 +61,25 @@ function buildErrorRedirect(request: NextRequest, returnTo: string | null, messa
   return NextResponse.redirect(fallbackUrl);
 }
 
+function parseBackendErrorMessage(rawBody: string, fallbackMessage: string): string {
+  if (!rawBody) return fallbackMessage;
+
+  try {
+    const parsed = JSON.parse(rawBody) as { error?: unknown; message?: unknown };
+    const error = typeof parsed.error === "string" ? parsed.error.trim() : "";
+    const message = typeof parsed.message === "string" ? parsed.message.trim() : "";
+    if (error.startsWith("Failed to ") && message) return message;
+    return error || message || fallbackMessage;
+  } catch {
+    return rawBody.trim() || fallbackMessage;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const cartId = searchParams.get("cartId")?.trim();
   const cartKey = searchParams.get("cartKey")?.trim();
   const mode = searchParams.get("mode")?.trim() || "server-form";
-  const paymentType = searchParams.get("paymentType")?.trim() === "card" ? "card" : "installments";
   const installmentLength = Number(searchParams.get("installmentLength") || 12);
   const clientFullName = searchParams.get("clientFullName")?.trim() || undefined;
   const mobile = searchParams.get("mobile")?.trim() || undefined;
@@ -78,6 +91,10 @@ export async function GET(request: NextRequest) {
     return buildErrorRedirect(request, returnTo, "Missing installment cart context.");
   }
 
+  if (!clientFullName || !mobile || !email || !factAddress) {
+    return buildErrorRedirect(request, returnTo, "Credo customer details are incomplete.");
+  }
+
   console.info("[checkout.installments.launch] start", {
     cartId,
     cartKey,
@@ -87,7 +104,7 @@ export async function GET(request: NextRequest) {
     hasEmail: Boolean(email),
     hasFactAddress: Boolean(factAddress),
     installmentLength,
-    paymentType,
+    paymentType: "installments",
   });
 
   try {
@@ -102,7 +119,7 @@ export async function GET(request: NextRequest) {
         },
         body: JSON.stringify({
           provider: "credo",
-          paymentType,
+          paymentType: "installments",
           installmentLength,
           clientFullName,
           mobile,
@@ -115,6 +132,10 @@ export async function GET(request: NextRequest) {
 
     const rawBody = await response.text();
     if (!response.ok) {
+      const parsedMessage = parseBackendErrorMessage(
+        rawBody,
+        "Failed to start Credo installments.",
+      );
       console.error("[checkout.installments.launch] backend start failed", {
         cartId,
         mode,
@@ -122,7 +143,7 @@ export async function GET(request: NextRequest) {
         statusText: response.statusText,
         body: rawBody || null,
       });
-      return buildErrorRedirect(request, returnTo, "Failed to start Credo installments.");
+      return buildErrorRedirect(request, returnTo, parsedMessage);
     }
 
     const parsed = JSON.parse(rawBody) as {
@@ -199,7 +220,7 @@ export async function GET(request: NextRequest) {
     );
     redirectResponse.cookies.set(
       CHECKOUT_INSTALLMENT_PAYMENT_TYPE_COOKIE,
-      encodeURIComponent(paymentType),
+      encodeURIComponent("installments"),
       cookieOptions,
     );
 

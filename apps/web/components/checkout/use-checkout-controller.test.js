@@ -4,6 +4,7 @@ import {
   clearCheckoutCartKeys,
   getCredoLaunchBlockReason,
   isCredoLaunchReady,
+  isOnlineInstallmentCartEligible,
   matchingAddressNeedsRefresh,
   resolveStoredCartId,
 } from "./use-checkout-controller";
@@ -103,13 +104,33 @@ describe("use-checkout-controller credo readiness", () => {
     expect(isCredoLaunchReady("cart", shippingForm)).toBe(false);
   });
 
-  test("reports missing customer data when cart exists but required credo fields are incomplete", () => {
+  test("missing credo fields no longer block launch (falls back to iMall contact info)", () => {
     globalThis.window.localStorage.setItem("cart", "cart-global-1");
 
     const shippingForm = createShippingForm({ phone: "" });
 
-    expect(getCredoLaunchBlockReason("cart", shippingForm)).toBe("missingCustomerData");
-    expect(isCredoLaunchReady("cart", shippingForm)).toBe(false);
+    expect(getCredoLaunchBlockReason("cart", shippingForm)).toBeNull();
+    expect(isCredoLaunchReady("cart", shippingForm)).toBe(true);
+  });
+
+  test("allows online installments for any non-empty cart, including multi-vendor", () => {
+    expect(isOnlineInstallmentCartEligible([])).toBe(false);
+    expect(isOnlineInstallmentCartEligible([{ tenantId: undefined }])).toBe(false);
+    expect(isOnlineInstallmentCartEligible([{ tenantId: "shop-a" }])).toBe(true);
+    expect(isOnlineInstallmentCartEligible([{ tenantId: "shop-a" }, { tenantId: "shop-a" }])).toBe(
+      true,
+    );
+    expect(isOnlineInstallmentCartEligible([{ tenantId: "shop-a" }, { tenantId: "shop-b" }])).toBe(
+      true,
+    );
+  });
+
+  test("does not manually refetch after each installment status query settles", async () => {
+    const source = await Bun.file(
+      new URL("./use-checkout-controller.ts", import.meta.url),
+    ).text();
+
+    expect(source).not.toContain("installmentStatusQuery.refetch");
   });
 
   test("clearing buy-now cart key does not clear default cart when IDs differ", () => {

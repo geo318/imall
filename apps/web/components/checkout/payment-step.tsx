@@ -3,7 +3,7 @@
 import { Button } from "@repo/ui/button";
 import { Input } from "@repo/ui/input";
 import { Label } from "@repo/ui/label";
-import { CreditCard, Shield } from "lucide-react";
+import { AlertCircle, CreditCard, Shield } from "lucide-react";
 import Image from "next/image";
 import { useId } from "react";
 import { useTranslations } from "@/i18n/provider";
@@ -32,7 +32,6 @@ type PaymentStepProps = {
     reason: "missingCart" | "missingCustomerData" | "missingKeepzPersonalNumber" | null;
   };
   submitting: boolean;
-  checkingStatus: boolean;
 };
 
 export function PaymentStep({
@@ -47,7 +46,6 @@ export function PaymentStep({
   onSubmit,
   onlineLaunchForm,
   submitting,
-  checkingStatus,
 }: PaymentStepProps) {
   const t = useTranslations();
   const onlineFormId = useId();
@@ -124,7 +122,7 @@ export function PaymentStep({
               {t("checkout.payment.onlineInstallmentsMultiVendorHint")}
             </p>
           ) : null}
-          {(["keepz", "credo", "crystal"] as const).map((provider) => (
+          {(["keepz", "credo"] as const).map((provider) => (
             <label
               key={provider}
               htmlFor={`installment-provider-${provider}`}
@@ -145,12 +143,17 @@ export function PaymentStep({
                 value={provider}
                 checked={installmentProvider === provider}
                 onChange={() => {
-                  if ((provider === "credo" || provider === "keepz") && !onlineInstallmentsAllowed) {
+                  if (
+                    (provider === "credo" || provider === "keepz") &&
+                    !onlineInstallmentsAllowed
+                  ) {
                     return;
                   }
                   onInstallmentProviderChange(provider);
                 }}
-                disabled={(provider === "credo" || provider === "keepz") && !onlineInstallmentsAllowed}
+                disabled={
+                  (provider === "credo" || provider === "keepz") && !onlineInstallmentsAllowed
+                }
                 className="h-4 w-4 text-emerald-600"
               />
               {INSTALLMENT_PROVIDER_LOGOS[provider] ? (
@@ -193,7 +196,9 @@ export function PaymentStep({
                   onChange={(event) => onKeepzPersonalNumberChange(event.target.value)}
                   placeholder={t("checkout.payment.keepzPersonalNumberPlaceholder")}
                 />
-                <p className="text-xs text-slate-500">{t("checkout.payment.keepzPersonalNumberHint")}</p>
+                <p className="text-xs text-slate-500">
+                  {t("checkout.payment.keepzPersonalNumberHint")}
+                </p>
               </div>
             </div>
           ) : null}
@@ -205,7 +210,16 @@ export function PaymentStep({
         <span>{t("checkout.payment.secureNote")}</span>
       </div>
 
-      <form id={onlineFormId} action={onlineLaunchForm.action} method="GET" className="hidden">
+      <form
+        id={onlineFormId}
+        action={onlineLaunchForm.action}
+        method="GET"
+        className="hidden"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onSubmit();
+        }}
+      >
         {Object.entries(onlineLaunchForm.fields).map(([key, value]) => (
           <input key={key} type="hidden" name={key} value={value} />
         ))}
@@ -227,15 +241,7 @@ export function PaymentStep({
                 ? "flex w-full items-center justify-center rounded-lg bg-[#006393] p-[18px] text-[14px] font-tbcx-bold text-white outline-none transition-all hover:bg-[#006393]/90 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
                 : "flex w-full items-center justify-center rounded-lg bg-emerald-600 p-[18px] text-[14px] font-semibold text-white outline-none transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:flex-1"
             }
-            disabled={submitting || checkingStatus}
-            onClick={(event) => {
-              if (onlineLaunchForm.ready) {
-                return;
-              }
-
-              event.preventDefault();
-              void onSubmit();
-            }}
+            disabled={submitting}
           >
             {installmentProvider === "credo" ? (
               <svg
@@ -272,28 +278,31 @@ export function PaymentStep({
             onClick={() => void onSubmit()}
             className="w-full sm:flex-1"
             size="lg"
-            disabled={submitting || checkingStatus}
+            disabled={submitting}
           >
             {submitting
               ? t("checkout.actions.processing")
               : paymentMethod === "card" && onlineInstallmentsAllowed
                 ? t("checkout.actions.keepzCard")
-              : paymentMethod === "installments"
-                ? t("checkout.actions.goToInstallments")
-                : t("checkout.actions.placeOrder")}
+                : paymentMethod === "installments"
+                  ? t("checkout.actions.goToInstallments")
+                  : t("checkout.actions.placeOrder")}
           </Button>
         )}
       </div>
       {paymentMethod === "installments" &&
       (installmentProvider === "credo" || installmentProvider === "keepz") &&
       !onlineLaunchForm.ready ? (
-        <p className="mt-3 text-sm text-amber-700">
-          {onlineLaunchForm.reason === "missingCart"
-            ? t("checkout.installments.missingCart")
-            : onlineLaunchForm.reason === "missingKeepzPersonalNumber"
-              ? t("checkout.installments.missingKeepzPersonalNumber")
-            : t("checkout.installments.missingCredoData")}
-        </p>
+        <div className="mt-3 flex items-start gap-2 text-sm text-amber-700" role="alert">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <p>
+            {onlineLaunchForm.reason === "missingCart"
+              ? t("checkout.installments.missingCart")
+              : onlineLaunchForm.reason === "missingKeepzPersonalNumber"
+                ? t("checkout.installments.missingKeepzPersonalNumber")
+                : t("checkout.installments.missingCredoData")}
+          </p>
+        </div>
       ) : null}
     </div>
   );

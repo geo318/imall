@@ -655,7 +655,8 @@
       }
     },
     "errors": {
-      "default": "Something went wrong. Please try again."
+      "default": "Something went wrong. Please try again.",
+      "emptyCart": "Your cart is empty. Add a product before continuing to payment."
     }
   },
   "productAvailability": {
