@@ -6,6 +6,7 @@ describe("Credo checkout validation", () => {
     expect(
       getMissingCredoCustomerFields({
         provider: "credo",
+        credoVariant: "zero",
         paymentType: "installments",
         clientFullName: " ",
         mobile: "+995599123456",
@@ -19,6 +20,7 @@ describe("Credo checkout validation", () => {
     expect(
       getMissingCredoCustomerFields({
         provider: "keepz",
+        credoVariant: "zero",
         paymentType: "installments",
       }),
     ).toEqual([]);
@@ -27,6 +29,7 @@ describe("Credo checkout validation", () => {
   test("backfills blank Credo customer fields with iMall contact info", () => {
     const filled = applyCredoCustomerFallbacks({
       provider: "credo",
+      credoVariant: "zero",
       paymentType: "installments",
       clientFullName: " ",
       mobile: undefined,
@@ -41,7 +44,11 @@ describe("Credo checkout validation", () => {
   });
 
   test("leaves Keepz payloads untouched", () => {
-    const payload = { provider: "keepz" as const, paymentType: "installments" as const };
+    const payload = {
+      provider: "keepz" as const,
+      credoVariant: "zero" as const,
+      paymentType: "installments" as const,
+    };
     expect(applyCredoCustomerFallbacks(payload)).toEqual(payload);
   });
 });

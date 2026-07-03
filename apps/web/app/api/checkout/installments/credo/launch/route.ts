@@ -86,6 +86,9 @@ export async function GET(request: NextRequest) {
   const email = searchParams.get("email")?.trim() || undefined;
   const factAddress = searchParams.get("factAddress")?.trim() || undefined;
   const returnTo = searchParams.get("returnTo")?.trim() || null;
+  const rawCredoVariant = searchParams.get("credoVariant")?.trim();
+  const credoVariant: "zero" | "standard" =
+    rawCredoVariant === "standard" ? "standard" : "zero";
 
   if (!cartId || !cartKey) {
     return buildErrorRedirect(request, returnTo, "Missing installment cart context.");
@@ -119,6 +122,7 @@ export async function GET(request: NextRequest) {
         },
         body: JSON.stringify({
           provider: "credo",
+          credoVariant,
           paymentType: "installments",
           installmentLength,
           clientFullName,

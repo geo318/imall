@@ -43,6 +43,7 @@ type UseCheckoutControllerOptions = {
   cartKey: string;
   initialPaymentMethod?: CheckoutPaymentMethod;
   initialInstallmentProvider?: InstallmentProvider;
+  credoVariant?: "zero" | "standard";
 };
 
 type PersistAddressOptions = {
@@ -244,6 +245,7 @@ export function useCheckoutController({
   cartKey,
   initialPaymentMethod = "card",
   initialInstallmentProvider = "keepz",
+  credoVariant = "zero",
 }: UseCheckoutControllerOptions) {
   const t = useTranslations();
   const [items, setItems] = useState<CartItem[]>([]);
@@ -335,6 +337,7 @@ export function useCheckoutController({
       cartKey,
       paymentType: "installments",
       installmentLength: "12",
+      credoVariant,
       clientFullName: credoCustomer.clientFullName,
       mobile: credoCustomer.mobile,
       email: credoCustomer.email,
@@ -353,7 +356,7 @@ export function useCheckoutController({
       reason,
       fields,
     };
-  }, [cartKey, installmentProvider, keepzPersonalNumber, shippingForm]);
+  }, [cartKey, credoVariant, installmentProvider, keepzPersonalNumber, shippingForm]);
 
   const hydratePendingInstallmentState = useCallback(() => {
     const localOrderCode =
@@ -506,7 +509,8 @@ export function useCheckoutController({
     [items, loading],
   );
   const shipping = subtotal > 100 ? 0 : 9.99;
-  const installmentCommission = paymentMethod === "installments" ? subtotal * 0.12 : 0;
+  const installmentCommission =
+    paymentMethod === "installments" && credoVariant === "standard" ? subtotal * 0.12 : 0;
   const total = subtotal + shipping + installmentCommission;
 
   useEffect(() => {
@@ -777,6 +781,7 @@ export function useCheckoutController({
                   cartId,
                   cartKey,
                   installmentLength: 12,
+                  credoVariant,
                   clientFullName: credoCustomer.clientFullName,
                   mobile: credoCustomer.mobile,
                   email: credoCustomer.email,
@@ -821,6 +826,7 @@ export function useCheckoutController({
 
           const session = await startInstallmentCheckout(cartId, {
             provider: installmentProvider === "keepz" ? "keepz" : "credo",
+            credoVariant: installmentProvider === "keepz" ? undefined : credoVariant,
             paymentType: "installments",
             installmentLength: 12,
             clientFullName: credoCustomer.clientFullName,
@@ -880,6 +886,7 @@ export function useCheckoutController({
     [
       cartKey,
       clearInstallmentState,
+      credoVariant,
       hydratePendingInstallmentState,
       installmentCommission,
       installmentOrderCodeKey,

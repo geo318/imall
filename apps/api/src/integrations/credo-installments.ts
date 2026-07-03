@@ -17,6 +17,7 @@ export type CredoInstallmentProduct = {
 
 export type StartCredoInstallmentInput = {
   cartId: string;
+  merchantId?: string;
   products: CredoInstallmentProduct[];
   installmentLength?: number;
   clientFullName?: string;
@@ -189,7 +190,7 @@ export async function createCredoInstallmentApplication(
   orderCode: string;
   redirectUrl: string;
 }> {
-  const merchantId = getCredoMerchantId();
+  const merchantId = input.merchantId?.trim() || getCredoMerchantId();
   const secret = getCredoSecret();
   const orderCode = buildOrderCode(input.cartId, secret);
 

@@ -43,6 +43,7 @@ import { logger } from "../utils/logger";
 
 const installmentStartSchema = z.object({
   provider: z.enum(["credo", "keepz"]).default("credo"),
+  credoVariant: z.enum(["zero", "standard"]).default("zero"),
   paymentType: z.enum(["card", "installments"]).default("installments"),
   installmentLength: z.coerce.number().int().positive().max(60).optional(),
   clientFullName: z.string().trim().max(128).optional(),
@@ -860,12 +861,18 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
 
     payload = applyCredoCustomerFallbacks(payload);
 
-    if (payload.provider === "credo" && !env.CREDO_MERCHANT_ID?.trim()) {
-      set.status = 503;
-      return {
-        error: "Credo installments are not configured",
-        code: "CREDO_NOT_CONFIGURED",
-      };
+    if (payload.provider === "credo") {
+      const isZero = payload.credoVariant === "zero";
+      const resolvedMerchantId = isZero
+        ? env.CREDO_ZERO_MERCHANT_ID?.trim() || env.CREDO_MERCHANT_ID?.trim()
+        : env.CREDO_MERCHANT_ID?.trim();
+      if (!resolvedMerchantId) {
+        set.status = 503;
+        return {
+          error: "Credo installments are not configured",
+          code: "CREDO_NOT_CONFIGURED",
+        };
+      }
     }
 
     try {
@@ -1078,20 +1085,28 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         };
       });
 
-      // 12% commission is charged only for installments and must be included in Credo payload.
-      const commissionTetri = Math.round(subtotal * 0.12 * 100);
-      if (commissionTetri > 0) {
-        credoProducts.push({
-          id: `fee-${cartId.slice(0, 8)}`,
-          title: "Installment commission",
-          amount: 1,
-          price: commissionTetri,
-          type: 0,
-        });
+      const isZeroRateCredo = payload.credoVariant === "zero";
+      const credoMerchantId = isZeroRateCredo
+        ? env.CREDO_ZERO_MERCHANT_ID?.trim() || env.CREDO_MERCHANT_ID?.trim()
+        : env.CREDO_MERCHANT_ID?.trim();
+
+      // 12% commission only for the standard merchant; zero-rate merchant absorbs it.
+      if (!isZeroRateCredo) {
+        const commissionTetri = Math.round(subtotal * 0.12 * 100);
+        if (commissionTetri > 0) {
+          credoProducts.push({
+            id: `fee-${cartId.slice(0, 8)}`,
+            title: "Installment commission",
+            amount: 1,
+            price: commissionTetri,
+            type: 0,
+          });
+        }
       }
 
       const session = await createCredoInstallmentApplication({
         cartId,
+        merchantId: credoMerchantId,
         products: credoProducts,
         installmentLength: payload.installmentLength,
         clientFullName: payload.clientFullName,

@@ -303,6 +303,7 @@ export async function checkoutCart(cartId: string): Promise<void> {
 
 export type StartInstallmentCheckoutInput = {
   provider?: "credo" | "keepz";
+  credoVariant?: "zero" | "standard";
   paymentType?: "card" | "installments";
   installmentLength?: number;
   clientFullName?: string;

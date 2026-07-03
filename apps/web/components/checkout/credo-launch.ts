@@ -29,7 +29,9 @@ type LaunchUrlInput = {
   returnTo?: string;
 };
 
-type CredoLaunchUrlInput = Omit<LaunchUrlInput, "provider" | "paymentType" | "personalNumber" | "isForeign">;
+type CredoLaunchUrlInput = Omit<LaunchUrlInput, "provider" | "paymentType" | "personalNumber" | "isForeign"> & {
+  credoVariant?: "zero" | "standard";
+};
 
 type KeepzLaunchUrlInput = Omit<LaunchUrlInput, "provider" | "installmentLength" | "clientFullName" | "mobile" | "email" | "factAddress">;
 
@@ -112,11 +114,16 @@ function buildInstallmentLaunchUrl({
 }
 
 export function buildCredoLaunchUrl(input: CredoLaunchUrlInput): string {
-  return buildInstallmentLaunchUrl({
-    ...input,
+  const { credoVariant, ...rest } = input;
+  const base = buildInstallmentLaunchUrl({
+    ...rest,
     provider: "credo",
     paymentType: "installments",
   });
+  if (credoVariant === "standard") {
+    return `${base}&credoVariant=standard`;
+  }
+  return base;
 }
 
 export function buildKeepzLaunchUrl(input: KeepzLaunchUrlInput): string {

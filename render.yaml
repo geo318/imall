@@ -46,6 +46,8 @@ services:
         sync: false
       - key: KEEPZ_DIRECT_SETTLEMENTS_CLIENT_SECRET
         sync: false
+      - key: CREDO_ZERO_MERCHANT_ID
+        sync: false
 
   - type: web
     name: imall

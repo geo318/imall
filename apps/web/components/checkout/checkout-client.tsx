@@ -34,10 +34,12 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
     requestedPayment === "installments" ? "installments" : "card";
   const initialInstallmentProvider: InstallmentProvider =
     requestedProvider === "crystal" ? "crystal" : requestedProvider === "credo" ? "credo" : "keepz";
+  const credoVariant = searchParams.get("id") === "3" ? "standard" : "zero";
   const checkout = useCheckoutController({
     cartKey: safeCartKey,
     initialPaymentMethod,
     initialInstallmentProvider,
+    credoVariant,
   });
   const lastErrorToastRef = useRef<string | null>(null);
   const checkoutErrorMessage = resolveCheckoutErrorMessage(
