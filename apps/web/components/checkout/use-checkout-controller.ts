@@ -509,8 +509,7 @@ export function useCheckoutController({
     [items, loading],
   );
   const shipping = subtotal > 100 ? 0 : 9.99;
-  const installmentCommission =
-    paymentMethod === "installments" && credoVariant === "standard" ? subtotal * 0.12 : 0;
+  const installmentCommission = paymentMethod === "installments" ? subtotal * 0.12 : 0;
   const total = subtotal + shipping + installmentCommission;
 
   useEffect(() => {

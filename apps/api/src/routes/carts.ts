@@ -1085,23 +1085,20 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         };
       });
 
-      const isZeroRateCredo = payload.credoVariant === "zero";
-      const credoMerchantId = isZeroRateCredo
-        ? env.CREDO_ZERO_MERCHANT_ID?.trim() || env.CREDO_MERCHANT_ID?.trim()
-        : env.CREDO_MERCHANT_ID?.trim();
+      const credoMerchantId =
+        payload.credoVariant === "zero"
+          ? env.CREDO_ZERO_MERCHANT_ID?.trim() || env.CREDO_MERCHANT_ID?.trim()
+          : env.CREDO_MERCHANT_ID?.trim();
 
-      // 12% commission only for the standard merchant; zero-rate merchant absorbs it.
-      if (!isZeroRateCredo) {
-        const commissionTetri = Math.round(subtotal * 0.12 * 100);
-        if (commissionTetri > 0) {
-          credoProducts.push({
-            id: `fee-${cartId.slice(0, 8)}`,
-            title: "Installment commission",
-            amount: 1,
-            price: commissionTetri,
-            type: 0,
-          });
-        }
+      const commissionTetri = Math.round(subtotal * 0.12 * 100);
+      if (commissionTetri > 0) {
+        credoProducts.push({
+          id: `fee-${cartId.slice(0, 8)}`,
+          title: "Installment commission",
+          amount: 1,
+          price: commissionTetri,
+          type: 0,
+        });
       }
 
       const session = await createCredoInstallmentApplication({
