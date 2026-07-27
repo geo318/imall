@@ -3,16 +3,17 @@ import { sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { bidPayloadSchema, env, listQuerySchema } from "./context";
 import { getKeepzDirectSettlementsDiagnostics } from "./integrations/keepz-direct-settlements";
+import { getKeepzConfigDiagnostics } from "./integrations/keepz-ecommerce";
 import { adminProductsRoutes } from "./routes/admin-products";
 import { adminShopRoutes } from "./routes/admin-shops";
 import { adminUploadRoutes } from "./routes/admin-upload";
 import { auctionsRoutes, startAuctionCloser } from "./routes/auctions";
 import { cartRoutes } from "./routes/carts";
 import { categoriesRoutes } from "./routes/categories";
+import { customCheckoutRoutes } from "./routes/custom-checkout";
 import { favoritesRoutes } from "./routes/favorites";
 import { imageRoutes } from "./routes/images";
 import { inventoryRoutes } from "./routes/inventory";
-import { getKeepzConfigDiagnostics } from "./integrations/keepz-ecommerce";
 import { keepzCallbackRoutes } from "./routes/keepz-callback";
 import { keepzDirectSettlementsRoutes } from "./routes/keepz-direct-settlements";
 import { allProductsRoutes, productsRoutes } from "./routes/products";
@@ -173,6 +174,7 @@ const app = new Elysia({ prefix: "/api" })
     }
   })
   .use(cartRoutes) // Single cart (can hold items from multiple shops) - register early to avoid conflicts
+  .use(customCheckoutRoutes)
   .use(keepzCallbackRoutes)
   .use(keepzDirectSettlementsRoutes)
   .use(imageRoutes) // Image serving - register early to avoid conflicts
