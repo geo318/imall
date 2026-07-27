@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const response = await fetch(`${env.BACKEND_URL}/custom-checkout/credo`, {
+    const response = await fetch(`${env.BACKEND_URL}/api/custom-checkout/credo`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
