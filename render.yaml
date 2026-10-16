@@ -5,6 +5,26 @@ services:
     region: frankfurt
     dockerfilePath: ./Dockerfile.api
     autoDeploy: true
+    # Keep frontend-only edits and documentation out of API build minutes.
+    buildFilter:
+      paths:
+        - apps/api/**
+        - apps/web/package.json
+        - packages/**
+        - scripts/**
+        - Dockerfile.api
+        - .dockerignore
+        - .npmrc
+        - package.json
+        - bun.lock
+        - turbo.json
+        - tsconfig.json
+        - drizzle.config.ts
+        - render.yaml
+      ignoredPaths:
+        - '**/README.md'
+        - '**/AGENTS.md'
+        - '**/*.test.*'
     disk:
       name: imall-api-data
       mountPath: /var/data
@@ -55,6 +75,24 @@ services:
     region: frankfurt
     dockerfilePath: ./Dockerfile.web
     autoDeploy: true
+    buildFilter:
+      paths:
+        - apps/web/**
+        - apps/api/package.json
+        - packages/**
+        - scripts/**
+        - Dockerfile.web
+        - .dockerignore
+        - .npmrc
+        - package.json
+        - bun.lock
+        - turbo.json
+        - tsconfig.json
+        - render.yaml
+      ignoredPaths:
+        - '**/README.md'
+        - '**/AGENTS.md'
+        - '**/*.test.*'
     envVars:
       - key: BACKEND_URL
         fromService:

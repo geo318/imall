@@ -24,17 +24,17 @@ const geistMono = localFont({
 const firago = localFont({
   src: [
     {
-      path: "../../public/fonts/Firago-Regular.ttf",
+      path: "../../public/fonts/Firago-Regular.woff2",
       weight: "400",
       style: "normal",
     },
     {
-      path: "../../public/fonts/Firago-Medium.ttf",
+      path: "../../public/fonts/Firago-Medium.woff2",
       weight: "500",
       style: "normal",
     },
     {
-      path: "../../public/fonts/Firago-SemiBold.ttf",
+      path: "../../public/fonts/Firago-SemiBold.woff2",
       weight: "600",
       style: "normal",
     },
