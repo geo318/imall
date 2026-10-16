@@ -3,23 +3,24 @@
 import { Button } from "@repo/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
-import { Link } from "@/i18n/navigation.client";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { getCart, removeCartItem, updateCartItemQty } from "@/actions/carts";
 import LazyImage from "@/components/shared/lazy-image";
 import { CartSkeleton } from "@/components/skeletons/cart-skeleton";
+import { Link } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import type { CartItem } from "@/lib/api/cart";
 import { getProductIdentifier } from "@/lib/api/products";
-import { revalidateCartClient } from "@/lib/revalidate-client";
-import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
-import { cn } from "@/lib/utils";
 import {
   clearCartIdFromStorage,
   dispatchCartStorageUpdated,
   readCartIdFromStorage,
 } from "@/lib/cart-storage";
+import { queryGcTime } from "@/lib/query-gc-time";
+import { revalidateCartClient } from "@/lib/revalidate-client";
+import { cn } from "@/lib/utils";
+import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 export function CartContent() {
   const t = useTranslations();
@@ -42,7 +43,7 @@ export function CartContent() {
     queryFn: () => getCart(cartId as string),
     enabled: Boolean(cartId),
     staleTime: 30_000,
-    gcTime: 10 * 60_000,
+    gcTime: queryGcTime(10 * 60_000),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: (failureCount, error) => {

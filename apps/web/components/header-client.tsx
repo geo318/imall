@@ -4,6 +4,7 @@ import { useClerk, useUser } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "@/i18n/navigation.client";
 import type { InitialHeaderAuth } from "@/lib/header-auth";
+import { queryGcTime } from "@/lib/query-gc-time";
 import { Header } from "./header";
 
 type HeaderClientProps = {
@@ -27,7 +28,7 @@ export function HeaderClient({ initialHeaderAuth }: HeaderClientProps) {
     },
     enabled: isSignedIn,
     staleTime: 60_000,
-    gcTime: 30 * 60_000,
+    gcTime: queryGcTime(30 * 60_000),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: false,

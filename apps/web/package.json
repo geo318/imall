@@ -5,8 +5,8 @@
   "private": true,
   "scripts": {
     "dev": "bun run --bun next dev --port 3000",
-    "build": "bun run --bun next build",
-    "start": "bun run --bun next start",
+    "build": "next build",
+    "start": "next start",
     "lint": "biome check .",
     "check-types": "bun run --bun next typegen && tsc --noEmit"
   },

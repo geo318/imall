@@ -112,10 +112,13 @@ const nextConfig = {
   // Toggle via NEXT_CACHE_COMPONENTS=false to disable without touching source.
   // 'use cache' directives remain in source — they become no-ops when this is off.
   cacheComponents: process.env.NEXT_CACHE_COMPONENTS !== "false",
-  // Hard cap on the in-process 'use cache' LRU store. Without this, unbounded
-  // unique keys (search queries, product slugs) grow until OOM. 50 MB leaves
-  // ~400 MB for the rest of the 512 MB container.
-  cacheMaxMemorySize: 50 * 1024 * 1024,
+  // Next has separate incremental and Cache Components stores using this budget.
+  // Keep both small enough for Render's 512 MB web container.
+  cacheMaxMemorySize: 16 * 1024 * 1024,
+  experimental: {
+    imgOptConcurrency: 1,
+    imgOptMaxInputPixels: 16_777_216,
+  },
   turbopack: {},
   images: {
     remotePatterns: dedupedRemotePatterns,

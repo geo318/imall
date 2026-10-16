@@ -86,18 +86,33 @@ async function proxyImageRequest(
     requestHeaders.set("if-modified-since", ifModifiedSince);
   }
 
-  let upstream = await fetch(backendUrl, {
-    method,
-    headers: requestHeaders,
-    cache: "force-cache",
-  });
-
-  if (upstream.status === 404 && normalizedPath !== path) {
-    const normalizedBackendUrl = buildBackendImageUrl(normalizedPath, url.search);
-    upstream = await fetch(normalizedBackendUrl, {
+  // Images already carry browser/CDN cache headers. Next's fetch cache would
+  // clone and buffer each binary response (including range/query variants).
+  const signal = AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]);
+  let upstream: Response;
+  try {
+    upstream = await fetch(backendUrl, {
       method,
       headers: requestHeaders,
-      cache: "force-cache",
+      cache: "no-store",
+      signal,
+    });
+
+    if (upstream.status === 404 && normalizedPath !== path) {
+      // Release the discarded body before retrying the legacy filename.
+      await upstream.body?.cancel();
+      const normalizedBackendUrl = buildBackendImageUrl(normalizedPath, url.search);
+      upstream = await fetch(normalizedBackendUrl, {
+        method,
+        headers: requestHeaders,
+        cache: "no-store",
+        signal,
+      });
+    }
+  } catch {
+    return new Response("IMAGE_UPSTREAM_UNAVAILABLE", {
+      status: signal.aborted ? 504 : 502,
+      headers: { "Cache-Control": "no-store" },
     });
   }
 

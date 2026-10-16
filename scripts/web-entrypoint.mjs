@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
 
 const now = () => new Date().toISOString();
 
@@ -47,6 +48,7 @@ function memorySnapshot() {
 log("1/3", "Container startup diagnostics");
 log("1/3", "Runtime env", {
   nodeEnv: process.env.NODE_ENV ?? null,
+  nodeVersion: process.version,
   port: process.env.PORT ?? null,
   renderServiceName: process.env.RENDER_SERVICE_NAME ?? null,
   renderExternalUrl: process.env.RENDER_EXTERNAL_URL ?? null,
@@ -59,30 +61,25 @@ log("1/3", "Runtime env", {
 });
 
 log("2/3", "Starting Next.js web server");
-const child = spawn("bun", ["run", "--bun", "next", "start"], { stdio: "inherit" });
-
-const heartbeatMs = Number.parseInt(process.env.WEB_MEMORY_LOG_INTERVAL_MS ?? "0", 10);
+// Run Next in this process: an idle supervisor's memory tells us nothing about
+// the actual web server, and adds another runtime to the container's RSS.
+const heartbeatMs = Number.parseInt(process.env.WEB_MEMORY_LOG_INTERVAL_MS ?? "60000", 10);
 if (Number.isFinite(heartbeatMs) && heartbeatMs > 0) {
   setInterval(() => {
     log("2/3", "Memory heartbeat", memorySnapshot());
   }, heartbeatMs).unref();
 }
 
-const forwardSignal = (signal) => {
-  log("2/3", `Forwarding signal ${signal} to web process`);
-  child.kill(signal);
-};
-
-process.on("SIGTERM", () => forwardSignal("SIGTERM"));
-process.on("SIGINT", () => forwardSignal("SIGINT"));
-
-child.on("error", (error) => fail("Failed to spawn Next.js process", error));
-child.on("exit", (code, signal) => {
-  if (signal) {
-    log("3/3", `Web process exited via signal ${signal}`);
-    process.exit(0);
+try {
+  const require = createRequire(path.join(process.cwd(), "package.json"));
+  const { nextStart } = require("next/dist/cli/next-start");
+  const port = Number.parseInt(process.env.PORT ?? "3000", 10);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("PORT must be between 1 and 65535");
   }
-
-  log("3/3", `Web process exited with code ${code ?? 0}`);
-  process.exit(code ?? 0);
-});
+  // Next registers its own SIGTERM/SIGINT cleanup handlers.
+  await nextStart({ port, hostname: "0.0.0.0" }, process.cwd());
+  log("3/3", "Web server ready", memorySnapshot());
+} catch (error) {
+  fail("Failed to start Next.js", error);
+}

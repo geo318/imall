@@ -30,6 +30,7 @@ import {
   clearCartIdFromStorage,
   readCartIdFromStorage,
 } from "@/lib/cart-storage";
+import { queryGcTime } from "@/lib/query-gc-time";
 import { HeaderFavorites } from "./header-favorites";
 import { LanguageSwitcher } from "./language-switcher";
 import { MegaMenu } from "./mega-menu";
@@ -161,7 +162,7 @@ export function Header({
     queryFn: () => getCart(cartId as string),
     enabled: Boolean(cartId),
     staleTime: 30_000,
-    gcTime: 10 * 60_000,
+    gcTime: queryGcTime(10 * 60_000),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: false,
@@ -184,7 +185,7 @@ export function Header({
     queryKey: ["categories-tree", locale],
     queryFn: () => fetchCategoryTree(locale),
     staleTime: 30 * 60_000,
-    gcTime: 2 * 60 * 60_000,
+    gcTime: queryGcTime(2 * 60 * 60_000),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: false,

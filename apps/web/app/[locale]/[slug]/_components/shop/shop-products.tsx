@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@repo/ui/button";
 import { Badge } from "@repo/ui/badge";
+import { Button } from "@repo/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@repo/ui/select";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { SlidersHorizontal, X } from "lucide-react";
@@ -19,8 +19,9 @@ import { useLocale, useTranslations } from "@/i18n/provider";
 import { fetchCategoryTree } from "@/lib/api/categories";
 import { searchShopProducts } from "@/lib/api/products";
 import { mapApiProductToMarketing } from "@/lib/marketing";
+import { queryGcTime } from "@/lib/query-gc-time";
+import { currencySymbol, DEFAULT_CURRENCY_CODE } from "@/lib/utils/currency";
 import { clampPriceRange, derivePriceBounds, type PriceBounds } from "@/lib/utils/price-range";
-import { DEFAULT_CURRENCY_CODE, currencySymbol } from "@/lib/utils/currency";
 
 type Props = {
   shopSlug: string;
@@ -47,7 +48,7 @@ export function ShopProducts({ shopSlug }: Props) {
     queryKey: ["categories-tree", locale],
     queryFn: () => fetchCategoryTree(locale),
     staleTime: 30 * 60_000,
-    gcTime: 2 * 60 * 60_000,
+    gcTime: queryGcTime(2 * 60 * 60_000),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: false,
@@ -215,7 +216,7 @@ export function ShopProducts({ shopSlug }: Props) {
     },
     initialPageParam: 0,
     staleTime: 60_000,
-    gcTime: 10 * 60_000,
+    gcTime: queryGcTime(10 * 60_000),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     retry: 1,
