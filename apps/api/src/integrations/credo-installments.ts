@@ -127,6 +127,10 @@ function parseOrderCode(orderCode: string): {
   return { cartPart, timestampPart, noncePart, signature, merchantId };
 }
 
+export function getCredoOrderMerchantId(orderCode: string): string | undefined {
+  return parseOrderCode(orderCode)?.merchantId;
+}
+
 export function validateOrderCodeForCart(orderCode: string, cartId: string): boolean {
   const parsed = parseOrderCode(orderCode);
   if (!parsed) return false;
@@ -283,7 +287,7 @@ export async function fetchCredoInstallmentStatus(
   orderCode: string,
 ): Promise<CredoInstallmentStatusResult> {
   // New order codes retain the selected shop; legacy codes use the configured merchant.
-  const merchantId = parseOrderCode(orderCode)?.merchantId || getCredoMerchantId();
+  const merchantId = getCredoOrderMerchantId(orderCode) || getCredoMerchantId();
   const secret = getCredoSecret();
   const hash = md5(`${merchantId}${orderCode}${secret}`);
   const url = new URL(getStatusUrl());

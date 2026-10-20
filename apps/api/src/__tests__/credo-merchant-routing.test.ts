@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { env } from "../context";
+import { markCredoInstallmentAsDelivered } from "../integrations/credo-additional-services";
 import {
   createCredoInstallmentApplication,
   fetchCredoInstallmentStatus,
@@ -8,8 +9,14 @@ import {
 } from "../integrations/credo-installments";
 
 const originalFetch = globalThis.fetch;
+const originalCredentials = {
+  CREDO_MERCHANT_ID: env.CREDO_MERCHANT_ID,
+  CREDO_ADDITIONAL_USERNAME: env.CREDO_ADDITIONAL_USERNAME,
+  CREDO_ADDITIONAL_PASSWORD: env.CREDO_ADDITIONAL_PASSWORD,
+};
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  Object.assign(env, originalCredentials);
 });
 
 test("each Credo product keeps its shop ID through creation and status lookup", async () => {
@@ -53,4 +60,35 @@ test("existing signed order codes remain valid", () => {
     .digest("hex")
     .slice(0, 10);
   expect(validateOrderCodeForCart(`IML-12345678-timestamp-abcdef-${signature}`, cartId)).toBe(true);
+});
+
+test("delivery uses the originating shop with cached authentication and token refresh", async () => {
+  Object.assign(env, {
+    CREDO_MERCHANT_ID: "134582",
+    CREDO_ADDITIONAL_USERNAME: "test-user",
+    CREDO_ADDITIONAL_PASSWORD: "test-password",
+  });
+  let authCalls = 0;
+  const deliveries: number[] = [];
+  globalThis.fetch = (async (input, init) => {
+    if (String(input).endsWith("/User/Authenticate")) {
+      authCalls++;
+      return Response.json({ data: { token: `token-${authCalls}`, merchantId: 134582 } });
+    }
+    expect(String(input)).toEndWith("/Shop/MarkAsDelivered");
+    const body = JSON.parse(String(init?.body));
+    deliveries.push(body.MerchantId);
+    if (deliveries.length === 1) return Response.json({ state: 1 });
+    return Response.json({ data: { success: true } });
+  }) as typeof fetch;
+
+  // These are persisted order codes; cart ownership/signatures are checked at creation/sync.
+  for (const suffix of ["-133469", "-134582", ""]) {
+    const result = await markCredoInstallmentAsDelivered(
+      `IML-12345678-timestamp-abcdef-signature${suffix}`,
+    );
+    expect(result.success).toBe(true);
+  }
+  expect(deliveries).toEqual([133469, 133469, 134582, 134582]);
+  expect(authCalls).toBe(2);
 });
