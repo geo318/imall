@@ -589,7 +589,8 @@
       "installments": "განვადება (12% საკომისიო)",
       "installmentProviderLabel": "აირჩიეთ განვადების პროვაიდერი",
       "keepzProvider": "Keepz QR განვადება",
-      "credoProvider": "ონლაინ",
+      "credoProvider": "კრედოს განვადება",
+      "dayaviProvider": "და-ყა-ვი",
       "crystalProvider": "ინვოისი",
       "keepzLogoAlt": "Keepz",
       "credoLogoAlt": "Credo.ge",
@@ -619,6 +620,7 @@
       "processing": "მუშავდება...",
       "goToInstallments": "განვადება",
       "credoInstallments": "განვადება",
+      "dayaviInstallments": "და-ყა-ვით გადახდა",
       "keepzInstallments": "Keepz QR გადახდა",
       "keepzCard": "Keepz-ით გადახდა"
     },

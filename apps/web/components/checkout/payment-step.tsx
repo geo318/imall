@@ -9,16 +9,13 @@ import { useId } from "react";
 import { useTranslations } from "@/i18n/provider";
 import type { CheckoutPaymentMethod, InstallmentProvider } from "./types";
 
-const INSTALLMENT_PROVIDER_LOGOS: Partial<Record<InstallmentProvider, string>> = {
-  credo: "/credo-bank-logo.png",
-  crystal: "/crystal-bank-logo.png",
-};
-
 type PaymentStepProps = {
   paymentMethod: CheckoutPaymentMethod;
   onPaymentMethodChange: (method: CheckoutPaymentMethod) => void;
   installmentProvider: InstallmentProvider;
   onInstallmentProviderChange: (provider: InstallmentProvider) => void;
+  credoVariant: "zero" | "standard";
+  onCredoVariantChange: (variant: "zero" | "standard") => void;
   keepzPersonalNumber: string;
   onKeepzPersonalNumberChange: (value: string) => void;
   onlineInstallmentsAllowed: boolean;
@@ -39,6 +36,8 @@ export function PaymentStep({
   onPaymentMethodChange,
   installmentProvider,
   onInstallmentProviderChange,
+  credoVariant,
+  onCredoVariantChange,
   keepzPersonalNumber,
   onKeepzPersonalNumberChange,
   onlineInstallmentsAllowed,
@@ -122,66 +121,73 @@ export function PaymentStep({
               {t("checkout.payment.onlineInstallmentsMultiVendorHint")}
             </p>
           ) : null}
-          {(["keepz", "credo"] as const).map((provider) => (
+          {(
+            [
+              {
+                key: "keepz",
+                provider: "keepz",
+                variant: "zero",
+                logo: null,
+                label: t("checkout.payment.keepzProvider"),
+              },
+              {
+                key: "dayavi",
+                provider: "credo",
+                variant: "zero",
+                logo: "/dayavi-logo.png",
+                label: t("checkout.payment.dayaviProvider"),
+              },
+              {
+                key: "credo",
+                provider: "credo",
+                variant: "standard",
+                logo: "/credo-bank-logo.png",
+                label: t("checkout.payment.credoProvider"),
+              },
+            ] as const
+          ).map(({ key, provider, variant, logo, label }) => (
             <label
-              key={provider}
-              htmlFor={`installment-provider-${provider}`}
+              key={key}
+              htmlFor={`installment-provider-${key}`}
               className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
-                (provider === "credo" || provider === "keepz") && !onlineInstallmentsAllowed
-                  ? "cursor-not-allowed opacity-55"
-                  : "cursor-pointer"
+                !onlineInstallmentsAllowed ? "cursor-not-allowed opacity-55" : "cursor-pointer"
               } ${
-                installmentProvider === provider
+                installmentProvider === provider &&
+                (provider !== "credo" || credoVariant === variant)
                   ? "border-emerald-500 bg-emerald-50/60"
                   : "border-slate-200 hover:border-emerald-300"
               }`}
             >
               <input
-                id={`installment-provider-${provider}`}
+                id={`installment-provider-${key}`}
                 type="radio"
                 name="installmentProvider"
-                value={provider}
-                checked={installmentProvider === provider}
-                onChange={() => {
-                  if (
-                    (provider === "credo" || provider === "keepz") &&
-                    !onlineInstallmentsAllowed
-                  ) {
-                    return;
-                  }
-                  onInstallmentProviderChange(provider);
-                }}
-                disabled={
-                  (provider === "credo" || provider === "keepz") && !onlineInstallmentsAllowed
+                value={key}
+                checked={
+                  installmentProvider === provider &&
+                  (provider !== "credo" || credoVariant === variant)
                 }
+                onChange={() => {
+                  onInstallmentProviderChange(provider);
+                  if (provider === "credo") onCredoVariantChange(variant);
+                }}
+                disabled={!onlineInstallmentsAllowed}
                 className="h-4 w-4 text-emerald-600"
               />
-              {INSTALLMENT_PROVIDER_LOGOS[provider] ? (
+              {logo ? (
                 <Image
-                  src={INSTALLMENT_PROVIDER_LOGOS[provider]}
-                  alt={
-                    provider === "credo"
-                      ? t("checkout.payment.credoLogoAlt")
-                      : provider === "keepz"
-                        ? t("checkout.payment.keepzLogoAlt")
-                        : t("checkout.payment.crystalLogoAlt")
-                  }
+                  src={logo}
+                  alt={label}
                   width={120}
-                  height={28}
-                  className="h-7 w-auto"
+                  height={64}
+                  className="h-12 w-[120px] shrink-0 object-contain"
                 />
               ) : (
                 <span className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-700">
                   Keepz
                 </span>
               )}
-              <span className="text-sm text-slate-700">
-                {provider === "credo"
-                  ? t("checkout.payment.credoProvider")
-                  : provider === "keepz"
-                    ? t("checkout.payment.keepzProvider")
-                    : t("checkout.payment.crystalProvider")}
-              </span>
+              <span className="text-sm text-slate-700">{label}</span>
             </label>
           ))}
           {installmentProvider === "keepz" ? (
@@ -271,7 +277,9 @@ export function PaymentStep({
               ? t("checkout.actions.processing")
               : installmentProvider === "keepz"
                 ? t("checkout.actions.keepzInstallments")
-                : t("checkout.actions.credoInstallments")}
+                : credoVariant === "zero"
+                  ? t("checkout.actions.dayaviInstallments")
+                  : t("checkout.actions.credoInstallments")}
           </button>
         ) : (
           <Button

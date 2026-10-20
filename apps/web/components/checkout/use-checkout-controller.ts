@@ -245,8 +245,9 @@ export function useCheckoutController({
   cartKey,
   initialPaymentMethod = "card",
   initialInstallmentProvider = "keepz",
-  credoVariant = "zero",
+  credoVariant: initialCredoVariant = "zero",
 }: UseCheckoutControllerOptions) {
+  const [credoVariant, setCredoVariant] = useState(initialCredoVariant);
   const t = useTranslations();
   const [items, setItems] = useState<CartItem[]>([]);
   const [step, setStep] = useState<CheckoutStep>("shipping");
@@ -935,6 +936,8 @@ export function useCheckoutController({
     pendingRedirectUrl,
     installmentProvider,
     setInstallmentProvider,
+    credoVariant,
+    setCredoVariant,
     keepzPersonalNumber,
     setKeepzPersonalNumber,
     onlineInstallmentsAllowed,

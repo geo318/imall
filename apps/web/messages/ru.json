@@ -589,7 +589,8 @@
       "installments": "Рассрочка (комиссия 12%)",
       "installmentProviderLabel": "Выберите провайдера рассрочки",
       "keepzProvider": "QR-рассрочка Keepz",
-      "credoProvider": "Онлайн-процесс",
+      "credoProvider": "Рассрочка Credo",
+      "dayaviProvider": "და-ყა-ვი",
       "crystalProvider": "Ручной счёт",
       "keepzLogoAlt": "Keepz",
       "credoLogoAlt": "Credo.ge",
@@ -619,6 +620,7 @@
       "processing": "Обработка...",
       "goToInstallments": "Рассрочка",
       "credoInstallments": "Рассрочка",
+      "dayaviInstallments": "Оплатить с და-ყა-ვი",
       "keepzInstallments": "Оплатить через Keepz QR",
       "keepzCard": "Оплатить картой через Keepz"
     },
