@@ -149,6 +149,7 @@ const nextConfig = {
         "/templates/:path*",
         "/imall-logo.png",
         "/credo-bank-logo.png",
+        "/dayavi-logo.png",
         "/crystal-bank-logo.png",
       ].map((source) => ({
         source,

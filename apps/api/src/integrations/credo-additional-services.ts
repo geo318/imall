@@ -1,4 +1,5 @@
 import { env } from "../context";
+import { getCredoOrderMerchantId } from "./credo-installments";
 
 const DEFAULT_CREDO_ADDITIONAL_API_BASE_URL = "http://10.195.103.186:1414/api";
 const TOKEN_TTL_MS = 55 * 60 * 1000;
@@ -132,7 +133,9 @@ function buildMarkAsDeliveredBody(orderCode: string, merchantId: string) {
 }
 
 async function sendMarkAsDelivered(orderCode: string): Promise<CredoMarkAsDeliveredResponse> {
-  const { token, merchantId } = await authenticateCredoAdditionalServices();
+  const { token, merchantId: authenticatedMerchantId } =
+    await authenticateCredoAdditionalServices();
+  const merchantId = getCredoOrderMerchantId(orderCode) || authenticatedMerchantId;
   const response = await fetch(`${getCredoAdditionalApiBaseUrl()}/Shop/MarkAsDelivered`, {
     method: "POST",
     headers: {

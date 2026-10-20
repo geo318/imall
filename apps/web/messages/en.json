@@ -589,7 +589,8 @@
       "installments": "Installments (12% commission)",
       "installmentProviderLabel": "Choose installment provider",
       "keepzProvider": "Keepz QR installments",
-      "credoProvider": "Online flow",
+      "credoProvider": "Credo installments",
+      "dayaviProvider": "და-ყა-ვი",
       "crystalProvider": "Manual invoice flow",
       "keepzLogoAlt": "Keepz",
       "credoLogoAlt": "Credo.ge",
@@ -619,6 +620,7 @@
       "processing": "Processing...",
       "goToInstallments": "Installments",
       "credoInstallments": "Installments",
+      "dayaviInstallments": "Pay with და-ყა-ვი",
       "keepzInstallments": "Pay with Keepz QR",
       "keepzCard": "Pay with Keepz Card"
     },

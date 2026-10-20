@@ -119,6 +119,8 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
                 onPaymentMethodChange={checkout.setPaymentMethod}
                 installmentProvider={checkout.installmentProvider}
                 onInstallmentProviderChange={checkout.setInstallmentProvider}
+                credoVariant={checkout.credoVariant}
+                onCredoVariantChange={checkout.setCredoVariant}
                 keepzPersonalNumber={checkout.keepzPersonalNumber}
                 onKeepzPersonalNumberChange={checkout.setKeepzPersonalNumber}
                 onlineInstallmentsAllowed={checkout.onlineInstallmentsAllowed}

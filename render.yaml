@@ -66,8 +66,10 @@ services:
         sync: false
       - key: KEEPZ_DIRECT_SETTLEMENTS_CLIENT_SECRET
         sync: false
+      - key: CREDO_MERCHANT_ID
+        value: "134582"
       - key: CREDO_ZERO_MERCHANT_ID
-        sync: false
+        value: "133469"
 
   - type: web
     name: imall

@@ -70,7 +70,7 @@ export const customCheckoutRoutes = new Elysia({ prefix: "/custom-checkout" }).p
 
     const isZero = payload.credoVariant === "zero";
     const merchantId = isZero
-      ? env.CREDO_ZERO_MERCHANT_ID?.trim() || env.CREDO_MERCHANT_ID?.trim()
+      ? env.CREDO_ZERO_MERCHANT_ID?.trim()
       : env.CREDO_MERCHANT_ID?.trim();
     if (!merchantId) {
       set.status = 503;

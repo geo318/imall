@@ -95,13 +95,17 @@ function getStatusUrl(): string {
   return env.CREDO_WIDGET_STATUS_URL || DEFAULT_CREDO_STATUS_URL;
 }
 
-function buildOrderCode(cartId: string, secret: string): string {
+function buildOrderCode(cartId: string, secret: string, merchantId: string): string {
+  if (!/^\d{1,9}$/.test(merchantId)) throw new Error("Invalid Credo shop ID");
   const compactCartId = cartId.replaceAll("-", "");
   const cartPart = compactCartId.slice(0, 8);
   const timestampPart = Date.now().toString(36);
   const noncePart = randomBytes(3).toString("hex");
-  const signature = md5(`${cartId}:${timestampPart}:${noncePart}:${secret}`).slice(0, 10);
-  const result = `${ORDER_CODE_PREFIX}-${cartPart}-${timestampPart}-${noncePart}-${signature}`;
+  const signature = md5(`${cartId}:${timestampPart}:${noncePart}:${secret}:${merchantId}`).slice(
+    0,
+    10,
+  );
+  const result = `${ORDER_CODE_PREFIX}-${cartPart}-${timestampPart}-${noncePart}-${signature}-${merchantId}`;
   return result.slice(0, ORDER_CODE_MAX_LENGTH);
 }
 
@@ -110,13 +114,21 @@ function parseOrderCode(orderCode: string): {
   timestampPart: string;
   noncePart: string;
   signature: string;
+  merchantId?: string;
 } | null {
-  const [prefix, cartPart, timestampPart, noncePart, signature] = orderCode.split("-");
+  const [prefix, cartPart, timestampPart, noncePart, signature, merchantId, extra] =
+    orderCode.split("-");
+  if (extra !== undefined || (merchantId !== undefined && !/^\d{1,9}$/.test(merchantId)))
+    return null;
   if (prefix !== ORDER_CODE_PREFIX || !cartPart || !timestampPart || !noncePart || !signature) {
     return null;
   }
 
-  return { cartPart, timestampPart, noncePart, signature };
+  return { cartPart, timestampPart, noncePart, signature, merchantId };
+}
+
+export function getCredoOrderMerchantId(orderCode: string): string | undefined {
+  return parseOrderCode(orderCode)?.merchantId;
 }
 
 export function validateOrderCodeForCart(orderCode: string, cartId: string): boolean {
@@ -130,7 +142,7 @@ export function validateOrderCodeForCart(orderCode: string, cartId: string): boo
 
   const secret = getCredoSecret();
   const expectedSignature = md5(
-    `${cartId}:${parsed.timestampPart}:${parsed.noncePart}:${secret}`,
+    `${cartId}:${parsed.timestampPart}:${parsed.noncePart}:${secret}${parsed.merchantId ? `:${parsed.merchantId}` : ""}`,
   ).slice(0, 10);
   // Constant-time comparison prevents timing side-channel attacks.
   const a = Buffer.from(expectedSignature);
@@ -192,7 +204,7 @@ export async function createCredoInstallmentApplication(
 }> {
   const merchantId = input.merchantId?.trim() || getCredoMerchantId();
   const secret = getCredoSecret();
-  const orderCode = buildOrderCode(input.cartId, secret);
+  const orderCode = buildOrderCode(input.cartId, secret, merchantId);
 
   const products = input.products.map((product) => ({
     id: normalizeText(product.id, 64),
@@ -274,7 +286,8 @@ export async function createCredoInstallmentApplication(
 export async function fetchCredoInstallmentStatus(
   orderCode: string,
 ): Promise<CredoInstallmentStatusResult> {
-  const merchantId = getCredoMerchantId();
+  // New order codes retain the selected shop; legacy codes use the configured merchant.
+  const merchantId = getCredoOrderMerchantId(orderCode) || getCredoMerchantId();
   const secret = getCredoSecret();
   const hash = md5(`${merchantId}${orderCode}${secret}`);
   const url = new URL(getStatusUrl());

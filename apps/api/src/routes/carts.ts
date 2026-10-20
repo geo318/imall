@@ -864,7 +864,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
     if (payload.provider === "credo") {
       const isZero = payload.credoVariant === "zero";
       const resolvedMerchantId = isZero
-        ? env.CREDO_ZERO_MERCHANT_ID?.trim() || env.CREDO_MERCHANT_ID?.trim()
+        ? env.CREDO_ZERO_MERCHANT_ID?.trim()
         : env.CREDO_MERCHANT_ID?.trim();
       if (!resolvedMerchantId) {
         set.status = 503;
@@ -1087,7 +1087,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
 
       const credoMerchantId =
         payload.credoVariant === "zero"
-          ? env.CREDO_ZERO_MERCHANT_ID?.trim() || env.CREDO_MERCHANT_ID?.trim()
+          ? env.CREDO_ZERO_MERCHANT_ID?.trim()
           : env.CREDO_MERCHANT_ID?.trim();
 
       const commissionTetri = Math.round(subtotal * 0.12 * 100);
