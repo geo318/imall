@@ -9,7 +9,7 @@ import {
   tenants,
   variants,
 } from "@repo/db";
-import { parseImageUrls } from "@repo/shared";
+import { calculateCheckoutTotals, parseImageUrls } from "@repo/shared";
 import { and, eq, sql } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { z } from "zod";
@@ -48,7 +48,7 @@ const installmentStartSchema = z.object({
   installmentLength: z.coerce.number().int().positive().max(60).optional(),
   clientFullName: z.string().trim().max(128).optional(),
   mobile: z.string().trim().max(32).optional(),
-  email: z.string().email().max(256).optional(),
+  email: z.union([z.string().trim().email().max(256), z.literal("")]).optional(),
   factAddress: z.string().trim().max(256).optional(),
   personalNumber: z.string().trim().max(32).optional(),
   isForeign: z.coerce.boolean().optional(),
@@ -507,7 +507,7 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         .from(carts)
         .where(eq(carts.id, cartId))
         .limit(1);
-      if (!cart || cart.status !== "open") {
+      if (!cart || (cart.status !== "open" && cart.status !== "completed")) {
         set.status = 404;
         return { error: "Cart not found" };
       }
@@ -517,6 +517,10 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       if (cart.userId && auth?.userId !== cart.userId) {
         set.status = 403;
         return { error: "Forbidden: You don't have access to this cart" };
+      }
+
+      if (cart.status === "completed") {
+        return { id: cart.id, status: cart.status, items: [] };
       }
 
       // Get all items from this cart (items can be from different tenants)
@@ -816,26 +820,12 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       };
     }
   })
-  .post("/:cartId/checkout", async ({ params, auth, set }) => {
-    const { cartId } = params as { cartId: string };
-
-    try {
-      const result = await completeCartCheckout(cartId, auth?.userId ?? null, {
-        paymentMethod: "card",
-      });
-
-      set.status = 201;
-      return result;
-    } catch (err) {
-      if (err instanceof Response) return err;
-      console.error("[Cart Route] Failed to checkout cart:", cartId);
-      console.error("[Cart Route] Error:", err);
-      set.status = 500;
-      return {
-        error: "Checkout failed",
-        message: err instanceof Error ? err.message : String(err),
-      };
-    }
+  .post("/:cartId/checkout", ({ set }) => {
+    set.status = 409;
+    return {
+      error: "Complete payment through the bank checkout before placing an order",
+      code: "ONLINE_PAYMENT_REQUIRED",
+    };
   })
   .post("/:cartId/checkout/installments/start", async ({ params, body, auth, set }) => {
     const { cartId } = params as { cartId: string };
@@ -970,7 +960,12 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
         }
       }
 
-      const subtotal = checkoutItems.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
+      const {
+        subtotal,
+        shipping,
+        installmentCommission: commission,
+        total: amount,
+      } = calculateCheckoutTotals(checkoutItems, payload.paymentType);
 
       if (payload.provider === "keepz") {
         if (!isKeepzEcommerceConfigured()) {
@@ -1001,8 +996,6 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           }
         })();
 
-        const commission = payload.paymentType === "installments" ? subtotal * 0.12 : 0;
-        const amount = Number((subtotal + commission).toFixed(2));
         const { minAmount, maxAmount, misconfigured } = getKeepzOrderAmountLimits();
         if (misconfigured) {
           logger.warn("[Cart Route] Keepz amount range env is inverted; using normalized bounds", {
@@ -1069,8 +1062,8 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
       const mediatorShopNumber = mediatorShopNumberMatch?.[0];
       const isMultiVendorCart = distinctTenantIds.size > 1;
       const credoMeta = {
-        mediatorShopName: isMultiVendorCart ? "iMall" : mediatorShop?.shopName ?? "",
-        mediatorShopNumber: isMultiVendorCart ? "" : mediatorShopNumber ?? "",
+        mediatorShopName: isMultiVendorCart ? "iMall" : (mediatorShop?.shopName ?? ""),
+        mediatorShopNumber: isMultiVendorCart ? "" : (mediatorShopNumber ?? ""),
         mediatorShopId: mediatorShop?.shopId ?? mediatorTenantId,
       };
 
@@ -1090,7 +1083,17 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
           ? env.CREDO_ZERO_MERCHANT_ID?.trim()
           : env.CREDO_MERCHANT_ID?.trim();
 
-      const commissionTetri = Math.round(subtotal * 0.12 * 100);
+      if (shipping > 0) {
+        credoProducts.push({
+          id: `shipping-${cartId.slice(0, 8)}`,
+          title: "Delivery",
+          amount: 1,
+          price: Math.round(shipping * 100),
+          type: 0,
+        });
+      }
+
+      const commissionTetri = Math.round(commission * 100);
       if (commissionTetri > 0) {
         credoProducts.push({
           id: `fee-${cartId.slice(0, 8)}`,
@@ -1591,7 +1594,9 @@ export const cartRoutes = new Elysia({ prefix: "/carts" })
 
           await db.update(orders).set(orderPatch).where(eq(orders.id, existingOrder.id));
           checkoutCompleted =
-            orderPatch.status === "completed" || existingOrder.status === "completed";
+            cart.status === "completed" ||
+            orderPatch.status === "completed" ||
+            existingOrder.status === "completed";
         } else if (
           cart.status === "open" &&
           CREDO_APPROVED_STATUS_IDS.has(statusResult.statusId ?? 0)

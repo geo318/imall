@@ -7,12 +7,16 @@ type CheckoutInstallmentBannerProps = {
   pendingOrderCode: string | null;
   pendingRedirectUrl: string | null;
   onClear: () => void;
+  onCheckStatus: () => Promise<void>;
+  checkingStatus: boolean;
 };
 
 export function CheckoutInstallmentBanner({
   pendingOrderCode,
   pendingRedirectUrl,
   onClear,
+  onCheckStatus,
+  checkingStatus,
 }: CheckoutInstallmentBannerProps) {
   const t = useTranslations();
 
@@ -26,9 +30,17 @@ export function CheckoutInstallmentBanner({
         {t("checkout.installments.pendingOrderCode")}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Button type="button" onClick={() => void onCheckStatus()} disabled={checkingStatus}>
+          {t(
+            checkingStatus
+              ? "checkout.installments.checkingStatus"
+              : "checkout.installments.checkStatus",
+          )}
+        </Button>
         {pendingRedirectUrl ? (
           <Button
             type="button"
+            disabled={checkingStatus}
             onClick={() => {
               globalThis.window.location.assign(pendingRedirectUrl);
             }}
@@ -36,7 +48,7 @@ export function CheckoutInstallmentBanner({
             {t("checkout.installments.openBankPage")}
           </Button>
         ) : null}
-        <Button type="button" variant="ghost" onClick={onClear}>
+        <Button type="button" variant="ghost" onClick={onClear} disabled={checkingStatus}>
           {t("checkout.installments.clearPending")}
         </Button>
       </div>

@@ -21,15 +21,15 @@ export type UserShippingAddress = {
 };
 
 export type UserShippingAddressInput = {
-  label?: string;
+  label?: string | null;
   firstName: string;
   lastName: string;
-  email?: string;
-  phone?: string;
+  email?: string | null;
+  phone?: string | null;
   addressLine1: string;
   city: string;
-  region?: string;
-  postalCode?: string;
+  region?: string | null;
+  postalCode?: string | null;
   country?: string;
   isDefault?: boolean;
 };
@@ -79,6 +79,8 @@ async function backendRequest(
     method: options.method ?? "GET",
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
   });
 }
 

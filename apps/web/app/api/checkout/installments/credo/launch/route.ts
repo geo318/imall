@@ -2,11 +2,13 @@ import { auth } from "@clerk/nextjs/server";
 import { env } from "@repo/shared";
 import { type NextRequest, NextResponse } from "next/server";
 import {
+  CHECKOUT_INSTALLMENT_CART_ID_COOKIE,
   CHECKOUT_INSTALLMENT_CART_KEY_COOKIE,
   CHECKOUT_INSTALLMENT_ORDER_CODE_COOKIE,
   CHECKOUT_INSTALLMENT_PAYMENT_TYPE_COOKIE,
   CHECKOUT_INSTALLMENT_PROVIDER_COOKIE,
   CHECKOUT_INSTALLMENT_REDIRECT_URL_COOKIE,
+  normalizeCheckoutReturnPath,
   normalizeCredoRedirectUrl,
 } from "@/components/checkout/credo-launch";
 
@@ -47,16 +49,8 @@ function getRequestOrigin(request: NextRequest): string {
   return `${protocol}://${host}`;
 }
 
-function normalizeReturnPath(returnTo: string | null): string {
-  if (!returnTo) return "/";
-  if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
-    return returnTo;
-  }
-  return "/";
-}
-
 function buildErrorRedirect(request: NextRequest, returnTo: string | null, message: string) {
-  const fallbackUrl = new URL(normalizeReturnPath(returnTo), getRequestOrigin(request));
+  const fallbackUrl = new URL(normalizeCheckoutReturnPath(returnTo), getRequestOrigin(request));
   fallbackUrl.searchParams.set("installment_error", message);
   return NextResponse.redirect(fallbackUrl);
 }
@@ -87,8 +81,7 @@ export async function GET(request: NextRequest) {
   const factAddress = searchParams.get("factAddress")?.trim() || undefined;
   const returnTo = searchParams.get("returnTo")?.trim() || null;
   const rawCredoVariant = searchParams.get("credoVariant")?.trim();
-  const credoVariant: "zero" | "standard" =
-    rawCredoVariant === "standard" ? "standard" : "zero";
+  const credoVariant: "zero" | "standard" = rawCredoVariant === "standard" ? "standard" : "zero";
 
   if (!cartId || !cartKey) {
     return buildErrorRedirect(request, returnTo, "Missing installment cart context.");
@@ -131,6 +124,7 @@ export async function GET(request: NextRequest) {
           factAddress,
         }),
         cache: "no-store",
+        signal: AbortSignal.timeout(30_000),
       },
     );
 
@@ -202,6 +196,11 @@ export async function GET(request: NextRequest) {
       maxAge: 60 * 60 * 24,
     };
 
+    redirectResponse.cookies.set(
+      CHECKOUT_INSTALLMENT_CART_ID_COOKIE,
+      encodeURIComponent(cartId),
+      cookieOptions,
+    );
     redirectResponse.cookies.set(
       CHECKOUT_INSTALLMENT_CART_KEY_COOKIE,
       encodeURIComponent(cartKey),

@@ -1,14 +1,16 @@
 "use client";
 
+import { calculateCheckoutTotals } from "@repo/shared/checkout";
 import { Button } from "@repo/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { getCart, removeCartItem, updateCartItemQty } from "@/actions/carts";
+import { sanitizeCheckoutCartKey } from "@/components/checkout/checkout-routing";
 import LazyImage from "@/components/shared/lazy-image";
 import { CartSkeleton } from "@/components/skeletons/cart-skeleton";
-import { Link } from "@/i18n/navigation.client";
+import { Link, useRouter, useSearchParams } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import type { CartItem } from "@/lib/api/cart";
 import { getProductIdentifier } from "@/lib/api/products";
@@ -23,16 +25,22 @@ import { cn } from "@/lib/utils";
 import { DEFAULT_CURRENCY_CODE, formatCurrencyAmount } from "@/lib/utils/currency";
 
 export function CartContent() {
+  const searchParams = useSearchParams();
+  const cartKey = sanitizeCheckoutCartKey(searchParams.get("cartKey"), "cart");
+  return <CartFlow key={cartKey} cartKey={cartKey} />;
+}
+
+function useCartContent(cartKey: string) {
   const t = useTranslations();
   const [cartId, setCartId] = useState<string | null>(null);
   const [isLoadingCartId, setIsLoadingCartId] = useState(true);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const id = readCartIdFromStorage("cart");
+    const id = readCartIdFromStorage(cartKey);
     setCartId(id);
     setIsLoadingCartId(false);
-  }, []);
+  }, [cartKey]);
 
   const {
     data: cart,
@@ -61,7 +69,7 @@ export function CartContent() {
       const msg = error instanceof Error ? error.message : t("cart.toasts.loadFailed");
       // If cart not found, clear the invalid cart ID from localStorage
       if (msg.toLowerCase().includes("not found")) {
-        clearCartIdFromStorage("cart");
+        clearCartIdFromStorage(cartKey);
         setCartId(null);
         toast.error(t("cart.toasts.notFound"), {
           description: t("cart.toasts.notFoundDescription"),
@@ -72,7 +80,7 @@ export function CartContent() {
         });
       }
     }
-  }, [error, t]);
+  }, [error, t, cartKey]);
 
   const items: CartItem[] = cart?.items ?? [];
 
@@ -108,7 +116,7 @@ export function CartContent() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
-      dispatchCartStorageUpdated(cartId, "cart");
+      dispatchCartStorageUpdated(cartId, cartKey);
       await revalidateCartClient();
       toast.success(t("cart.toasts.qtyUpdated"));
     },
@@ -128,7 +136,7 @@ export function CartContent() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["cart", cartId] });
-      dispatchCartStorageUpdated(cartId, "cart");
+      dispatchCartStorageUpdated(cartId, cartKey);
       await revalidateCartClient();
       toast.success(t("cart.toasts.itemRemoved"));
     },
@@ -141,10 +149,36 @@ export function CartContent() {
     },
   });
 
-  const subtotal = purchasableItems.reduce((sum, item) => sum + Number(item.price) * item.qty, 0);
-  const shipping = subtotal > 100 ? 0 : 9.99;
-  const tax = subtotal * 0.08;
-  const total = subtotal + shipping + tax;
+  return {
+    t,
+    cartId,
+    isLoadingCartId,
+    isLoading,
+    items,
+    unavailableItems,
+    purchasableItems,
+    updateQtyMutation,
+    removeItemMutation,
+    ...calculateCheckoutTotals(purchasableItems, "card"),
+  };
+}
+
+function CartFlow({ cartKey }: { cartKey: string }) {
+  const router = useRouter();
+  const {
+    t,
+    cartId,
+    isLoadingCartId,
+    isLoading,
+    items,
+    unavailableItems,
+    purchasableItems,
+    updateQtyMutation,
+    removeItemMutation,
+    subtotal,
+    shipping,
+    total,
+  } = useCartContent(cartKey);
 
   // Show skeleton while loading cartId from localStorage or while fetching cart data
   if (isLoadingCartId || isLoading) {
@@ -220,9 +254,7 @@ export function CartContent() {
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold truncate">{item.productTitle}</h3>
                   <p className="text-sm text-muted-foreground mb-2">
-                    {item.sku
-                      ? t("cart.skuLabel", { sku: item.sku })
-                      : t("cart.defaultVariant")}
+                    {item.sku ? t("cart.skuLabel", { sku: item.sku }) : t("cart.defaultVariant")}
                   </p>
                   {(isSoldOut || isOver) && (
                     <p className="mb-2 inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
@@ -320,10 +352,6 @@ export function CartContent() {
                 )}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t("cart.summary.tax")}</span>
-              <span>{formatCurrencyAmount(tax, DEFAULT_CURRENCY_CODE)}</span>
-            </div>
             <div className="border-t border-border pt-3 mt-3">
               <div className="flex justify-between text-base font-semibold">
                 <span>{t("cart.summary.total")}</span>
@@ -335,7 +363,7 @@ export function CartContent() {
           {shipping > 0 && (
             <p className="text-xs text-muted-foreground mt-4">
               {t("cart.summary.freeShippingHint", {
-                amount: formatCurrencyAmount(100 - subtotal, DEFAULT_CURRENCY_CODE),
+                amount: formatCurrencyAmount(100.01 - subtotal, DEFAULT_CURRENCY_CODE),
               })}
             </p>
           )}
@@ -344,11 +372,16 @@ export function CartContent() {
             className="w-full mt-6"
             size="lg"
             disabled={purchasableItems.length === 0 || unavailableItems.length > 0}
+            onClick={() =>
+              router.push(
+                cartKey === "cart"
+                  ? "/checkout"
+                  : `/checkout?cartKey=${encodeURIComponent(cartKey)}`,
+              )
+            }
           >
-            <Link href="/checkout" className="flex items-center group">
-              {t("cart.summary.proceedToCheckout")}
-              <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
+            {t("cart.summary.proceedToCheckout")}
+            <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
 
           <Button variant="ghost" className="w-full mt-2">

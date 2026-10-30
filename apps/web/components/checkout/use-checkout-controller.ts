@@ -1,8 +1,9 @@
 "use client";
 
+import { calculateCheckoutTotals } from "@repo/shared/checkout";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { checkoutCart, getCart, startInstallmentCheckout } from "@/actions/carts";
+import { getCart, syncInstallmentCheckoutStatus } from "@/actions/carts";
 import {
   createMyShippingAddress,
   getMyShippingAddresses,
@@ -19,7 +20,6 @@ import {
 import {
   buildCredoLaunchUrl,
   buildKeepzLaunchUrl,
-  type CredoLaunchMode,
   clearPersistedInstallmentCookies,
   normalizeCredoMobile,
   normalizeCredoRedirectUrl,
@@ -36,26 +36,18 @@ import {
   type InstallmentProvider,
   mapAddressToShippingForm,
   mapShippingFormToAddressInput,
+  parseCheckoutShippingDraft,
   type ShippingFormState,
 } from "./types";
 
 type UseCheckoutControllerOptions = {
   cartKey: string;
-  initialPaymentMethod?: CheckoutPaymentMethod;
-  initialInstallmentProvider?: InstallmentProvider;
   credoVariant?: "zero" | "standard";
+  initialError?: string | null;
 };
 
 type PersistAddressOptions = {
   manual?: boolean;
-};
-
-type OnlineLaunchFormConfig = {
-  action: string;
-  fields: Record<string, string>;
-  provider: OnlineCheckoutProvider;
-  ready: boolean;
-  reason: "missingCart" | "missingCustomerData" | "missingKeepzPersonalNumber" | null;
 };
 
 const DEFAULT_CART_STORAGE_KEY = "cart";
@@ -77,9 +69,12 @@ let crystalInvoicePrinterPromise: Promise<PrintCrystalInstallmentInvoice> | null
 
 async function getCrystalInvoicePrinter(): Promise<PrintCrystalInstallmentInvoice> {
   if (!crystalInvoicePrinterPromise) {
-    crystalInvoicePrinterPromise = import("./crystal-installment-invoice").then(
-      (module) => module.printCrystalInstallmentInvoice,
-    );
+    crystalInvoicePrinterPromise = import("./crystal-installment-invoice")
+      .then((module) => module.printCrystalInstallmentInvoice)
+      .catch((error) => {
+        crystalInvoicePrinterPromise = null;
+        throw error;
+      });
   }
   return crystalInvoicePrinterPromise;
 }
@@ -89,9 +84,10 @@ export function hasRequiredCredoCustomerData(shippingForm: ShippingFormState): b
   return Boolean(
     shippingForm.firstName.trim() &&
       shippingForm.lastName.trim() &&
-      shippingForm.email.trim() &&
-      mobile &&
-      shippingForm.address.trim(),
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shippingForm.email.trim()) &&
+      /^5\d{8}$/.test(mobile) &&
+      shippingForm.address.trim() &&
+      shippingForm.city.trim(),
   );
 }
 
@@ -139,7 +135,8 @@ export function listStoredCartEntries(): Array<{ key: string; cartId: string }> 
     const key = globalThis.window.localStorage.key(index);
     if (
       !key ||
-      (key !== DEFAULT_CART_STORAGE_KEY && !key.startsWith(`${DEFAULT_CART_STORAGE_KEY}:`))
+      (key !== DEFAULT_CART_STORAGE_KEY && !/^cart:[^:]+$/.test(key)) ||
+      /^cart:installment/.test(key)
     ) {
       continue;
     }
@@ -161,13 +158,15 @@ export function resolveStoredCartId(cartKey: string): string | null {
     return directCartId;
   }
 
+  if (cartKey === "cart:buy-now") return null;
+
   const fallbackCartId = readCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
   if (fallbackCartId && cartKey !== DEFAULT_CART_STORAGE_KEY) {
     writeCartIdToStorage(fallbackCartId, cartKey);
     return fallbackCartId;
   }
 
-  const cartEntries = listStoredCartEntries();
+  const cartEntries = listStoredCartEntries().filter((entry) => entry.key !== "cart:buy-now");
   const uniqueCartIds = [...new Set(cartEntries.map((entry) => entry.cartId))];
   if (uniqueCartIds.length !== 1) {
     return null;
@@ -187,20 +186,30 @@ export function resolveStoredCartId(cartKey: string): string | null {
 }
 
 export function clearCheckoutCartKeys(cartKey: string, cartId?: string | null) {
-  clearCartIdFromStorage(cartKey);
-  const defaultCartId = readCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
-  if (cartKey === DEFAULT_CART_STORAGE_KEY || (cartId && defaultCartId === cartId)) {
-    clearCartIdFromStorage(DEFAULT_CART_STORAGE_KEY);
-  }
-
-  if (typeof globalThis.window === "undefined" || !cartId) {
-    return;
-  }
-
+  const keys = new Set([cartKey]);
   for (const entry of listStoredCartEntries()) {
-    if (entry.cartId === cartId) {
-      clearCartIdFromStorage(entry.key);
+    if (cartId && entry.cartId === cartId) keys.add(entry.key);
+  }
+  for (const key of keys) {
+    clearCartIdFromStorage(key);
+    try {
+      globalThis.window.sessionStorage.removeItem(`${key}:shipping:${cartId}`);
+    } catch {
+      // Storage may be unavailable in private browsing.
     }
+  }
+}
+
+export function persistCheckoutShippingDraft(cartKey: string, shippingForm: ShippingFormState) {
+  const cartId = readCartIdFromStorage(cartKey);
+  if (!cartId) return;
+  try {
+    globalThis.window.sessionStorage.setItem(
+      `${cartKey}:shipping:${cartId}`,
+      JSON.stringify(shippingForm),
+    );
+  } catch {
+    // A disabled draft store must not prevent checkout.
   }
 }
 
@@ -243,23 +252,21 @@ export function withCredoCustomerFallback(shippingForm: ShippingFormState) {
 
 export function useCheckoutController({
   cartKey,
-  initialPaymentMethod = "card",
-  initialInstallmentProvider = "keepz",
   credoVariant: initialCredoVariant = "zero",
+  initialError = null,
 }: UseCheckoutControllerOptions) {
   const [credoVariant, setCredoVariant] = useState(initialCredoVariant);
   const t = useTranslations();
   const [items, setItems] = useState<CartItem[]>([]);
-  const [step, setStep] = useState<CheckoutStep>("shipping");
-  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod>(initialPaymentMethod);
+  const [step, setStep] = useState<CheckoutStep>(initialError ? "payment" : "shipping");
+  const [paymentMethod, setPaymentMethod] = useState<CheckoutPaymentMethod | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(initialError);
   const [pendingOrderCode, setPendingOrderCode] = useState<string | null>(null);
   const [pendingRedirectUrl, setPendingRedirectUrl] = useState<string | null>(null);
-  const [installmentProvider, setInstallmentProvider] = useState<InstallmentProvider>(
-    initialInstallmentProvider,
-  );
+  const [installmentProvider, setInstallmentProvider] = useState<InstallmentProvider | null>(null);
   const [keepzPersonalNumber, setKeepzPersonalNumber] = useState("");
   const [pendingProvider, setPendingProvider] = useState<OnlineCheckoutProvider | null>(null);
   const [pendingPaymentType, setPendingPaymentType] = useState<OnlineCheckoutPaymentType | null>(
@@ -273,6 +280,7 @@ export function useCheckoutController({
   const [addressMessage, setAddressMessage] = useState<string | null>(null);
 
   const installmentOrderCodeKey = `${cartKey}:installmentOrderCode`;
+  const installmentCartIdKey = `${cartKey}:installmentCartId`;
   const installmentRedirectUrlKey = `${cartKey}:installmentRedirectUrl`;
   const installmentProviderKey = `${cartKey}:installmentProvider`;
   const installmentPaymentTypeKey = `${cartKey}:installmentPaymentType`;
@@ -297,69 +305,20 @@ export function useCheckoutController({
         : false,
     [existingAddressMatch, shippingForm],
   );
-  const onlineLaunchForm = useMemo<OnlineLaunchFormConfig>(() => {
-    const cartId = typeof globalThis.window !== "undefined" ? resolveStoredCartId(cartKey) : null;
-    const credoCustomer = withCredoCustomerFallback(shippingForm);
-    const normalizedPersonalNumber = normalizeKeepzPersonalNumber(keepzPersonalNumber);
-    const returnTo =
-      typeof globalThis.window !== "undefined"
-        ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
-        : "";
-
-    if (installmentProvider === "keepz") {
-      const fields: Record<string, string> = {
-        cartId: cartId ?? "",
-        cartKey,
-        paymentType: "installments",
-        personalNumber: normalizedPersonalNumber,
-        isForeign: "false",
-        returnTo,
-      };
-      const reason =
-        typeof globalThis.window !== "undefined"
-          ? !resolveStoredCartId(cartKey)
-            ? "missingCart"
-            : !isValidKeepzPersonalNumber(normalizedPersonalNumber)
-              ? "missingKeepzPersonalNumber"
-              : null
-          : null;
-
-      return {
-        provider: "keepz",
-        action: "/api/checkout/installments/keepz/launch",
-        ready: reason === null,
-        reason,
-        fields,
-      };
-    }
-
-    const fields: Record<string, string> = {
-      cartId: cartId ?? "",
-      cartKey,
-      paymentType: "installments",
-      installmentLength: "12",
-      credoVariant,
-      clientFullName: credoCustomer.clientFullName,
-      mobile: credoCustomer.mobile,
-      email: credoCustomer.email,
-      factAddress: credoCustomer.factAddress,
-      returnTo,
-    };
-    const reason =
-      typeof globalThis.window !== "undefined"
-        ? getCredoLaunchBlockReason(cartKey, shippingForm)
-        : null;
-
-    return {
-      provider: "credo",
-      action: "/api/checkout/installments/credo/launch",
-      ready: reason === null,
-      reason,
-      fields,
-    };
-  }, [cartKey, credoVariant, installmentProvider, keepzPersonalNumber, shippingForm]);
-
   const hydratePendingInstallmentState = useCallback(() => {
+    const cartId = readCartIdFromStorage(cartKey);
+    const localCartId = localStorage.getItem(installmentCartIdKey);
+    if (!cartId || (localCartId && localCartId !== cartId)) {
+      for (const key of [
+        installmentCartIdKey,
+        installmentOrderCodeKey,
+        installmentRedirectUrlKey,
+        installmentProviderKey,
+        installmentPaymentTypeKey,
+      ]) {
+        localStorage.removeItem(key);
+      }
+    }
     const localOrderCode =
       typeof globalThis.window !== "undefined"
         ? localStorage.getItem(installmentOrderCodeKey)
@@ -378,24 +337,33 @@ export function useCheckoutController({
         : null;
     const persistedCookieState =
       typeof document !== "undefined"
-        ? readPersistedInstallmentState(cartKey, document.cookie)
+        ? cartId
+          ? readPersistedInstallmentState(cartKey, document.cookie, cartId)
+          : null
         : null;
 
     const nextOrderCode = localOrderCode || persistedCookieState?.orderCode || null;
-    const nextRedirectUrl = localRedirectUrl || persistedCookieState?.redirectUrl || null;
+    const rawRedirectUrl = localRedirectUrl || persistedCookieState?.redirectUrl || "";
     const nextProvider =
       localProvider === "credo" || localProvider === "keepz"
         ? localProvider
-        : persistedCookieState?.provider || null;
+        : persistedCookieState?.provider || (nextOrderCode?.startsWith("IML-") ? "credo" : null);
     const nextPaymentType =
       localPaymentType === "card" || localPaymentType === "installments"
         ? localPaymentType
         : persistedCookieState?.paymentType || null;
 
+    const nextRedirectUrl =
+      nextProvider === "keepz"
+        ? normalizeKeepzRedirectUrl(rawRedirectUrl)
+        : normalizeCredoRedirectUrl(rawRedirectUrl);
+
     setPendingOrderCode(nextOrderCode);
     setPendingRedirectUrl(nextRedirectUrl);
     setPendingProvider(nextProvider);
     setPendingPaymentType(nextPaymentType);
+    if (persistedCookieState?.cartId)
+      localStorage.setItem(installmentCartIdKey, persistedCookieState.cartId);
 
     if (
       typeof globalThis.window !== "undefined" &&
@@ -427,18 +395,33 @@ export function useCheckoutController({
     }
   }, [
     cartKey,
+    installmentCartIdKey,
     installmentOrderCodeKey,
     installmentPaymentTypeKey,
     installmentProviderKey,
     installmentRedirectUrlKey,
   ]);
 
-  useEffect(() => {
-    setPaymentMethod(initialPaymentMethod);
-  }, [initialPaymentMethod]);
-  useEffect(() => {
-    setInstallmentProvider(initialInstallmentProvider);
-  }, [initialInstallmentProvider]);
+  const clearInstallmentState = useCallback(() => {
+    setPendingOrderCode(null);
+    setPendingRedirectUrl(null);
+    setPendingProvider(null);
+    setPendingPaymentType(null);
+    if (globalThis.window) {
+      localStorage.removeItem(installmentOrderCodeKey);
+      localStorage.removeItem(installmentCartIdKey);
+      localStorage.removeItem(installmentRedirectUrlKey);
+      localStorage.removeItem(installmentProviderKey);
+      localStorage.removeItem(installmentPaymentTypeKey);
+    }
+    clearPersistedInstallmentCookies();
+  }, [
+    installmentCartIdKey,
+    installmentOrderCodeKey,
+    installmentPaymentTypeKey,
+    installmentProviderKey,
+    installmentRedirectUrlKey,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -456,20 +439,39 @@ export function useCheckoutController({
 
       if (cartResult.status === "fulfilled") {
         setItems(cartResult.value.items ?? []);
+        if (cartResult.value.status === "completed") {
+          clearCheckoutCartKeys(cartKey, cartId);
+          clearInstallmentState();
+          setStep("confirmation");
+        }
       } else {
         console.error("Failed to load cart:", cartResult.reason);
         setItems([]);
+        if (cartResult.reason instanceof Error && cartResult.reason.message === "Cart not found") {
+          clearCheckoutCartKeys(cartKey, cartId);
+          clearInstallmentState();
+        }
         setErrorMessage(
           cartResult.reason instanceof Error ? cartResult.reason.message : "Failed to load cart",
         );
       }
       setLoading(false);
 
+      let shippingDraft: ShippingFormState | null = null;
+      try {
+        shippingDraft = parseCheckoutShippingDraft(
+          globalThis.window.sessionStorage.getItem(`${cartKey}:shipping:${cartId}`),
+        );
+      } catch {
+        // Storage may be unavailable in private browsing.
+      }
+      if (shippingDraft) setShippingForm(shippingDraft);
+
       if (addressesResult.status === "fulfilled") {
         const addresses = addressesResult.value;
         setSavedAddresses(addresses);
         const preferredAddress = addresses.find((address) => address.isDefault) ?? addresses[0];
-        if (preferredAddress) {
+        if (preferredAddress && !shippingDraft) {
           setShippingForm((previous) => {
             const hasAnyInput = Object.values(previous).some((value) => value.trim().length > 0);
             return hasAnyInput ? previous : mapAddressToShippingForm(preferredAddress);
@@ -486,7 +488,7 @@ export function useCheckoutController({
     return () => {
       cancelled = true;
     };
-  }, [cartKey, hydratePendingInstallmentState]);
+  }, [cartKey, hydratePendingInstallmentState, clearInstallmentState]);
 
   useEffect(() => {
     if (typeof globalThis.window === "undefined") {
@@ -501,55 +503,74 @@ export function useCheckoutController({
     };
   }, [hydratePendingInstallmentState]);
 
-  const subtotal = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.price) * item.qty, 0),
-    [items],
+  const onlineInstallmentsAllowed = !loading && isOnlineInstallmentCartEligible(items);
+  const { subtotal, shipping, installmentCommission, total } = calculateCheckoutTotals(
+    items,
+    paymentMethod ?? "card",
   );
-  const onlineInstallmentsAllowed = useMemo(
-    () => loading || isOnlineInstallmentCartEligible(items),
-    [items, loading],
-  );
-  const shipping = subtotal > 100 ? 0 : 9.99;
-  const installmentCommission = paymentMethod === "installments" ? subtotal * 0.12 : 0;
-  const total = subtotal + shipping + installmentCommission;
 
-  useEffect(() => {
-    if (
-      !onlineInstallmentsAllowed &&
-      (installmentProvider === "credo" || installmentProvider === "keepz")
-    ) {
-      setInstallmentProvider("crystal");
+  const checkPendingPayment = useCallback(async () => {
+    const cartId = readCartIdFromStorage(cartKey);
+    if (!pendingOrderCode || checkingStatus) return;
+    if (!cartId) {
+      setErrorMessage(t("checkout.installments.missingCart"));
+      return;
     }
-  }, [installmentProvider, onlineInstallmentsAllowed]);
-
-  const clearInstallmentState = useCallback(() => {
-    setPendingOrderCode(null);
-    setPendingRedirectUrl(null);
-    setPendingProvider(null);
-    setPendingPaymentType(null);
-    if (globalThis.window) {
-      localStorage.removeItem(installmentOrderCodeKey);
-      localStorage.removeItem(installmentRedirectUrlKey);
-      localStorage.removeItem(installmentProviderKey);
-      localStorage.removeItem(installmentPaymentTypeKey);
+    setCheckingStatus(true);
+    setErrorMessage(null);
+    try {
+      // Keepz finalizes through its verified callback; only Credo needs an explicit sync.
+      const completed =
+        pendingProvider === "credo"
+          ? (
+              await syncInstallmentCheckoutStatus(cartId, pendingOrderCode, {
+                provider: "credo",
+                paymentType: pendingPaymentType ?? "installments",
+              })
+            ).checkoutCompleted
+          : (await getCart(cartId)).status === "completed";
+      if (completed) {
+        clearCheckoutCartKeys(cartKey, cartId);
+        clearInstallmentState();
+        setStep("confirmation");
+      } else {
+        toast.info(t("checkout.installments.paymentPending"));
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : t("checkout.installments.syncFailed"),
+      );
+    } finally {
+      setCheckingStatus(false);
     }
-    clearPersistedInstallmentCookies();
   }, [
-    installmentOrderCodeKey,
-    installmentPaymentTypeKey,
-    installmentProviderKey,
-    installmentRedirectUrlKey,
+    cartKey,
+    pendingOrderCode,
+    pendingProvider,
+    pendingPaymentType,
+    checkingStatus,
+    clearInstallmentState,
+    t,
   ]);
 
-  const applySavedAddress = useCallback((address: UserShippingAddress) => {
-    setShippingForm(mapAddressToShippingForm(address));
-    setSelectedAddressId(address.id);
-    setAddressMessage(null);
-  }, []);
+  const applySavedAddress = useCallback(
+    (address: UserShippingAddress) => {
+      const nextForm = mapAddressToShippingForm(address);
+      setShippingForm(nextForm);
+      persistCheckoutShippingDraft(cartKey, nextForm);
+      setSelectedAddressId(address.id);
+      setAddressMessage(null);
+      setErrorMessage(null);
+    },
+    [cartKey],
+  );
 
   const handleShippingFieldChange = useCallback(
     (field: keyof ShippingFormState, value: string) => {
-      setShippingForm((previous) => ({ ...previous, [field]: value }));
+      setErrorMessage(null);
+      const nextForm = { ...shippingForm, [field]: value };
+      setShippingForm(nextForm);
+      persistCheckoutShippingDraft(cartKey, nextForm);
       if (selectedAddressId) {
         setSelectedAddressId(null);
       }
@@ -557,7 +578,7 @@ export function useCheckoutController({
         setAddressMessage(null);
       }
     },
-    [addressMessage, selectedAddressId],
+    [addressMessage, selectedAddressId, shippingForm, cartKey],
   );
 
   const persistCurrentAddress = useCallback(
@@ -580,6 +601,7 @@ export function useCheckoutController({
 
       if (duplicate) {
         if (duplicateNeedsRefresh) {
+          setAddressActionPending(true);
           try {
             const updated = await updateMyShippingAddress(duplicate.id, payload);
             setSavedAddresses((previous) => {
@@ -600,6 +622,8 @@ export function useCheckoutController({
               setErrorMessage(message);
             }
             return null;
+          } finally {
+            setAddressActionPending(false);
           }
         }
 
@@ -647,10 +671,15 @@ export function useCheckoutController({
       return;
     }
 
-    if (savedAddresses.length === 0 || existingAddressNeedsRefresh) {
-      await persistCurrentAddress();
+    setSubmitting(true);
+    try {
+      if (savedAddresses.length === 0 || existingAddressNeedsRefresh) {
+        await persistCurrentAddress();
+      }
+      setStep("payment");
+    } finally {
+      setSubmitting(false);
     }
-    setStep("payment");
   }, [
     existingAddressNeedsRefresh,
     items.length,
@@ -660,286 +689,158 @@ export function useCheckoutController({
     t,
   ]);
 
-  const submitCheckout = useCallback(
-    async (launchMode: CredoLaunchMode = "server-assign") => {
-      const cartId = resolveStoredCartId(cartKey);
-      if (!cartId) {
-        setErrorMessage(t("checkout.installments.missingCart"));
+  const submitCheckout = useCallback(async () => {
+    if (!paymentMethod) {
+      setErrorMessage(t("checkout.payment.chooseMethod"));
+      return;
+    }
+    if (paymentMethod === "installments" && !installmentProvider) {
+      setErrorMessage(t("checkout.payment.chooseInstallmentProvider"));
+      return;
+    }
+    const cartId = resolveStoredCartId(cartKey);
+    if (!cartId) {
+      setErrorMessage(t("checkout.installments.missingCart"));
+      return;
+    }
+    if (pendingOrderCode) {
+      setErrorMessage(t("checkout.installments.paymentPending"));
+      return;
+    }
+    if (!items.length || !hasRequiredCredoCustomerData(shippingForm)) {
+      setStep("shipping");
+      setErrorMessage(t("checkout.shipping.continueValidation"));
+      return;
+    }
+    const manualInvoice = paymentMethod === "installments" && installmentProvider === "crystal";
+    if (!onlineInstallmentsAllowed && !manualInvoice) {
+      setErrorMessage(t("checkout.payment.onlineUnavailable"));
+      return;
+    }
+    const normalizedPersonalNumber = normalizeKeepzPersonalNumber(keepzPersonalNumber);
+    if (
+      paymentMethod === "installments" &&
+      installmentProvider === "keepz" &&
+      !isValidKeepzPersonalNumber(normalizedPersonalNumber)
+    ) {
+      setErrorMessage(t("checkout.installments.missingKeepzPersonalNumber"));
+      return;
+    }
+    setSubmitting(true);
+    let redirecting = false;
+    try {
+      if (manualInvoice) {
+        const printInvoice = await getCrystalInvoicePrinter();
+        await printInvoice({
+          buyer: shippingForm,
+          items,
+          subtotal,
+          shipping,
+          installmentCommission,
+          total,
+        });
+        toast.success(t("checkout.installments.manual.invoiceGenerated"));
         return;
       }
-      setSubmitting(true);
-      try {
-        if (paymentMethod === "card" && onlineInstallmentsAllowed) {
-          const launchUrl = buildKeepzLaunchUrl({
-            cartId,
-            cartKey,
-            paymentType: "card",
-            returnTo:
-              typeof globalThis.window !== "undefined"
-                ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
-                : undefined,
-          });
-
-          if (launchMode !== "direct-replace") {
-            if (launchMode === "server-new-tab") {
-              const newTab = globalThis.window.open(launchUrl, "_blank");
-              if (!newTab) {
-                throw new Error(t("checkout.installments.popupBlocked"));
-              }
-              hydratePendingInstallmentState();
-              return;
-            }
-
-            if (launchMode === "server-popup") {
-              const popup = globalThis.window.open(
-                launchUrl,
-                "keepz_card_checkout",
-                "popup=yes,width=520,height=820",
-              );
-              if (!popup) {
-                throw new Error(t("checkout.installments.popupBlocked"));
-              }
-              hydratePendingInstallmentState();
-              return;
-            }
-
-            if (launchMode === "server-replace") {
-              globalThis.window.location.replace(launchUrl);
-              return;
-            }
-
-            globalThis.window.location.assign(launchUrl);
-            return;
-          }
-
-          const session = await startInstallmentCheckout(cartId, {
-            provider: "keepz",
-            paymentType: "card",
-          });
-
-          const normalizedRedirectUrl = normalizeKeepzRedirectUrl(session.redirectUrl);
-          localStorage.setItem(installmentOrderCodeKey, session.orderCode);
-          localStorage.setItem(installmentRedirectUrlKey, normalizedRedirectUrl);
-          localStorage.setItem(installmentProviderKey, "keepz");
-          localStorage.setItem(installmentPaymentTypeKey, "card");
-          writeCartIdToStorage(cartId, cartKey);
-          setPendingOrderCode(session.orderCode);
-          setPendingRedirectUrl(normalizedRedirectUrl);
-          setPendingProvider("keepz");
-          setPendingPaymentType("card");
-          globalThis.window.location.replace(normalizedRedirectUrl);
-          return;
-        }
-
-        if (paymentMethod === "installments") {
-          if (
-            !onlineInstallmentsAllowed &&
-            (installmentProvider === "credo" || installmentProvider === "keepz")
-          ) {
-            setErrorMessage(t("checkout.payment.onlineInstallmentsMultiVendorError"));
-            return;
-          }
-
-          const normalizedPersonalNumber = normalizeKeepzPersonalNumber(keepzPersonalNumber);
-          if (
-            installmentProvider === "keepz" &&
-            !isValidKeepzPersonalNumber(normalizedPersonalNumber)
-          ) {
-            setErrorMessage(t("checkout.installments.missingKeepzPersonalNumber"));
-            return;
-          }
-
-          if (installmentProvider === "crystal") {
-            const printCrystalInstallmentInvoice = await getCrystalInvoicePrinter();
-            await printCrystalInstallmentInvoice({
-              buyer: shippingForm,
-              items,
-              subtotal,
-              shipping,
-              installmentCommission,
-              total,
+      const returnParams = new URLSearchParams(globalThis.window.location.search);
+      returnParams.delete("installment_error");
+      returnParams.delete("id");
+      returnParams.set("payment", paymentMethod);
+      if (installmentProvider) returnParams.set("provider", installmentProvider);
+      else returnParams.delete("provider");
+      returnParams.set("credoVariant", credoVariant);
+      const returnTo = `${globalThis.window.location.pathname}?${returnParams}`;
+      const customer = withCredoCustomerFallback(shippingForm);
+      persistCheckoutShippingDraft(cartKey, shippingForm);
+      const launchUrl =
+        paymentMethod === "card" || installmentProvider === "keepz"
+          ? buildKeepzLaunchUrl({
+              cartId,
+              cartKey,
+              paymentType: paymentMethod,
+              personalNumber:
+                paymentMethod === "installments" ? normalizedPersonalNumber : undefined,
+              isForeign: false,
+              returnTo,
+            })
+          : buildCredoLaunchUrl({
+              cartId,
+              cartKey,
+              installmentLength: 12,
+              credoVariant,
+              ...customer,
+              returnTo,
             });
-            toast.success(t("checkout.installments.manual.invoiceGenerated"));
-            return;
-          }
+      globalThis.window.location.assign(launchUrl);
+      redirecting = true;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : t("checkout.errors.default"));
+    } finally {
+      if (!redirecting) setSubmitting(false);
+    }
+  }, [
+    cartKey,
+    pendingOrderCode,
+    items,
+    shippingForm,
+    onlineInstallmentsAllowed,
+    paymentMethod,
+    installmentProvider,
+    keepzPersonalNumber,
+    credoVariant,
+    subtotal,
+    shipping,
+    installmentCommission,
+    total,
+    t,
+  ]);
 
-          const credoCustomer = withCredoCustomerFallback(shippingForm);
-          const launchUrl =
-            installmentProvider === "keepz"
-              ? buildKeepzLaunchUrl({
-                  cartId,
-                  cartKey,
-                  paymentType: "installments",
-                  personalNumber: normalizedPersonalNumber,
-                  isForeign: false,
-                  returnTo:
-                    typeof globalThis.window !== "undefined"
-                      ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
-                      : undefined,
-                })
-              : buildCredoLaunchUrl({
-                  cartId,
-                  cartKey,
-                  installmentLength: 12,
-                  credoVariant,
-                  clientFullName: credoCustomer.clientFullName,
-                  mobile: credoCustomer.mobile,
-                  email: credoCustomer.email,
-                  factAddress: credoCustomer.factAddress,
-                  returnTo:
-                    typeof globalThis.window !== "undefined"
-                      ? `${globalThis.window.location.pathname}${globalThis.window.location.search}`
-                      : undefined,
-                });
+  const handleContinue = useCallback(async () => {
+    if (submitting || addressActionPending) return;
+    setErrorMessage(null);
 
-          if (launchMode !== "direct-replace") {
-            if (launchMode === "server-new-tab") {
-              const newTab = globalThis.window.open(launchUrl, "_blank");
-              if (!newTab) {
-                throw new Error(t("checkout.installments.popupBlocked"));
-              }
-              hydratePendingInstallmentState();
-              return;
-            }
+    if (step === "shipping") {
+      await continueFromShipping();
+      return;
+    }
 
-            if (launchMode === "server-popup") {
-              const popup = globalThis.window.open(
-                launchUrl,
-                "installment_checkout",
-                "popup=yes,width=520,height=820",
-              );
-              if (!popup) {
-                throw new Error(t("checkout.installments.popupBlocked"));
-              }
-              hydratePendingInstallmentState();
-              return;
-            }
-
-            if (launchMode === "server-replace") {
-              globalThis.window.location.replace(launchUrl);
-              return;
-            }
-
-            globalThis.window.location.assign(launchUrl);
-            return;
-          }
-
-          const session = await startInstallmentCheckout(cartId, {
-            provider: installmentProvider === "keepz" ? "keepz" : "credo",
-            credoVariant: installmentProvider === "keepz" ? undefined : credoVariant,
-            paymentType: "installments",
-            installmentLength: 12,
-            clientFullName: credoCustomer.clientFullName,
-            mobile: credoCustomer.mobile,
-            email: credoCustomer.email,
-            factAddress: credoCustomer.factAddress,
-            personalNumber:
-              installmentProvider === "keepz" ? normalizedPersonalNumber || undefined : undefined,
-            isForeign: installmentProvider === "keepz" ? false : undefined,
-          });
-
-          localStorage.setItem(installmentOrderCodeKey, session.orderCode);
-          const resolvedProvider =
-            session.provider || (installmentProvider === "keepz" ? "keepz" : "credo");
-          const resolvedPaymentType = session.paymentType || "installments";
-          const normalizedRedirectUrl =
-            resolvedProvider === "keepz"
-              ? normalizeKeepzRedirectUrl(session.redirectUrl)
-              : normalizeCredoRedirectUrl(session.redirectUrl);
-
-          if (resolvedProvider === "credo") {
-            const redirectHost = (() => {
-              try {
-                return new URL(normalizedRedirectUrl).hostname.toLowerCase();
-              } catch {
-                return "";
-              }
-            })();
-            if (!redirectHost.endsWith("credo.ge")) {
-              throw new Error(`Unexpected installment redirect host: ${redirectHost || "unknown"}`);
-            }
-          }
-
-          localStorage.setItem(installmentRedirectUrlKey, normalizedRedirectUrl);
-          localStorage.setItem(installmentProviderKey, resolvedProvider);
-          localStorage.setItem(installmentPaymentTypeKey, resolvedPaymentType);
-          writeCartIdToStorage(cartId, cartKey);
-          setPendingOrderCode(session.orderCode);
-          setPendingRedirectUrl(normalizedRedirectUrl);
-          setPendingProvider(resolvedProvider);
-          setPendingPaymentType(resolvedPaymentType);
-          globalThis.window.location.replace(normalizedRedirectUrl);
-          return;
-        }
-
-        await checkoutCart(cartId);
-        clearCheckoutCartKeys(cartKey, cartId);
-        clearInstallmentState();
-        setStep("confirmation");
-      } catch (error) {
-        const message = error instanceof Error ? error.message : t("checkout.errors.default");
-        setErrorMessage(message);
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [
-      cartKey,
-      clearInstallmentState,
-      credoVariant,
-      hydratePendingInstallmentState,
-      installmentCommission,
-      installmentOrderCodeKey,
-      installmentPaymentTypeKey,
-      installmentProviderKey,
-      installmentRedirectUrlKey,
-      installmentProvider,
-      keepzPersonalNumber,
-      items,
-      onlineInstallmentsAllowed,
-      paymentMethod,
-      shipping,
-      shippingForm,
-      subtotal,
-      t,
-      total,
-    ],
-  );
-
-  const handleContinue = useCallback(
-    async (launchMode?: CredoLaunchMode) => {
-      setErrorMessage(null);
-
-      if (step === "shipping") {
-        await continueFromShipping();
-        return;
-      }
-
-      if (step === "payment") {
-        await submitCheckout(launchMode);
-      }
-    },
-    [continueFromShipping, step, submitCheckout],
-  );
+    if (step === "payment") {
+      await submitCheckout();
+    }
+  }, [continueFromShipping, step, submitCheckout, submitting, addressActionPending]);
 
   return {
     items,
     step,
     setStep,
     paymentMethod,
-    setPaymentMethod,
+    setPaymentMethod: (method: CheckoutPaymentMethod) => {
+      setErrorMessage(null);
+      setPaymentMethod(method);
+    },
     loading,
     submitting,
+    checkingStatus,
+    checkPendingPayment,
     errorMessage,
     setErrorMessage,
     pendingOrderCode,
     pendingRedirectUrl,
     installmentProvider,
-    setInstallmentProvider,
+    setInstallmentProvider: (provider: InstallmentProvider) => {
+      setErrorMessage(null);
+      setInstallmentProvider(provider);
+    },
     credoVariant,
-    setCredoVariant,
+    setCredoVariant: (variant: "zero" | "standard") => {
+      setErrorMessage(null);
+      setCredoVariant(variant);
+    },
     keepzPersonalNumber,
-    setKeepzPersonalNumber,
+    setKeepzPersonalNumber: (value: string) => {
+      setErrorMessage(null);
+      setKeepzPersonalNumber(value);
+    },
     onlineInstallmentsAllowed,
     clearInstallmentState,
     shippingForm,
@@ -953,7 +854,6 @@ export function useCheckoutController({
     applySavedAddress,
     persistCurrentAddress,
     handleContinue,
-    onlineLaunchForm,
     subtotal,
     shipping,
     installmentCommission,

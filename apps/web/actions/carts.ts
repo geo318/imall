@@ -55,6 +55,8 @@ async function backendRequest(
     method: options.method || "GET",
     headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
+    cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
   });
 
   return response;

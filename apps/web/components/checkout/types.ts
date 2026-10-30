@@ -1,7 +1,7 @@
 import type { UserShippingAddress, UserShippingAddressInput } from "@/actions/user-addresses";
 
 export type CheckoutStep = "shipping" | "payment" | "confirmation";
-export type CheckoutPaymentMethod = "card" | "paypal" | "installments";
+export type CheckoutPaymentMethod = "card" | "installments";
 export type InstallmentProvider = "credo" | "keepz" | "crystal";
 
 export type ShippingFormState = {
@@ -26,6 +26,19 @@ export const EMPTY_SHIPPING_FORM: ShippingFormState = {
   phone: "",
 };
 
+export function parseCheckoutShippingDraft(raw: string | null): ShippingFormState | null {
+  try {
+    const draft = JSON.parse(raw ?? "null");
+    if (!draft || Array.isArray(draft)) return null;
+    for (const field of Object.keys(EMPTY_SHIPPING_FORM)) {
+      if (typeof draft[field] !== "string" || draft[field].length > 256) return null;
+    }
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
 export const getAddressDisplayLabel = (address: UserShippingAddress) =>
   address.label?.trim() || `${address.firstName} ${address.lastName}`.trim();
 
@@ -47,12 +60,12 @@ export function mapShippingFormToAddressInput(
   return {
     firstName: shippingForm.firstName.trim(),
     lastName: shippingForm.lastName.trim(),
-    email: shippingForm.email.trim() || undefined,
-    phone: shippingForm.phone.trim() || undefined,
+    email: shippingForm.email.trim() || null,
+    phone: shippingForm.phone.trim() || null,
     addressLine1: shippingForm.address.trim(),
     city: shippingForm.city.trim(),
-    region: shippingForm.state.trim() || undefined,
-    postalCode: shippingForm.zip.trim() || undefined,
+    region: shippingForm.state.trim() || null,
+    postalCode: shippingForm.zip.trim() || null,
     country: "GE",
     isDefault: options.isDefault,
   };

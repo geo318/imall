@@ -10,9 +10,10 @@ const normalizeOptional = <T extends z.ZodString>(schema: T) =>
     .union([schema, z.literal(""), z.null()])
     .optional()
     .transform((value) => {
-      if (typeof value !== "string") return undefined;
+      if (value === undefined) return undefined;
+      if (value === null) return null;
       const trimmed = value.trim();
-      return trimmed.length > 0 ? trimmed : undefined;
+      return trimmed.length > 0 ? trimmed : null;
     });
 
 const createAddressSchema = z.object({
@@ -29,7 +30,7 @@ const createAddressSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
-const updateAddressSchema = z
+export const updateAddressSchema = z
   .object({
     label: normalizeOptional(z.string().max(128)),
     firstName: z.string().trim().min(1).max(128).optional(),

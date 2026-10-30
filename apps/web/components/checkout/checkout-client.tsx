@@ -1,12 +1,11 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "@/i18n/navigation.client";
 import { useTranslations } from "@/i18n/provider";
 import { CheckoutConfirmation } from "./checkout-confirmation";
-import { resolveCheckoutErrorMessage, shouldShowCheckoutErrorToast } from "./checkout-errors";
 import { CheckoutInstallmentBanner } from "./checkout-installment-banner";
 import { CheckoutProgress } from "./checkout-progress";
 import { sanitizeCheckoutCartKey } from "./checkout-routing";
@@ -14,7 +13,6 @@ import { CheckoutSkeleton } from "./checkout-skeleton";
 import { OrderSummary } from "./order-summary";
 import { PaymentStep } from "./payment-step";
 import { ShippingStep } from "./shipping-step";
-import type { CheckoutPaymentMethod, InstallmentProvider } from "./types";
 import { useCheckoutController } from "./use-checkout-controller";
 
 type CheckoutClientProps = {
@@ -22,44 +20,43 @@ type CheckoutClientProps = {
   continueShoppingHref: string;
 };
 
-export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClientProps) {
+export function CheckoutClient(props: CheckoutClientProps) {
+  const searchParams = useSearchParams();
+  const cartKey = sanitizeCheckoutCartKey(searchParams.get("cartKey"), props.cartKey);
+  return (
+    <CheckoutFlow
+      key={`${cartKey}:${searchParams.get("payment")}:${searchParams.get("provider")}:${searchParams.get("credoVariant")}:${searchParams.get("id")}`}
+      {...props}
+      cartKey={cartKey}
+    />
+  );
+}
+
+function useCheckoutErrorToast(message: string | null) {
+  useEffect(() => {
+    if (message) toast.error(message, { id: "checkout-error" });
+    else toast.dismiss("checkout-error");
+    return () => {
+      toast.dismiss("checkout-error");
+    };
+  }, [message]);
+}
+
+function CheckoutFlow({ cartKey, continueShoppingHref }: CheckoutClientProps) {
   const t = useTranslations();
   const searchParams = useSearchParams();
-  const requestedPayment = searchParams.get("payment");
-  const requestedProvider = searchParams.get("provider");
-  const requestedCartKey = searchParams.get("cartKey");
   const installmentLaunchError = searchParams.get("installment_error");
-  const safeCartKey = sanitizeCheckoutCartKey(requestedCartKey, cartKey);
-  const initialPaymentMethod: CheckoutPaymentMethod =
-    requestedPayment === "installments" ? "installments" : "card";
-  const initialInstallmentProvider: InstallmentProvider =
-    requestedProvider === "crystal" ? "crystal" : requestedProvider === "credo" ? "credo" : "keepz";
-  const credoVariant = searchParams.get("id") === "3" ? "standard" : "zero";
+  const credoVariant =
+    searchParams.get("id") === "3" || searchParams.get("credoVariant") === "standard"
+      ? "standard"
+      : "zero";
   const checkout = useCheckoutController({
-    cartKey: safeCartKey,
-    initialPaymentMethod,
-    initialInstallmentProvider,
+    cartKey,
     credoVariant,
+    initialError: installmentLaunchError,
   });
-  const lastErrorToastRef = useRef<string | null>(null);
-  const checkoutErrorMessage = resolveCheckoutErrorMessage(
-    checkout.errorMessage,
-    installmentLaunchError,
-  );
-
-  useEffect(() => {
-    if (!checkoutErrorMessage) {
-      lastErrorToastRef.current = null;
-      return;
-    }
-
-    if (!shouldShowCheckoutErrorToast(checkoutErrorMessage, lastErrorToastRef.current)) {
-      return;
-    }
-
-    lastErrorToastRef.current = checkoutErrorMessage;
-    toast.error(checkoutErrorMessage);
-  }, [checkoutErrorMessage]);
+  const checkoutErrorMessage = checkout.errorMessage;
+  useCheckoutErrorToast(checkoutErrorMessage);
 
   if (checkout.loading) {
     return <CheckoutSkeleton label={t("checkout.loading")} />;
@@ -73,7 +70,7 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
     <div className="bg-slate-50">
       <div className="container py-8 md:py-12">
         <Link
-          href="/cart"
+          href={cartKey === "cart" ? "/cart" : `/cart?cartKey=${encodeURIComponent(cartKey)}`}
           className="inline-flex items-center text-sm text-slate-600 hover:text-slate-900 mb-6"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -84,6 +81,8 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
           pendingOrderCode={checkout.pendingOrderCode}
           pendingRedirectUrl={checkout.pendingRedirectUrl}
           onClear={checkout.clearInstallmentState}
+          onCheckStatus={checkout.checkPendingPayment}
+          checkingStatus={checkout.checkingStatus}
         />
 
         {checkoutErrorMessage ? (
@@ -107,7 +106,7 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
                 addressMessage={checkout.addressMessage}
                 addressActionPending={checkout.addressActionPending}
                 saveAddressDisabled={checkout.saveAddressDisabled}
-                submitting={checkout.submitting}
+                submitting={checkout.submitting || checkout.checkingStatus}
                 onSaveAddress={() => checkout.persistCurrentAddress({ manual: true })}
                 onContinue={checkout.handleContinue}
               />
@@ -126,8 +125,7 @@ export function CheckoutClient({ cartKey, continueShoppingHref }: CheckoutClient
                 onlineInstallmentsAllowed={checkout.onlineInstallmentsAllowed}
                 onBack={() => checkout.setStep("shipping")}
                 onSubmit={checkout.handleContinue}
-                onlineLaunchForm={checkout.onlineLaunchForm}
-                submitting={checkout.submitting}
+                submitting={checkout.submitting || checkout.checkingStatus}
               />
             ) : null}
           </div>

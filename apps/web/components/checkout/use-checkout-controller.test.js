@@ -3,9 +3,11 @@ import { EMPTY_SHIPPING_FORM } from "./types";
 import {
   clearCheckoutCartKeys,
   getCredoLaunchBlockReason,
+  hasRequiredCredoCustomerData,
   isCredoLaunchReady,
   isOnlineInstallmentCartEligible,
   matchingAddressNeedsRefresh,
+  persistCheckoutShippingDraft,
   resolveStoredCartId,
 } from "./use-checkout-controller";
 
@@ -56,6 +58,7 @@ describe("use-checkout-controller credo readiness", () => {
       configurable: true,
       value: {
         localStorage,
+        sessionStorage: createStorage(),
         dispatchEvent() {},
       },
     });
@@ -104,6 +107,27 @@ describe("use-checkout-controller credo readiness", () => {
     expect(isCredoLaunchReady("cart", shippingForm)).toBe(false);
   });
 
+  test("buy-now never falls back to another cart", () => {
+    globalThis.window.localStorage.setItem("cart", "regular-cart");
+    expect(resolveStoredCartId("cart:buy-now")).toBeNull();
+  });
+
+  test("generic checkout ignores buy-now and pending payment metadata", () => {
+    globalThis.window.localStorage.setItem("cart:buy-now", "buy-now-cart");
+    globalThis.window.localStorage.setItem("cart:installmentOrderCode", "bank-order");
+    globalThis.window.localStorage.setItem("cart:shop:installmentRedirectUrl", "https://bank");
+    expect(resolveStoredCartId("cart")).toBeNull();
+    globalThis.window.localStorage.setItem("cart:shop", "shop-cart");
+    expect(resolveStoredCartId("cart")).toBe("shop-cart");
+  });
+
+  test("shipping requires city, a valid email and a complete Georgian phone number", () => {
+    expect(hasRequiredCredoCustomerData(createShippingForm())).toBe(true);
+    for (const invalid of [{ city: " " }, { email: "invalid" }, { phone: "5" }]) {
+      expect(hasRequiredCredoCustomerData(createShippingForm(invalid))).toBe(false);
+    }
+  });
+
   test("missing credo fields no longer block launch (falls back to iMall contact info)", () => {
     globalThis.window.localStorage.setItem("cart", "cart-global-1");
 
@@ -126,23 +150,39 @@ describe("use-checkout-controller credo readiness", () => {
   });
 
   test("installment status polling is removed entirely", async () => {
-    const source = await Bun.file(
-      new URL("./use-checkout-controller.ts", import.meta.url),
-    ).text();
+    const source = await Bun.file(new URL("./use-checkout-controller.ts", import.meta.url)).text();
 
     expect(source).not.toContain("installmentStatusQuery");
-    expect(source).not.toContain("syncInstallmentCheckoutStatus");
+    expect(source).not.toContain("setInterval");
     expect(source).not.toContain("refetchInterval");
   });
 
   test("clearing buy-now cart key does not clear default cart when IDs differ", () => {
     globalThis.window.localStorage.setItem("cart", "cart-default-1");
     globalThis.window.localStorage.setItem("cart:buy-now", "cart-buy-now-1");
+    globalThis.window.sessionStorage.setItem("cart:buy-now:shipping:cart-buy-now-1", "draft");
 
     clearCheckoutCartKeys("cart:buy-now", "cart-buy-now-1");
 
     expect(globalThis.window.localStorage.getItem("cart")).toBe("cart-default-1");
     expect(globalThis.window.localStorage.getItem("cart:buy-now")).toBeNull();
+    expect(
+      globalThis.window.sessionStorage.getItem("cart:buy-now:shipping:cart-buy-now-1"),
+    ).toBeNull();
+  });
+
+  test("shipping drafts stay with the selected cart and tolerate unavailable storage", () => {
+    const form = createShippingForm();
+    globalThis.window.localStorage.setItem("cart:buy-now", "buy-now-cart");
+    persistCheckoutShippingDraft("cart:buy-now", form);
+    expect(
+      JSON.parse(globalThis.window.sessionStorage.getItem("cart:buy-now:shipping:buy-now-cart")),
+    ).toEqual(form);
+    expect(globalThis.window.sessionStorage.getItem("cart:shipping:buy-now-cart")).toBeNull();
+    globalThis.window.sessionStorage.setItem = () => {
+      throw new Error("Storage disabled");
+    };
+    expect(() => persistCheckoutShippingDraft("cart:buy-now", form)).not.toThrow();
   });
 
   test("clearing buy-now cart key clears default cart when IDs match", () => {

@@ -11,7 +11,7 @@ type OrderSummaryProps = {
   shipping: number;
   installmentCommission: number;
   total: number;
-  paymentMethod: CheckoutPaymentMethod;
+  paymentMethod: CheckoutPaymentMethod | null;
 };
 
 export function OrderSummary({
